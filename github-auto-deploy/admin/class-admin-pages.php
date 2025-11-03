@@ -32,6 +32,7 @@ class GitHub_Deploy_Admin_Pages {
         add_action('wp_ajax_github_deploy_manual_deploy', [$this, 'ajax_manual_deploy']);
         add_action('wp_ajax_github_deploy_get_status', [$this, 'ajax_get_status']);
         add_action('wp_ajax_github_deploy_rollback', [$this, 'ajax_rollback']);
+        add_action('wp_ajax_github_deploy_cancel', [$this, 'ajax_cancel_deployment']);
         add_action('wp_ajax_github_deploy_get_commits', [$this, 'ajax_get_commits']);
         add_action('wp_ajax_github_deploy_get_repos', [$this, 'ajax_get_repos']);
         add_action('wp_ajax_github_deploy_get_workflows', [$this, 'ajax_get_workflows']);
@@ -121,8 +122,10 @@ class GitHub_Deploy_Admin_Pages {
             'strings' => [
                 'confirmRollback' => __('Are you sure you want to rollback to this deployment? This will restore the previous theme files.', 'github-auto-deploy'),
                 'confirmDeploy' => __('Are you sure you want to start a deployment?', 'github-auto-deploy'),
+                'confirmCancel' => __('Are you sure you want to cancel this deployment? The GitHub Actions workflow will be stopped.', 'github-auto-deploy'),
                 'deploying' => __('Deploying...', 'github-auto-deploy'),
                 'testing' => __('Testing connection...', 'github-auto-deploy'),
+                'cancelling' => __('Cancelling...', 'github-auto-deploy'),
             ],
         ]);
     }
@@ -303,6 +306,31 @@ class GitHub_Deploy_Admin_Pages {
             wp_send_json_success(['message' => __('Rollback completed successfully!', 'github-auto-deploy')]);
         } else {
             wp_send_json_error(['message' => __('Rollback failed', 'github-auto-deploy')]);
+        }
+    }
+
+    /**
+     * AJAX: Cancel deployment
+     */
+    public function ajax_cancel_deployment(): void {
+        check_ajax_referer('github_deploy_admin', 'nonce');
+
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error(['message' => __('Unauthorized', 'github-auto-deploy')]);
+        }
+
+        $deployment_id = intval($_POST['deployment_id'] ?? 0);
+
+        if (!$deployment_id) {
+            wp_send_json_error(['message' => __('Invalid deployment ID', 'github-auto-deploy')]);
+        }
+
+        $result = $this->deployment_manager->cancel_deployment($deployment_id);
+
+        if ($result) {
+            wp_send_json_success(['message' => __('Deployment cancelled successfully!', 'github-auto-deploy')]);
+        } else {
+            wp_send_json_error(['message' => __('Failed to cancel deployment. It may have already completed or been cancelled.', 'github-auto-deploy')]);
         }
     }
 

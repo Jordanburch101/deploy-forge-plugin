@@ -1,4 +1,5 @@
 <?php
+
 /**
  * GitHub API wrapper class
  * Handles all GitHub API v3 interactions using wp_remote_request()
@@ -8,14 +9,16 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-class GitHub_API {
+class GitHub_API
+{
 
     private GitHub_Deploy_Settings $settings;
     private GitHub_Deploy_Debug_Logger $logger;
     private const API_BASE = 'https://api.github.com';
     private const USER_AGENT = 'WordPress-GitHub-Deploy/1.0';
 
-    public function __construct(GitHub_Deploy_Settings $settings, GitHub_Deploy_Debug_Logger $logger) {
+    public function __construct(GitHub_Deploy_Settings $settings, GitHub_Deploy_Debug_Logger $logger)
+    {
         $this->settings = $settings;
         $this->logger = $logger;
     }
@@ -23,7 +26,8 @@ class GitHub_API {
     /**
      * Test connection to GitHub API and repository
      */
-    public function test_connection(): array {
+    public function test_connection(): array
+    {
         $response = $this->request('GET', "/repos/{$this->settings->get_repo_full_name()}");
 
         if (is_wp_error($response)) {
@@ -50,7 +54,8 @@ class GitHub_API {
     /**
      * Trigger a GitHub Actions workflow
      */
-    public function trigger_workflow(string $workflow_name, ?string $ref = null): array {
+    public function trigger_workflow(string $workflow_name, ?string $ref = null): array
+    {
         if (!$ref) {
             $ref = $this->settings->get('github_branch');
         }
@@ -84,7 +89,8 @@ class GitHub_API {
     /**
      * Get workflow run status
      */
-    public function get_workflow_run_status(int $run_id): array {
+    public function get_workflow_run_status(int $run_id): array
+    {
         $endpoint = "/repos/{$this->settings->get_repo_full_name()}/actions/runs/{$run_id}";
 
         $response = $this->request('GET', $endpoint);
@@ -112,7 +118,8 @@ class GitHub_API {
     /**
      * Get latest workflow runs
      */
-    public function get_latest_workflow_runs(int $limit = 5): array {
+    public function get_latest_workflow_runs(int $limit = 5): array
+    {
         $workflow_name = $this->settings->get('github_workflow_name');
         $endpoint = "/repos/{$this->settings->get_repo_full_name()}/actions/workflows/{$workflow_name}/runs";
 
@@ -151,7 +158,8 @@ class GitHub_API {
     /**
      * Get artifacts for a workflow run
      */
-    public function get_workflow_artifacts(int $run_id): array {
+    public function get_workflow_artifacts(int $run_id): array
+    {
         $endpoint = "/repos/{$this->settings->get_repo_full_name()}/actions/runs/{$run_id}/artifacts";
 
         $response = $this->request('GET', $endpoint);
@@ -179,7 +187,8 @@ class GitHub_API {
     /**
      * Download artifact
      */
-    public function download_artifact(int $artifact_id, string $destination): bool|WP_Error {
+    public function download_artifact(int $artifact_id, string $destination): bool|WP_Error
+    {
         $endpoint = "/repos/{$this->settings->get_repo_full_name()}/actions/artifacts/{$artifact_id}/zip";
 
         $token = $this->settings->get_github_token();
@@ -284,7 +293,8 @@ class GitHub_API {
     /**
      * Get recent commits
      */
-    public function get_recent_commits(int $limit = 10): array {
+    public function get_recent_commits(int $limit = 10): array
+    {
         $branch = $this->settings->get('github_branch');
         $endpoint = "/repos/{$this->settings->get_repo_full_name()}/commits";
 
@@ -326,7 +336,8 @@ class GitHub_API {
     /**
      * Get commit details
      */
-    public function get_commit_details(string $commit_hash): array {
+    public function get_commit_details(string $commit_hash): array
+    {
         $endpoint = "/repos/{$this->settings->get_repo_full_name()}/commits/{$commit_hash}";
 
         $response = $this->request('GET', $endpoint);
@@ -354,7 +365,8 @@ class GitHub_API {
     /**
      * Make a request to GitHub API
      */
-    private function request(string $method, string $endpoint, ?array $data = null): array|WP_Error {
+    private function request(string $method, string $endpoint, ?array $data = null): array|WP_Error
+    {
         $token = $this->settings->get_github_token();
 
         if (empty($token)) {
@@ -425,7 +437,8 @@ class GitHub_API {
     /**
      * Get rate limit information
      */
-    public function get_rate_limit(): array {
+    public function get_rate_limit(): array
+    {
         $response = $this->request('GET', '/rate_limit');
 
         if (is_wp_error($response)) {
@@ -451,7 +464,8 @@ class GitHub_API {
     /**
      * Get user's repositories (for repo selector)
      */
-    public function get_user_repositories(int $per_page = 100): array {
+    public function get_user_repositories(int $per_page = 100): array
+    {
         $cache_key = 'github_deploy_user_repos';
         $cached = get_transient($cache_key);
         if ($cached !== false) {
@@ -475,7 +489,7 @@ class GitHub_API {
             $repos = is_array($response['body']) ? $response['body'] : [];
 
             // Format repos for dropdown
-            $formatted_repos = array_map(function($repo) {
+            $formatted_repos = array_map(function ($repo) {
                 return [
                     'id' => $repo->id ?? 0,
                     'full_name' => $repo->full_name ?? '',
@@ -506,7 +520,8 @@ class GitHub_API {
     /**
      * Get repository workflows (for workflow selector)
      */
-    public function get_repository_workflows(string $owner, string $repo): array {
+    public function get_repository_workflows(string $owner, string $repo): array
+    {
         $cache_key = 'github_deploy_workflows_' . md5($owner . $repo);
         $cached = get_transient($cache_key);
         if ($cached !== false) {
@@ -527,7 +542,7 @@ class GitHub_API {
             $workflows = $response['body']->workflows ?? [];
 
             // Format workflows for dropdown
-            $formatted_workflows = array_map(function($workflow) {
+            $formatted_workflows = array_map(function ($workflow) {
                 $path_parts = explode('/', $workflow->path ?? '');
                 $filename = end($path_parts);
 
@@ -552,6 +567,36 @@ class GitHub_API {
         return [
             'success' => false,
             'message' => $response['body']->message ?? __('Failed to get workflows.', 'github-auto-deploy'),
+        ];
+    }
+
+    /**
+     * Cancel a workflow run
+     */
+    public function cancel_workflow_run(int $run_id): array
+    {
+        $endpoint = "/repos/{$this->settings->get_repo_full_name()}/actions/runs/{$run_id}/cancel";
+
+        $response = $this->request('POST', $endpoint);
+
+        if (is_wp_error($response)) {
+            return [
+                'success' => false,
+                'message' => $response->get_error_message(),
+            ];
+        }
+
+        // GitHub returns 202 Accepted for successful cancellation
+        if ($response['status'] === 202) {
+            return [
+                'success' => true,
+                'message' => __('Workflow run cancellation requested successfully!', 'github-auto-deploy'),
+            ];
+        }
+
+        return [
+            'success' => false,
+            'message' => $response['body']->message ?? __('Failed to cancel workflow run.', 'github-auto-deploy'),
         ];
     }
 }

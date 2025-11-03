@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Deployment manager class
  * Orchestrates the entire deployment workflow
@@ -8,14 +9,16 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-class GitHub_Deployment_Manager {
+class GitHub_Deployment_Manager
+{
 
     private GitHub_Deploy_Settings $settings;
     private GitHub_API $github_api;
     private GitHub_Deploy_Database $database;
     private GitHub_Deploy_Debug_Logger $logger;
 
-    public function __construct(GitHub_Deploy_Settings $settings, GitHub_API $github_api, GitHub_Deploy_Database $database, GitHub_Deploy_Debug_Logger $logger) {
+    public function __construct(GitHub_Deploy_Settings $settings, GitHub_API $github_api, GitHub_Deploy_Database $database, GitHub_Deploy_Debug_Logger $logger)
+    {
         $this->settings = $settings;
         $this->github_api = $github_api;
         $this->database = $database;
@@ -25,7 +28,8 @@ class GitHub_Deployment_Manager {
     /**
      * Start a new deployment
      */
-    public function start_deployment(string $commit_hash, string $trigger_type = 'manual', int $user_id = 0, array $commit_data = []): int|false {
+    public function start_deployment(string $commit_hash, string $trigger_type = 'manual', int $user_id = 0, array $commit_data = []): int|false
+    {
         $this->logger->log_deployment_step(0, 'Start Deployment', 'initiated', [
             'commit_hash' => $commit_hash,
             'trigger_type' => $trigger_type,
@@ -71,7 +75,8 @@ class GitHub_Deployment_Manager {
     /**
      * Trigger GitHub Actions workflow
      */
-    private function trigger_github_build(int $deployment_id, string $commit_hash): bool {
+    private function trigger_github_build(int $deployment_id, string $commit_hash): bool
+    {
         $workflow_name = $this->settings->get('github_workflow_name');
         $branch = $this->settings->get('github_branch');
 
@@ -97,7 +102,8 @@ class GitHub_Deployment_Manager {
     /**
      * Check pending deployments (called by cron)
      */
-    public function check_pending_deployments(): void {
+    public function check_pending_deployments(): void
+    {
         $pending_deployments = $this->database->get_pending_deployments();
 
         foreach ($pending_deployments as $deployment) {
@@ -110,7 +116,8 @@ class GitHub_Deployment_Manager {
     /**
      * Check build status for a deployment
      */
-    private function check_build_status(int $deployment_id): void {
+    private function check_build_status(int $deployment_id): void
+    {
         $deployment = $this->database->get_deployment($deployment_id);
 
         if (!$deployment || !$deployment->workflow_run_id) {
@@ -172,7 +179,8 @@ class GitHub_Deployment_Manager {
     /**
      * Find workflow run for deployment
      */
-    private function find_workflow_run(int $deployment_id): void {
+    private function find_workflow_run(int $deployment_id): void
+    {
         $deployment = $this->database->get_deployment($deployment_id);
         $commit_hash = $deployment->commit_hash;
 
@@ -221,7 +229,8 @@ class GitHub_Deployment_Manager {
     /**
      * Process successful build
      */
-    public function process_successful_build(int $deployment_id): void {
+    public function process_successful_build(int $deployment_id): void
+    {
         $deployment = $this->database->get_deployment($deployment_id);
 
         if (!$deployment) {
@@ -264,7 +273,8 @@ class GitHub_Deployment_Manager {
     /**
      * Download artifact and deploy theme
      */
-    private function download_and_deploy(int $deployment_id, int $artifact_id): void {
+    private function download_and_deploy(int $deployment_id, int $artifact_id): void
+    {
         // Create temp directory
         $temp_dir = $this->get_temp_directory();
         $artifact_zip = $temp_dir . '/artifact-' . $deployment_id . '.zip';
@@ -314,7 +324,8 @@ class GitHub_Deployment_Manager {
     /**
      * Extract artifact and deploy to theme directory
      */
-    private function extract_and_deploy(int $deployment_id, string $artifact_zip): void {
+    private function extract_and_deploy(int $deployment_id, string $artifact_zip): void
+    {
         global $wp_filesystem;
 
         $this->logger->log_deployment_step($deployment_id, 'Extract and Deploy', 'started');
@@ -404,7 +415,8 @@ class GitHub_Deployment_Manager {
     /**
      * Backup current theme
      */
-    public function backup_current_theme(int $deployment_id): string|false {
+    public function backup_current_theme(int $deployment_id): string|false
+    {
         global $wp_filesystem;
 
         if (!WP_Filesystem()) {
@@ -456,7 +468,8 @@ class GitHub_Deployment_Manager {
     /**
      * Add directory to zip recursively
      */
-    private function add_directory_to_zip(ZipArchive $zip, string $dir, string $zip_path): void {
+    private function add_directory_to_zip(ZipArchive $zip, string $dir, string $zip_path): void
+    {
         $files = new RecursiveIteratorIterator(
             new RecursiveDirectoryIterator($dir),
             RecursiveIteratorIterator::LEAVES_ONLY
@@ -474,7 +487,8 @@ class GitHub_Deployment_Manager {
     /**
      * Rollback to previous deployment
      */
-    public function rollback_deployment(int $deployment_id): bool {
+    public function rollback_deployment(int $deployment_id): bool
+    {
         $deployment = $this->database->get_deployment($deployment_id);
 
         if (!$deployment || empty($deployment->backup_path)) {
@@ -518,9 +532,62 @@ class GitHub_Deployment_Manager {
     }
 
     /**
+     * Cancel a deployment
+     */
+    public function cancel_deployment(int $deployment_id): bool
+    {
+        $deployment = $this->database->get_deployment($deployment_id);
+
+        if (!$deployment) {
+            $this->logger->error('Deployment', "Deployment #$deployment_id not found");
+            return false;
+        }
+
+        // Can only cancel deployments in pending or building status
+        if (!in_array($deployment->status, ['pending', 'building'])) {
+            $this->logger->error('Deployment', "Deployment #$deployment_id cannot be cancelled (status: {$deployment->status})");
+            return false;
+        }
+
+        $this->logger->log_deployment_step($deployment_id, 'Cancel Deployment', 'initiated');
+
+        // If workflow run ID exists, cancel it on GitHub
+        if (!empty($deployment->workflow_run_id)) {
+            $this->logger->log_deployment_step($deployment_id, 'Cancel GitHub Workflow', 'started', [
+                'workflow_run_id' => $deployment->workflow_run_id,
+            ]);
+
+            $cancel_result = $this->github_api->cancel_workflow_run($deployment->workflow_run_id);
+
+            if (!$cancel_result['success']) {
+                $this->logger->error('Deployment', "Deployment #$deployment_id failed to cancel workflow run", $cancel_result);
+                $this->log_deployment($deployment_id, 'Failed to cancel GitHub workflow: ' . $cancel_result['message']);
+                // Continue anyway to update database status
+            } else {
+                $this->logger->log_deployment_step($deployment_id, 'GitHub Workflow Cancelled', 'success');
+                $this->log_deployment($deployment_id, 'GitHub workflow run cancellation requested.');
+            }
+        }
+
+        // Update deployment status to cancelled
+        $this->database->update_deployment($deployment_id, [
+            'status' => 'cancelled',
+            'error_message' => __('Deployment cancelled by user.', 'github-auto-deploy'),
+        ]);
+
+        $this->logger->log_deployment_step($deployment_id, 'Deployment Cancelled', 'success');
+        $this->log_deployment($deployment_id, 'Deployment cancelled by user.');
+
+        do_action('github_deploy_cancelled', $deployment_id);
+
+        return true;
+    }
+
+    /**
      * Get temp directory
      */
-    private function get_temp_directory(): string {
+    private function get_temp_directory(): string
+    {
         $temp_dir = sys_get_temp_dir() . '/github-deploy';
 
         if (!file_exists($temp_dir)) {
@@ -533,7 +600,8 @@ class GitHub_Deployment_Manager {
     /**
      * Log deployment message
      */
-    private function log_deployment(int $deployment_id, string $message): void {
+    private function log_deployment(int $deployment_id, string $message): void
+    {
         $deployment = $this->database->get_deployment($deployment_id);
 
         if (!$deployment) {
