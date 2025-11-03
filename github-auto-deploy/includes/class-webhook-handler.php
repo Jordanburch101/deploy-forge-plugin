@@ -29,22 +29,120 @@ class GitHub_Webhook_Handler {
             'callback' => [$this, 'handle_webhook'],
             'permission_callback' => '__return_true', // We validate via signature
         ]);
+        
+        // Debug endpoint to test webhook reception
+        register_rest_route('github-deploy/v1', '/webhook-test', [
+            'methods' => ['GET', 'POST'],
+            'callback' => [$this, 'test_webhook_reception'],
+            'permission_callback' => '__return_true',
+        ]);
+    }
+    
+    /**
+     * Test webhook reception (debug endpoint)
+     */
+    public function test_webhook_reception(WP_REST_Request $request): WP_REST_Response {
+        $methods = [
+            'get_body' => $request->get_body(),
+            'get_json_params' => $request->get_json_params(),
+            'get_body_params' => $request->get_body_params(),
+            'get_params' => $request->get_params(),
+        ];
+        
+        $diagnostics = [
+            'request_method' => $request->get_method(),
+            'content_type' => $request->get_header('content-type'),
+            'headers' => $request->get_headers(),
+            'php_input' => file_get_contents('php://input'),
+        ];
+        
+        foreach ($methods as $method => $data) {
+            $diagnostics[$method] = [
+                'is_empty' => empty($data),
+                'length' => is_string($data) ? strlen($data) : (is_array($data) ? count($data) : 0),
+                'preview' => is_string($data) ? substr($data, 0, 200) : $data,
+            ];
+        }
+        
+        return new WP_REST_Response([
+            'success' => true,
+            'message' => 'Debug info',
+            'diagnostics' => $diagnostics,
+        ], 200);
     }
 
     /**
      * Handle incoming webhook
      */
     public function handle_webhook(WP_REST_Request $request): WP_REST_Response {
-        // Get request data
-        $payload = $request->get_body();
         $signature = $request->get_header('x-hub-signature-256');
         $event = $request->get_header('x-github-event');
+        $content_type = $request->get_header('content-type');
+        
+        // Get request data - try multiple methods to get the payload
+        // Try php://input first (most reliable with nginx)
+        $raw_payload = file_get_contents('php://input');
+        
+        // If empty, try WordPress methods
+        if (empty($raw_payload)) {
+            $raw_payload = $request->get_body();
+        }
+        
+        // GitHub can send webhooks in two formats:
+        // 1. application/json - raw JSON in body
+        // 2. application/x-www-form-urlencoded - JSON in "payload" form field
+        
+        $payload = '';
+        
+        if (strpos($content_type, 'application/x-www-form-urlencoded') !== false) {
+            // Form-encoded: Extract and decode the "payload" field
+            parse_str($raw_payload, $form_data);
+            if (isset($form_data['payload'])) {
+                $payload = $form_data['payload'];
+            } else {
+                $payload = $raw_payload;
+            }
+        } else {
+            // JSON format - use as-is
+            $payload = $raw_payload;
+        }
+        
+        // Fallback: If still empty, try WordPress parsed methods
+        if (empty($payload)) {
+            $data = $request->get_json_params();
+            if (!empty($data)) {
+                $payload = wp_json_encode($data);
+            }
+        }
+        
+        if (empty($payload)) {
+            $data = $request->get_body_params();
+            if (!empty($data)) {
+                $payload = wp_json_encode($data);
+            }
+        }
+
+        // Log webhook receipt with payload info
+        $this->logger->log('Webhook', 'Webhook received', [
+            'event' => $event,
+            'payload_length' => strlen($payload),
+            'has_signature' => !empty($signature),
+            'content_type' => $request->get_header('content-type'),
+        ]);
 
         // Log webhook receipt
         $this->log_webhook_receipt($event);
 
-        // Verify webhook signature
-        if (!$this->verify_signature($payload, $signature)) {
+        // Verify webhook signature (skip if payload is empty - likely a test)
+        // For form-encoded webhooks, GitHub signs the raw form data, not the extracted JSON
+        $signature_payload = (strpos($content_type, 'application/x-www-form-urlencoded') !== false) ? $raw_payload : $payload;
+        
+        if (!empty($payload) && !$this->verify_signature($signature_payload, $signature)) {
+            $this->logger->error('Webhook', 'Invalid webhook signature', [
+                'content_type' => $content_type,
+                'payload_length' => strlen($payload),
+                'signature_payload_length' => strlen($signature_payload),
+            ]);
             return new WP_REST_Response([
                 'success' => false,
                 'message' => __('Invalid webhook signature.', 'github-auto-deploy'),
@@ -54,12 +152,33 @@ class GitHub_Webhook_Handler {
         // Parse payload
         $data = json_decode($payload, true);
 
-        if (json_last_error() !== JSON_ERROR_NONE) {
+        if (json_last_error() !== JSON_ERROR_NONE || $data === null) {
+            $this->logger->error('Webhook', 'JSON decode error', [
+                'error' => json_last_error_msg(),
+                'payload_length' => strlen($payload),
+                'payload_preview' => substr($payload, 0, 500),
+                'payload_is_empty' => empty($payload),
+            ]);
+            
+            // If payload is truly empty, return a more helpful error
+            if (empty($payload)) {
+                return new WP_REST_Response([
+                    'success' => false,
+                    'message' => __('Empty payload received. Check webhook Content-Type header.', 'github-auto-deploy'),
+                ], 400);
+            }
+            
             return new WP_REST_Response([
                 'success' => false,
-                'message' => __('Invalid JSON payload.', 'github-auto-deploy'),
+                'message' => sprintf(__('Invalid JSON payload: %s', 'github-auto-deploy'), json_last_error_msg()),
             ], 400);
         }
+
+        $this->logger->log('Webhook', 'Payload parsed successfully', [
+            'event' => $event,
+            'has_action' => isset($data['action']),
+            'data_keys' => array_keys($data),
+        ]);
 
         // Handle different event types
         switch ($event) {
@@ -162,6 +281,7 @@ class GitHub_Webhook_Handler {
 
     /**
      * Handle workflow_run event
+     * Called when a GitHub Actions workflow completes
      */
     private function handle_workflow_run_event(array $data): WP_REST_Response {
         $action = $data['action'] ?? '';
@@ -169,13 +289,32 @@ class GitHub_Webhook_Handler {
         $run_id = $workflow_run['id'] ?? 0;
         $status = $workflow_run['status'] ?? '';
         $conclusion = $workflow_run['conclusion'] ?? '';
+        $head_sha = $workflow_run['head_sha'] ?? '';
+        $html_url = $workflow_run['html_url'] ?? '';
 
-        // We're interested in completed workflows
+        $this->logger->log('Webhook', 'Workflow run event received', [
+            'action' => $action,
+            'run_id' => $run_id,
+            'status' => $status,
+            'conclusion' => $conclusion,
+            'head_sha' => $head_sha,
+        ]);
+
+        // We're only interested in completed workflows
         if ($action !== 'completed') {
+            $this->logger->log('Webhook', "Ignoring workflow_run action: {$action}");
             return new WP_REST_Response([
                 'success' => true,
-                'message' => __('Workflow not completed yet.', 'github-auto-deploy'),
+                'message' => sprintf(__('Workflow run action "%s" ignored (waiting for completion).', 'github-auto-deploy'), $action),
             ], 200);
+        }
+
+        if (empty($run_id)) {
+            $this->logger->error('Webhook', 'No workflow run ID in payload');
+            return new WP_REST_Response([
+                'success' => false,
+                'message' => __('No workflow run ID found in payload.', 'github-auto-deploy'),
+            ], 400);
         }
 
         // Find deployment by workflow run ID
@@ -184,33 +323,75 @@ class GitHub_Webhook_Handler {
 
         global $wpdb;
         $table_name = $wpdb->prefix . 'github_deployments';
+        
+        // First try to find by workflow_run_id
         $deployment = $wpdb->get_row(
             $wpdb->prepare("SELECT * FROM {$table_name} WHERE workflow_run_id = %d ORDER BY id DESC LIMIT 1", $run_id)
         );
 
+        // If not found by run_id, try to find by commit hash (for deployments where run_id wasn't set yet)
+        if (!$deployment && !empty($head_sha)) {
+            $this->logger->log('Webhook', "Workflow run ID not found, trying commit hash: {$head_sha}");
+            $deployment = $wpdb->get_row(
+                $wpdb->prepare(
+                    "SELECT * FROM {$table_name} WHERE commit_hash = %s AND status IN ('pending', 'building') ORDER BY id DESC LIMIT 1",
+                    $head_sha
+                )
+            );
+            
+            // Update the deployment with the workflow run ID
+            if ($deployment) {
+                $database->update_deployment($deployment->id, [
+                    'workflow_run_id' => $run_id,
+                    'build_url' => $html_url,
+                ]);
+                $this->logger->log('Webhook', "Updated deployment #{$deployment->id} with workflow_run_id: {$run_id}");
+            }
+        }
+
         if (!$deployment) {
+            $this->logger->error('Webhook', 'No deployment found for workflow run', [
+                'run_id' => $run_id,
+                'head_sha' => $head_sha,
+            ]);
             return new WP_REST_Response([
                 'success' => false,
                 'message' => __('No deployment found for this workflow run.', 'github-auto-deploy'),
             ], 404);
         }
 
+        $this->logger->log('Webhook', "Found deployment #{$deployment->id} for workflow run #{$run_id}");
+
         // Update deployment status based on workflow conclusion
         if ($conclusion === 'success') {
+            $this->logger->log('Webhook', "Workflow completed successfully, processing build for deployment #{$deployment->id}");
+            
             // Workflow succeeded, continue with deployment
             $deployment_manager->process_successful_build($deployment->id);
+            
+            return new WP_REST_Response([
+                'success' => true,
+                'message' => __('Workflow completed successfully. Starting deployment...', 'github-auto-deploy'),
+                'deployment_id' => $deployment->id,
+            ], 200);
         } else {
-            // Workflow failed
+            // Workflow failed or was cancelled
+            $this->logger->error('Webhook', "Workflow failed for deployment #{$deployment->id}", [
+                'conclusion' => $conclusion,
+                'status' => $status,
+            ]);
+            
             $database->update_deployment($deployment->id, [
                 'status' => 'failed',
-                'error_message' => sprintf(__('Workflow failed with conclusion: %s', 'github-auto-deploy'), $conclusion),
+                'error_message' => sprintf(__('GitHub Actions workflow failed with conclusion: %s', 'github-auto-deploy'), $conclusion),
             ]);
+            
+            return new WP_REST_Response([
+                'success' => true,
+                'message' => sprintf(__('Workflow failed with conclusion: %s', 'github-auto-deploy'), $conclusion),
+                'deployment_id' => $deployment->id,
+            ], 200);
         }
-
-        return new WP_REST_Response([
-            'success' => true,
-            'message' => __('Workflow run processed.', 'github-auto-deploy'),
-        ], 200);
     }
 
     /**

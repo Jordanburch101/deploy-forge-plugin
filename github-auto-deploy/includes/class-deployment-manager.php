@@ -330,6 +330,19 @@ class GitHub_Deployment_Manager
 
         $this->logger->log_deployment_step($deployment_id, 'Extract and Deploy', 'started');
 
+        // Check if artifact file exists and is readable
+        if (!file_exists($artifact_zip)) {
+            $this->logger->error('Deployment', "Deployment #$deployment_id artifact file not found: {$artifact_zip}");
+            $this->database->update_deployment($deployment_id, [
+                'status' => 'failed',
+                'error_message' => __('Artifact file not found.', 'github-auto-deploy'),
+            ]);
+            return;
+        }
+
+        $this->logger->log_deployment_step($deployment_id, 'WP_Filesystem Init', 'starting');
+
+        // Initialize filesystem with direct method to avoid FTP prompts
         if (!WP_Filesystem()) {
             $this->logger->error('Deployment', "Deployment #$deployment_id WP_Filesystem initialization failed");
             $this->database->update_deployment($deployment_id, [
@@ -339,14 +352,21 @@ class GitHub_Deployment_Manager
             return;
         }
 
+        $this->logger->log_deployment_step($deployment_id, 'WP_Filesystem Init', 'success');
         $this->log_deployment($deployment_id, 'Extracting artifact...');
 
         // Extract to temp directory
         $temp_extract_dir = $this->get_temp_directory() . '/extract-' . $deployment_id;
+
         $this->logger->log_deployment_step($deployment_id, 'Unzip Artifact', 'started', [
             'source' => $artifact_zip,
             'destination' => $temp_extract_dir,
+            'file_size' => filesize($artifact_zip),
+            'file_exists' => file_exists($artifact_zip),
         ]);
+
+        // Increase timeout for large files
+        @set_time_limit(300); // 5 minutes
 
         $unzip_result = unzip_file($artifact_zip, $temp_extract_dir);
 
@@ -361,6 +381,48 @@ class GitHub_Deployment_Manager
         }
 
         $this->logger->log_deployment_step($deployment_id, 'Artifact Extracted', 'success');
+
+        // GitHub Actions artifacts are double-zipped - check if we need to unzip again
+        $extracted_files = scandir($temp_extract_dir);
+        $extracted_files = array_diff($extracted_files, ['.', '..']);
+
+        $this->logger->log_deployment_step($deployment_id, 'Check Extracted Files', 'checking', [
+            'file_count' => count($extracted_files),
+            'files' => array_values($extracted_files),
+        ]);
+
+        // If there's only one file and it's a zip, extract it
+        if (count($extracted_files) === 1) {
+            $single_file = reset($extracted_files);
+            $single_file_path = $temp_extract_dir . '/' . $single_file;
+
+            if (pathinfo($single_file, PATHINFO_EXTENSION) === 'zip') {
+                $this->logger->log_deployment_step($deployment_id, 'Double-Zipped Detected', 'extracting_inner_zip', [
+                    'inner_zip' => $single_file,
+                ]);
+
+                $this->log_deployment($deployment_id, 'Artifact is double-zipped, extracting inner archive...');
+
+                $final_extract_dir = $this->get_temp_directory() . '/final-' . $deployment_id;
+                $inner_unzip_result = unzip_file($single_file_path, $final_extract_dir);
+
+                if (is_wp_error($inner_unzip_result)) {
+                    $this->logger->error('Deployment', "Deployment #$deployment_id inner unzip failed", $inner_unzip_result);
+                    $this->database->update_deployment($deployment_id, [
+                        'status' => 'failed',
+                        'error_message' => $inner_unzip_result->get_error_message(),
+                    ]);
+                    $this->log_deployment($deployment_id, 'Inner extraction failed: ' . $inner_unzip_result->get_error_message());
+                    return;
+                }
+
+                // Clean up outer extraction and use inner as source
+                $wp_filesystem->delete($temp_extract_dir, true);
+                $temp_extract_dir = $final_extract_dir;
+
+                $this->logger->log_deployment_step($deployment_id, 'Inner Archive Extracted', 'success');
+            }
+        }
 
         // Get theme path
         $theme_path = $this->settings->get_theme_path();
@@ -378,7 +440,32 @@ class GitHub_Deployment_Manager
 
         $this->log_deployment($deployment_id, 'Deploying files to theme directory...');
 
+        // Count files to be copied for logging
+        $file_count = 0;
+        $dir_count = 0;
+        if (is_dir($temp_extract_dir)) {
+            $iterator = new RecursiveIteratorIterator(
+                new RecursiveDirectoryIterator($temp_extract_dir, RecursiveDirectoryIterator::SKIP_DOTS),
+                RecursiveIteratorIterator::SELF_FIRST
+            );
+            foreach ($iterator as $item) {
+                if ($item->isFile()) {
+                    $file_count++;
+                } else {
+                    $dir_count++;
+                }
+            }
+        }
+
+        $this->logger->log_deployment_step($deployment_id, 'Starting File Copy', 'in_progress', [
+            'file_count' => $file_count,
+            'directory_count' => $dir_count,
+        ]);
+
         // Copy files from extracted directory to theme directory
+        // Increase timeout for large theme deployments
+        @set_time_limit(300);
+
         $copy_result = copy_dir($temp_extract_dir, $theme_path);
 
         if (is_wp_error($copy_result)) {
@@ -391,7 +478,10 @@ class GitHub_Deployment_Manager
             return;
         }
 
-        $this->logger->log_deployment_step($deployment_id, 'Files Copied', 'success');
+        $this->logger->log_deployment_step($deployment_id, 'Files Copied', 'success', [
+            'files_copied' => $file_count,
+            'directories_copied' => $dir_count,
+        ]);
 
         // Clean up temp files
         $wp_filesystem->delete($artifact_zip);
