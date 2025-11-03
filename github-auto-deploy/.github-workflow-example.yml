@@ -1,0 +1,171 @@
+# Example GitHub Actions Workflow for Theme Builds
+# Place this file in your theme repository at: .github/workflows/build-theme.yml
+
+name: Build and Deploy Theme
+
+on:
+  # Trigger on workflow dispatch (manual trigger from plugin)
+  workflow_dispatch:
+
+  # Trigger on push to main branch (for automatic deployments)
+  push:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Checkout repository
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      # Setup Node.js (adjust version as needed)
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      # Install dependencies
+      - name: Install dependencies
+        run: npm ci
+
+      # Run build process (adjust command based on your theme)
+      - name: Build theme
+        run: npm run build
+
+      # Optional: Run tests
+      - name: Run tests
+        run: npm test
+        continue-on-error: true
+
+      # Optional: Lint code
+      - name: Lint code
+        run: npm run lint
+        continue-on-error: true
+
+      # Upload build artifact
+      # This is what the WordPress plugin will download
+      - name: Upload theme artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: theme-build
+          path: |
+            **/*
+            !node_modules/**
+            !.git/**
+            !.github/**
+            !tests/**
+            !*.md
+            !package*.json
+          retention-days: 30
+
+# Alternative workflow for PHP-based themes with Composer
+
+# name: Build PHP Theme
+#
+# on:
+#   workflow_dispatch:
+#   push:
+#     branches: [ main ]
+#
+# jobs:
+#   build:
+#     runs-on: ubuntu-latest
+#
+#     steps:
+#       - uses: actions/checkout@v3
+#
+#       # Setup PHP
+#       - name: Setup PHP
+#         uses: shivammathur/setup-php@v2
+#         with:
+#           php-version: '8.1'
+#
+#       # Install Composer dependencies
+#       - name: Install Composer dependencies
+#         run: composer install --no-dev --optimize-autoloader
+#
+#       # Optional: Build assets if needed
+#       - name: Setup Node.js
+#         uses: actions/setup-node@v3
+#         with:
+#           node-version: '18'
+#
+#       - name: Install npm dependencies
+#         run: npm ci
+#
+#       - name: Build assets
+#         run: npm run build
+#
+#       # Upload artifact
+#       - name: Upload theme artifact
+#         uses: actions/upload-artifact@v3
+#         with:
+#           name: theme-build
+#           path: |
+#             **/*
+#             !node_modules/**
+#             !.git/**
+#             !.github/**
+#             !vendor/**
+#             !tests/**
+
+# Advanced workflow with caching and optimizations
+
+# name: Build Theme (Advanced)
+#
+# on:
+#   workflow_dispatch:
+#   push:
+#     branches: [ main ]
+#
+# jobs:
+#   build:
+#     runs-on: ubuntu-latest
+#
+#     steps:
+#       - uses: actions/checkout@v3
+#
+#       # Cache node_modules for faster builds
+#       - name: Cache node modules
+#         uses: actions/cache@v3
+#         with:
+#           path: node_modules
+#           key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+#
+#       - name: Setup Node.js
+#         uses: actions/setup-node@v3
+#         with:
+#           node-version: '18'
+#
+#       - name: Install dependencies
+#         run: npm ci
+#
+#       # Build with production optimizations
+#       - name: Build for production
+#         run: npm run build:production
+#         env:
+#           NODE_ENV: production
+#
+#       # Optimize images
+#       - name: Optimize images
+#         run: npm run optimize-images
+#         continue-on-error: true
+#
+#       # Generate sourcemaps
+#       - name: Generate sourcemaps
+#         run: npm run sourcemaps
+#         continue-on-error: true
+#
+#       # Create zip archive
+#       - name: Create zip archive
+#         run: |
+#           zip -r theme.zip . -x "node_modules/*" ".git/*" ".github/*" "tests/*"
+#
+#       - name: Upload theme artifact
+#         uses: actions/upload-artifact@v3
+#         with:
+#           name: theme-build
+#           path: theme.zip
