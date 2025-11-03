@@ -28,7 +28,7 @@ class GitHub_Deployment_Manager
     /**
      * Start a new deployment
      */
-    public function start_deployment(string $commit_hash, string $trigger_type = 'manual', int $user_id = 0, array $commit_data = []): int|false
+    public function start_deployment(string $commit_hash, string $trigger_type = 'manual', int $user_id = 0, array $commit_data = []): int|false|array
     {
         $this->logger->log_deployment_step(0, 'Start Deployment', 'initiated', [
             'commit_hash' => $commit_hash,
@@ -36,6 +36,42 @@ class GitHub_Deployment_Manager
             'user_id' => $user_id,
             'commit_data' => $commit_data,
         ]);
+
+        // Check if there's a deployment currently building
+        $building_deployment = $this->database->get_building_deployment();
+
+        if ($building_deployment) {
+            $this->logger->log('Deployment', 'Found existing building deployment', [
+                'existing_deployment_id' => $building_deployment->id,
+                'existing_status' => $building_deployment->status,
+                'trigger_type' => $trigger_type,
+            ]);
+
+            // If manual deploy, block and return error with deployment info
+            if ($trigger_type === 'manual') {
+                return [
+                    'error' => 'deployment_in_progress',
+                    'message' => __('A deployment is already in progress. Please cancel it before starting a new one.', 'github-auto-deploy'),
+                    'building_deployment' => $building_deployment,
+                ];
+            }
+
+            // If webhook/auto deploy, cancel existing deployment first
+            if (in_array($trigger_type, ['webhook', 'auto'])) {
+                $this->logger->log('Deployment', 'Auto-cancelling existing deployment', [
+                    'existing_deployment_id' => $building_deployment->id,
+                ]);
+
+                $cancel_result = $this->cancel_deployment($building_deployment->id);
+
+                if (!$cancel_result) {
+                    $this->logger->error('Deployment', 'Failed to cancel existing deployment');
+                    return false;
+                }
+
+                $this->logger->log('Deployment', 'Successfully cancelled existing deployment');
+            }
+        }
 
         // Create deployment record
         $deployment_id = $this->database->insert_deployment([
@@ -340,23 +376,25 @@ class GitHub_Deployment_Manager
             return;
         }
 
-        $this->logger->log_deployment_step($deployment_id, 'WP_Filesystem Init', 'starting');
-
-        // Initialize filesystem with direct method to avoid FTP prompts
-        if (!WP_Filesystem()) {
-            $this->logger->error('Deployment', "Deployment #$deployment_id WP_Filesystem initialization failed");
-            $this->database->update_deployment($deployment_id, [
-                'status' => 'failed',
-                'error_message' => __('Failed to initialize WP_Filesystem.', 'github-auto-deploy'),
-            ]);
-            return;
-        }
-
-        $this->logger->log_deployment_step($deployment_id, 'WP_Filesystem Init', 'success');
+        // Skip WP_Filesystem - it hangs in background processes
+        // We'll use native PHP functions instead
+        $this->logger->log_deployment_step($deployment_id, 'WP_Filesystem', 'skipped - using native PHP functions');
         $this->log_deployment($deployment_id, 'Extracting artifact...');
 
         // Extract to temp directory
         $temp_extract_dir = $this->get_temp_directory() . '/extract-' . $deployment_id;
+
+        // Create extraction directory
+        if (!is_dir($temp_extract_dir)) {
+            if (!mkdir($temp_extract_dir, 0755, true)) {
+                $this->logger->error('Deployment', "Failed to create extraction directory: {$temp_extract_dir}");
+                $this->database->update_deployment($deployment_id, [
+                    'status' => 'failed',
+                    'error_message' => __('Failed to create extraction directory.', 'github-auto-deploy'),
+                ]);
+                return;
+            }
+        }
 
         $this->logger->log_deployment_step($deployment_id, 'Unzip Artifact', 'started', [
             'source' => $artifact_zip,
@@ -368,7 +406,43 @@ class GitHub_Deployment_Manager
         // Increase timeout for large files
         @set_time_limit(300); // 5 minutes
 
-        $unzip_result = unzip_file($artifact_zip, $temp_extract_dir);
+        // Use native ZipArchive instead of WP_Filesystem-dependent unzip_file
+        if (!class_exists('ZipArchive')) {
+            $this->logger->error('Deployment', 'ZipArchive class not available');
+            $this->database->update_deployment($deployment_id, [
+                'status' => 'failed',
+                'error_message' => __('ZipArchive extension not available on server.', 'github-auto-deploy'),
+            ]);
+            return;
+        }
+
+        $zip = new ZipArchive();
+        $zip_open_result = $zip->open($artifact_zip);
+
+        if ($zip_open_result !== true) {
+            $this->logger->error('Deployment', "Failed to open ZIP file", [
+                'error_code' => $zip_open_result,
+            ]);
+            $this->database->update_deployment($deployment_id, [
+                'status' => 'failed',
+                'error_message' => sprintf(__('Failed to open ZIP file (error code: %d).', 'github-auto-deploy'), $zip_open_result),
+            ]);
+            return;
+        }
+
+        $extract_result = $zip->extractTo($temp_extract_dir);
+        $zip->close();
+
+        if (!$extract_result) {
+            $this->logger->error('Deployment', "Failed to extract ZIP file");
+            $this->database->update_deployment($deployment_id, [
+                'status' => 'failed',
+                'error_message' => __('Failed to extract ZIP file.', 'github-auto-deploy'),
+            ]);
+            return;
+        }
+
+        $unzip_result = true; // Set for compatibility with rest of code
 
         if (is_wp_error($unzip_result)) {
             $this->logger->error('Deployment', "Deployment #$deployment_id unzip failed", $unzip_result);
@@ -404,20 +478,70 @@ class GitHub_Deployment_Manager
                 $this->log_deployment($deployment_id, 'Artifact is double-zipped, extracting inner archive...');
 
                 $final_extract_dir = $this->get_temp_directory() . '/final-' . $deployment_id;
-                $inner_unzip_result = unzip_file($single_file_path, $final_extract_dir);
 
-                if (is_wp_error($inner_unzip_result)) {
-                    $this->logger->error('Deployment', "Deployment #$deployment_id inner unzip failed", $inner_unzip_result);
+                // Create final extraction directory
+                if (!is_dir($final_extract_dir)) {
+                    if (!mkdir($final_extract_dir, 0755, true)) {
+                        $this->logger->error('Deployment', "Failed to create final extraction directory");
+                        $this->database->update_deployment($deployment_id, [
+                            'status' => 'failed',
+                            'error_message' => __('Failed to create extraction directory.', 'github-auto-deploy'),
+                        ]);
+                        return;
+                    }
+                }
+
+                // Extract inner zip using native ZipArchive
+                $this->logger->log_deployment_step($deployment_id, 'Opening Inner ZIP', 'starting', [
+                    'inner_zip_path' => $single_file_path,
+                    'inner_zip_size' => file_exists($single_file_path) ? filesize($single_file_path) : 0,
+                ]);
+
+                $inner_zip = new ZipArchive();
+                $inner_zip_open = $inner_zip->open($single_file_path);
+
+                $this->logger->log_deployment_step($deployment_id, 'Inner ZIP Open Result', 'checked', [
+                    'result' => $inner_zip_open,
+                    'success' => $inner_zip_open === true,
+                ]);
+
+                if ($inner_zip_open !== true) {
+                    $this->logger->error('Deployment', "Failed to open inner ZIP file", [
+                        'error_code' => $inner_zip_open,
+                        'file_path' => $single_file_path,
+                    ]);
                     $this->database->update_deployment($deployment_id, [
                         'status' => 'failed',
-                        'error_message' => $inner_unzip_result->get_error_message(),
+                        'error_message' => sprintf(__('Failed to open inner ZIP file (error code: %d).', 'github-auto-deploy'), $inner_zip_open),
                     ]);
-                    $this->log_deployment($deployment_id, 'Inner extraction failed: ' . $inner_unzip_result->get_error_message());
                     return;
                 }
 
+                $this->logger->log_deployment_step($deployment_id, 'Extracting Inner ZIP', 'in_progress', [
+                    'destination' => $final_extract_dir,
+                ]);
+
+                $inner_extract_result = $inner_zip->extractTo($final_extract_dir);
+
+                $this->logger->log_deployment_step($deployment_id, 'Inner ZIP Extract Complete', 'checked', [
+                    'result' => $inner_extract_result,
+                ]);
+
+                $inner_zip->close();
+
+                if (!$inner_extract_result) {
+                    $this->logger->error('Deployment', "Failed to extract inner ZIP file");
+                    $this->database->update_deployment($deployment_id, [
+                        'status' => 'failed',
+                        'error_message' => __('Failed to extract inner ZIP file.', 'github-auto-deploy'),
+                    ]);
+                    return;
+                }
+
+                $this->logger->log_deployment_step($deployment_id, 'Cleaning Up Outer Extract', 'starting');
+
                 // Clean up outer extraction and use inner as source
-                $wp_filesystem->delete($temp_extract_dir, true);
+                $this->recursive_delete($temp_extract_dir);
                 $temp_extract_dir = $final_extract_dir;
 
                 $this->logger->log_deployment_step($deployment_id, 'Inner Archive Extracted', 'success');
@@ -433,8 +557,15 @@ class GitHub_Deployment_Manager
         ]);
 
         // Ensure theme directory exists
-        if (!$wp_filesystem->is_dir($theme_path)) {
-            $wp_filesystem->mkdir($theme_path, FS_CHMOD_DIR);
+        if (!is_dir($theme_path)) {
+            if (!mkdir($theme_path, 0755, true)) {
+                $this->logger->error('Deployment', "Failed to create theme directory: {$theme_path}");
+                $this->database->update_deployment($deployment_id, [
+                    'status' => 'failed',
+                    'error_message' => __('Failed to create theme directory.', 'github-auto-deploy'),
+                ]);
+                return;
+            }
             $this->logger->log('Deployment', "Created theme directory: $theme_path");
         }
 
@@ -462,19 +593,19 @@ class GitHub_Deployment_Manager
             'directory_count' => $dir_count,
         ]);
 
-        // Copy files from extracted directory to theme directory
+        // Copy files from extracted directory to theme directory using native PHP
         // Increase timeout for large theme deployments
         @set_time_limit(300);
 
-        $copy_result = copy_dir($temp_extract_dir, $theme_path);
+        $copy_result = $this->recursive_copy($temp_extract_dir, $theme_path);
 
-        if (is_wp_error($copy_result)) {
-            $this->logger->error('Deployment', "Deployment #$deployment_id copy_dir failed", $copy_result);
+        if (!$copy_result) {
+            $this->logger->error('Deployment', "Deployment #$deployment_id file copy failed");
             $this->database->update_deployment($deployment_id, [
                 'status' => 'failed',
-                'error_message' => $copy_result->get_error_message(),
+                'error_message' => __('Failed to copy files to theme directory.', 'github-auto-deploy'),
             ]);
-            $this->log_deployment($deployment_id, 'Deployment failed: ' . $copy_result->get_error_message());
+            $this->log_deployment($deployment_id, 'Deployment failed: Unable to copy files.');
             return;
         }
 
@@ -483,9 +614,9 @@ class GitHub_Deployment_Manager
             'directories_copied' => $dir_count,
         ]);
 
-        // Clean up temp files
-        $wp_filesystem->delete($artifact_zip);
-        $wp_filesystem->delete($temp_extract_dir, true);
+        // Clean up temp files using native PHP
+        @unlink($artifact_zip);
+        $this->recursive_delete($temp_extract_dir);
 
         $this->logger->log_deployment_step($deployment_id, 'Cleanup Complete', 'success');
 
@@ -507,17 +638,19 @@ class GitHub_Deployment_Manager
      */
     public function backup_current_theme(int $deployment_id): string|false
     {
-        global $wp_filesystem;
-
-        if (!WP_Filesystem()) {
-            $this->logger->error('Deployment', "Backup failed - WP_Filesystem init failed");
-            return false;
-        }
-
+        // Skip WP_Filesystem - use native PHP
         $theme_path = $this->settings->get_theme_path();
         $backup_dir = $this->settings->get_backup_directory();
         $backup_filename = 'backup-' . $deployment_id . '-' . time() . '.zip';
         $backup_path = $backup_dir . '/' . $backup_filename;
+
+        // Ensure backup directory exists
+        if (!is_dir($backup_dir)) {
+            if (!mkdir($backup_dir, 0755, true)) {
+                $this->logger->error('Deployment', "Failed to create backup directory: {$backup_dir}");
+                return false;
+            }
+        }
 
         $this->logger->log('Deployment', "Creating backup ZIP", [
             'theme_path' => $theme_path,
@@ -585,31 +718,42 @@ class GitHub_Deployment_Manager
             return false;
         }
 
-        global $wp_filesystem;
-
-        if (!WP_Filesystem()) {
-            return false;
-        }
-
+        // Skip WP_Filesystem - use native PHP
         $theme_path = $this->settings->get_theme_path();
         $temp_extract_dir = $this->get_temp_directory() . '/rollback-' . $deployment_id;
 
-        // Extract backup
-        $unzip_result = unzip_file($deployment->backup_path, $temp_extract_dir);
+        // Create extraction directory
+        if (!is_dir($temp_extract_dir)) {
+            if (!mkdir($temp_extract_dir, 0755, true)) {
+                $this->logger->error('Deployment', "Failed to create rollback extraction directory");
+                return false;
+            }
+        }
 
-        if (is_wp_error($unzip_result)) {
+        // Extract backup using native ZipArchive
+        $zip = new ZipArchive();
+        if ($zip->open($deployment->backup_path) !== true) {
+            $this->logger->error('Deployment', "Failed to open backup ZIP for rollback");
             return false;
         }
 
-        // Copy files back
-        $copy_result = copy_dir($temp_extract_dir, $theme_path);
+        if (!$zip->extractTo($temp_extract_dir)) {
+            $zip->close();
+            $this->logger->error('Deployment', "Failed to extract backup ZIP for rollback");
+            return false;
+        }
+        $zip->close();
 
-        if (is_wp_error($copy_result)) {
+        // Copy files back using native PHP
+        $copy_result = $this->recursive_copy($temp_extract_dir, $theme_path);
+
+        if (!$copy_result) {
+            $this->logger->error('Deployment', "Failed to copy rollback files");
             return false;
         }
 
         // Clean up
-        $wp_filesystem->delete($temp_extract_dir, true);
+        $this->recursive_delete($temp_extract_dir);
 
         // Update deployment status
         $this->database->update_deployment($deployment_id, [
@@ -707,5 +851,71 @@ class GitHub_Deployment_Manager
         $this->database->update_deployment($deployment_id, [
             'deployment_logs' => $updated_logs,
         ]);
+    }
+
+    /**
+     * Recursively copy directory contents (native PHP replacement for copy_dir)
+     */
+    private function recursive_copy(string $source, string $dest): bool
+    {
+        if (!is_dir($source)) {
+            return false;
+        }
+
+        // Create destination if needed
+        if (!is_dir($dest)) {
+            if (!mkdir($dest, 0755, true)) {
+                return false;
+            }
+        }
+
+        $iterator = new RecursiveIteratorIterator(
+            new RecursiveDirectoryIterator($source, RecursiveDirectoryIterator::SKIP_DOTS),
+            RecursiveIteratorIterator::SELF_FIRST
+        );
+
+        foreach ($iterator as $item) {
+            $target = $dest . DIRECTORY_SEPARATOR . $iterator->getSubPathname();
+
+            if ($item->isDir()) {
+                if (!is_dir($target)) {
+                    if (!mkdir($target, 0755, true)) {
+                        return false;
+                    }
+                }
+            } else {
+                if (!copy($item->getRealPath(), $target)) {
+                    return false;
+                }
+                chmod($target, 0644);
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Recursively delete directory (native PHP replacement for WP_Filesystem delete)
+     */
+    private function recursive_delete(string $dir): bool
+    {
+        if (!is_dir($dir)) {
+            return false;
+        }
+
+        $iterator = new RecursiveIteratorIterator(
+            new RecursiveDirectoryIterator($dir, RecursiveDirectoryIterator::SKIP_DOTS),
+            RecursiveIteratorIterator::CHILD_FIRST
+        );
+
+        foreach ($iterator as $item) {
+            if ($item->isDir()) {
+                rmdir($item->getRealPath());
+            } else {
+                unlink($item->getRealPath());
+            }
+        }
+
+        return rmdir($dir);
     }
 }

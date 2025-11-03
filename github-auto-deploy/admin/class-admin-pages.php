@@ -246,16 +246,31 @@ class GitHub_Deploy_Admin_Pages {
         }
 
         $commit_data = $commit_result['data'];
-        $deployment_id = $this->deployment_manager->start_deployment($commit_hash, 'manual', get_current_user_id(), [
+        $deployment_result = $this->deployment_manager->start_deployment($commit_hash, 'manual', get_current_user_id(), [
             'commit_message' => $commit_data->commit->message ?? '',
             'commit_author' => $commit_data->commit->author->name ?? '',
             'commit_date' => $commit_data->commit->author->date ?? current_time('mysql'),
         ]);
 
-        if ($deployment_id) {
+        // Check if result is an array (error) or int (success)
+        if (is_array($deployment_result) && isset($deployment_result['error'])) {
+            // Deployment blocked due to existing build
+            wp_send_json_error([
+                'message' => $deployment_result['message'],
+                'error_code' => $deployment_result['error'],
+                'building_deployment' => [
+                    'id' => $deployment_result['building_deployment']->id ?? 0,
+                    'commit_hash' => $deployment_result['building_deployment']->commit_hash ?? '',
+                    'status' => $deployment_result['building_deployment']->status ?? '',
+                    'created_at' => $deployment_result['building_deployment']->created_at ?? '',
+                ],
+            ]);
+        }
+
+        if ($deployment_result) {
             wp_send_json_success([
                 'message' => __('Deployment started successfully!', 'github-auto-deploy'),
-                'deployment_id' => $deployment_id,
+                'deployment_id' => $deployment_result,
             ]);
         } else {
             wp_send_json_error(['message' => __('Failed to start deployment', 'github-auto-deploy')]);

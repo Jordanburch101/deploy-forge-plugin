@@ -202,6 +202,19 @@ class GitHub_Deploy_Database {
     }
 
     /**
+     * Get currently building deployment (if any)
+     */
+    public function get_building_deployment(): ?object {
+        global $wpdb;
+
+        $deployment = $wpdb->get_row(
+            "SELECT * FROM {$this->table_name} WHERE status IN ('pending', 'building') ORDER BY created_at DESC LIMIT 1"
+        );
+
+        return $deployment ?: null;
+    }
+
+    /**
      * Get total deployment count
      */
     public function get_deployment_count(?string $status = null): int {

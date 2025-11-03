@@ -110,13 +110,73 @@
             alert(response.data.message);
             location.reload();
           } else {
-            alert(response.data.message || "Deployment failed.");
+            // Check if error is due to deployment in progress
+            if (
+              response.data.error_code === "deployment_in_progress" &&
+              response.data.building_deployment
+            ) {
+              const buildingDep = response.data.building_deployment;
+              const message =
+                response.data.message +
+                "\n\n" +
+                "Deployment #" +
+                buildingDep.id +
+                " (Status: " +
+                buildingDep.status +
+                ")\n" +
+                "Commit: " +
+                buildingDep.commit_hash.substring(0, 7) +
+                "\n\n" +
+                "Would you like to cancel it now?";
+
+              if (confirm(message)) {
+                // Cancel the existing deployment
+                GitHubDeployAdmin.cancelExistingDeployment(
+                  buildingDep.id,
+                  button,
+                  originalHtml
+                );
+              } else {
+                button.prop("disabled", false).html(originalHtml);
+              }
+            } else {
+              alert(response.data.message || "Deployment failed.");
+              button.prop("disabled", false).html(originalHtml);
+            }
           }
         },
         error: function () {
           alert("Deployment request failed.");
+          button.prop("disabled", false).html(originalHtml);
         },
-        complete: function () {
+      });
+    },
+
+    cancelExistingDeployment: function (deploymentId, button, originalHtml) {
+      $.ajax({
+        url: githubDeployAdmin.ajaxUrl,
+        type: "POST",
+        data: {
+          action: "github_deploy_cancel",
+          nonce: githubDeployAdmin.nonce,
+          deployment_id: deploymentId,
+        },
+        success: function (response) {
+          if (response.success) {
+            alert(
+              "Previous deployment cancelled. Please click 'Deploy Now' again to start a new deployment."
+            );
+            location.reload();
+          } else {
+            alert(
+              "Failed to cancel existing deployment: " +
+                (response.data.message || "Unknown error")
+            );
+            button.prop("disabled", false).html(originalHtml);
+          }
+        },
+        error: function () {
+          alert("Failed to cancel existing deployment.");
           button.prop("disabled", false).html(originalHtml);
         },
       });
