@@ -30,6 +30,7 @@ require_once GITHUB_DEPLOY_PLUGIN_DIR . 'includes/class-database.php';
 require_once GITHUB_DEPLOY_PLUGIN_DIR . 'includes/class-settings.php';
 require_once GITHUB_DEPLOY_PLUGIN_DIR . 'includes/class-debug-logger.php';
 require_once GITHUB_DEPLOY_PLUGIN_DIR . 'includes/class-github-api.php';
+require_once GITHUB_DEPLOY_PLUGIN_DIR . 'includes/class-github-app-connector.php';
 require_once GITHUB_DEPLOY_PLUGIN_DIR . 'includes/class-webhook-handler.php';
 require_once GITHUB_DEPLOY_PLUGIN_DIR . 'includes/class-deployment-manager.php';
 require_once GITHUB_DEPLOY_PLUGIN_DIR . 'admin/class-admin-pages.php';
@@ -44,6 +45,7 @@ class GitHub_Auto_Deploy {
     private GitHub_Deploy_Settings $settings;
     private GitHub_Deploy_Debug_Logger $logger;
     private GitHub_API $github_api;
+    private GitHub_Deploy_App_Connector $app_connector;
     private GitHub_Webhook_Handler $webhook_handler;
     private GitHub_Deployment_Manager $deployment_manager;
     private GitHub_Deploy_Admin_Pages $admin_pages;
@@ -65,11 +67,12 @@ class GitHub_Auto_Deploy {
         $this->settings = new GitHub_Deploy_Settings();
         $this->logger = new GitHub_Deploy_Debug_Logger($this->settings);
         $this->github_api = new GitHub_API($this->settings, $this->logger);
+        $this->app_connector = new GitHub_Deploy_App_Connector($this->settings, $this->logger);
         $this->webhook_handler = new GitHub_Webhook_Handler($this->settings, $this->github_api, $this->logger);
         $this->deployment_manager = new GitHub_Deployment_Manager($this->settings, $this->github_api, $this->database, $this->logger);
 
         if (is_admin()) {
-            $this->admin_pages = new GitHub_Deploy_Admin_Pages($this->settings, $this->github_api, $this->deployment_manager, $this->database, $this->logger);
+            $this->admin_pages = new GitHub_Deploy_Admin_Pages($this->settings, $this->github_api, $this->deployment_manager, $this->database, $this->logger, $this->app_connector);
         }
     }
 

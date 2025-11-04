@@ -73,7 +73,8 @@ class GitHub_API
             ];
         }
 
-        if ($response['status'] === 204) {
+        // GitHub API returns 204 (No Content) or sometimes 200 (OK) on success
+        if ($response['status'] === 204 || $response['status'] === 200) {
             return [
                 'success' => true,
                 'message' => __('Workflow triggered successfully!', 'github-auto-deploy'),
@@ -140,9 +141,14 @@ class GitHub_API
         }
 
         if ($response['status'] === 200) {
+            $body = $response['body'];
+            $workflow_runs = is_object($body)
+                ? ($body->workflow_runs ?? [])
+                : ($body['workflow_runs'] ?? []);
+
             $result = [
                 'success' => true,
-                'data' => $response['body']->workflow_runs ?? [],
+                'data' => $workflow_runs,
             ];
 
             set_transient($cache_key, $result, 2 * MINUTE_IN_SECONDS);
@@ -186,107 +192,116 @@ class GitHub_API
 
     /**
      * Download artifact
+     * Note: Artifact downloads still use direct GitHub API because they return binary data
      */
     public function download_artifact(int $artifact_id, string $destination): bool|WP_Error
     {
         $endpoint = "/repos/{$this->settings->get_repo_full_name()}/actions/artifacts/{$artifact_id}/zip";
 
-        $token = $this->settings->get_github_token();
+        $api_key = $this->settings->get_api_key();
+        if (empty($api_key)) {
+            return new WP_Error('no_api_key', __('Not connected to GitHub', 'github-auto-deploy'));
+        }
 
         $this->logger->log('GitHub_API', "Downloading artifact #$artifact_id to $destination");
 
-        // Step 1: Get the download URL from GitHub (this will return a redirect)
+        // For artifact downloads, we need to get the redirect URL through the proxy first
+        // Then download directly from the Azure/S3 URL
+        $redirect_result = $this->request('GET', $endpoint);
+
+        if (is_wp_error($redirect_result)) {
+            $this->logger->error('GitHub_API', "Failed to get artifact download URL", $redirect_result);
+            return $redirect_result;
+        }
+
+        // The backend should handle the redirect and return the actual download URL
+        // For now, we'll use a workaround: make a direct request with installation token
+        // This requires the backend to expose a download endpoint or we handle it differently
+
+        // Alternative: Use the backend proxy to get the redirect location
+        $backend_url = defined('GITHUB_DEPLOY_BACKEND_URL')
+            ? GITHUB_DEPLOY_BACKEND_URL
+            : 'https://deploy-forge.vercel.app';
+
+        $proxy_url = $backend_url . '/api/github/proxy';
+
         $args = [
-            'timeout' => 30,
-            'redirection' => 0, // Don't follow redirects automatically
+            'method' => 'POST',
             'headers' => [
-                'Authorization' => 'Bearer ' . $token,
-                'Accept' => 'application/vnd.github+json',
-                'User-Agent' => self::USER_AGENT,
+                'Content-Type' => 'application/json',
+                'X-API-Key' => $api_key,
             ],
+            'body' => wp_json_encode([
+                'method' => 'GET',
+                'endpoint' => $endpoint,
+                'data' => null,
+            ]),
+            'timeout' => 30,
+            'redirection' => 0, // Don't follow redirects
         ];
 
-        $response = wp_remote_get(self::API_BASE . $endpoint, $args);
+        $response = wp_remote_post($proxy_url, $args);
 
         if (is_wp_error($response)) {
             $this->logger->error('GitHub_API', "Failed to get artifact download URL", $response);
             return $response;
         }
 
-        $status_code = wp_remote_retrieve_response_code($response);
+        $body = json_decode(wp_remote_retrieve_body($response), true);
 
-        $this->logger->log('GitHub_API', "Artifact URL request response", [
-            'status_code' => $status_code,
-        ]);
-
-        // GitHub returns 302 with Location header pointing to Azure Blob Storage
-        if ($status_code === 302 || $status_code === 301) {
-            $location = wp_remote_retrieve_header($response, 'location');
-
-            if (!$location) {
-                $this->logger->error('GitHub_API', "No redirect location provided");
-                return new WP_Error('no_redirect', __('GitHub did not provide download URL', 'github-auto-deploy'));
-            }
-
-            $this->logger->log('GitHub_API', "Got Azure download URL, downloading...", [
-                'url_length' => strlen($location),
-                'is_azure' => strpos($location, 'blob.core.windows.net') !== false,
-            ]);
-
-            // Step 2: Download from Azure Blob Storage WITHOUT GitHub auth
-            $download_args = [
-                'timeout' => 300,
-                'stream' => true,
-                'filename' => $destination,
-                // No Authorization header - Azure URL is pre-signed
-            ];
-
-            $download_response = wp_remote_get($location, $download_args);
-
-            if (is_wp_error($download_response)) {
-                $this->logger->error('GitHub_API', "Azure download failed", $download_response);
-                return $download_response;
-            }
-
-            $download_status = wp_remote_retrieve_response_code($download_response);
-
-            $this->logger->log('GitHub_API', "Azure download response", [
-                'status_code' => $download_status,
-                'file_exists' => file_exists($destination),
-                'file_size' => file_exists($destination) ? filesize($destination) : 0,
-            ]);
-
-            if ($download_status === 200 && file_exists($destination) && filesize($destination) > 0) {
-                $this->logger->log('GitHub_API', "Artifact download successful!");
-                return true;
-            }
-
-            $this->logger->error('GitHub_API', "Azure download failed", [
-                'status_code' => $download_status,
-                'file_exists' => file_exists($destination),
-                'file_size' => file_exists($destination) ? filesize($destination) : 0,
-            ]);
-
-            return new WP_Error(
-                'download_failed',
-                sprintf(__('Failed to download from Azure. Status: %d', 'github-auto-deploy'), $download_status)
-            );
+        // Extract the download location from GitHub response
+        // The backend should return the Location header if it's a redirect
+        if (isset($body['headers']['location'])) {
+            $location = $body['headers']['location'];
+        } elseif (isset($body['data']['url'])) {
+            $location = $body['data']['url'];
+        } else {
+            // Fallback: try to extract from response
+            $this->logger->error('GitHub_API', "No redirect location in response", $body);
+            return new WP_Error('no_redirect', __('Could not get artifact download URL', 'github-auto-deploy'));
         }
 
-        // If we got 200 directly (shouldn't happen for private repos)
-        if ($status_code === 200 && file_exists($destination) && filesize($destination) > 0) {
-            $this->logger->log('GitHub_API', "Direct download successful (no redirect)");
+        $this->logger->log('GitHub_API', "Got download URL, downloading...", [
+            'url_length' => strlen($location),
+            'is_azure' => strpos($location, 'blob.core.windows.net') !== false,
+        ]);
+
+        // Download from the pre-signed URL (no auth needed)
+        $download_args = [
+            'timeout' => 300,
+            'stream' => true,
+            'filename' => $destination,
+        ];
+
+        $download_response = wp_remote_get($location, $download_args);
+
+        if (is_wp_error($download_response)) {
+            $this->logger->error('GitHub_API', "Download failed", $download_response);
+            return $download_response;
+        }
+
+        $download_status = wp_remote_retrieve_response_code($download_response);
+
+        $this->logger->log('GitHub_API', "Download response", [
+            'status_code' => $download_status,
+            'file_exists' => file_exists($destination),
+            'file_size' => file_exists($destination) ? filesize($destination) : 0,
+        ]);
+
+        if ($download_status === 200 && file_exists($destination) && filesize($destination) > 0) {
+            $this->logger->log('GitHub_API', "Artifact download successful!");
             return true;
         }
 
-        $this->logger->error('GitHub_API', "Unexpected response from GitHub", [
-            'status_code' => $status_code,
-            'expected' => '302 redirect',
+        $this->logger->error('GitHub_API', "Download failed", [
+            'status_code' => $download_status,
+            'file_exists' => file_exists($destination),
+            'file_size' => file_exists($destination) ? filesize($destination) : 0,
         ]);
 
         return new WP_Error(
-            'unexpected_response',
-            sprintf(__('Unexpected response from GitHub. Status: %d', 'github-auto-deploy'), $status_code)
+            'download_failed',
+            sprintf(__('Failed to download artifact. Status: %d', 'github-auto-deploy'), $download_status)
         );
     }
 
@@ -363,45 +378,44 @@ class GitHub_API
     }
 
     /**
-     * Make a request to GitHub API
+     * Make a request to GitHub API (proxied through backend)
      */
     private function request(string $method, string $endpoint, ?array $data = null): array|WP_Error
     {
-        $token = $this->settings->get_github_token();
+        $api_key = $this->settings->get_api_key();
 
-        if (empty($token)) {
-            $error = new WP_Error('no_token', __('GitHub token not configured.', 'github-auto-deploy'));
-            $this->logger->error('GitHub_API', 'No GitHub token configured', $error);
+        if (empty($api_key)) {
+            $error = new WP_Error('no_api_key', __('Not connected to GitHub. Please connect from settings.', 'github-auto-deploy'));
+            $this->logger->error('GitHub_API', 'No API key configured', $error);
             return $error;
         }
 
-        $url = self::API_BASE . $endpoint;
+        // Get backend URL from constant or use default
+        $backend_url = defined('GITHUB_DEPLOY_BACKEND_URL')
+            ? GITHUB_DEPLOY_BACKEND_URL
+            : 'https://deploy-forge.vercel.app';
 
-        // Add query parameters for GET requests
-        if ($method === 'GET' && !empty($data)) {
-            $url = add_query_arg($data, $url);
-            $data = null;
-        }
+        // Prepare proxy request
+        $proxy_url = $backend_url . '/api/github/proxy';
 
         $args = [
-            'method' => $method,
+            'method' => 'POST',
             'headers' => [
-                'Authorization' => 'Bearer ' . $token,
-                'Accept' => 'application/vnd.github+json',
-                'User-Agent' => self::USER_AGENT,
                 'Content-Type' => 'application/json',
+                'X-API-Key' => $api_key,
             ],
+            'body' => wp_json_encode([
+                'method' => $method,
+                'endpoint' => $endpoint,
+                'data' => $data,
+            ]),
             'timeout' => 30,
         ];
 
-        if ($data !== null && in_array($method, ['POST', 'PUT', 'PATCH'])) {
-            $args['body'] = wp_json_encode($data);
-        }
-
         // Log request
-        $this->logger->log_api_request($method, $endpoint, $data ?: [], $args['headers']);
+        $this->logger->log_api_request($method, $endpoint, $data ?: [], ['via_proxy' => true]);
 
-        $response = wp_remote_request($url, $args);
+        $response = wp_remote_post($proxy_url, $args);
 
         if (is_wp_error($response)) {
             $this->logger->log_api_response($endpoint, 0, null, $response->get_error_message());
@@ -410,27 +424,46 @@ class GitHub_API
 
         $status_code = wp_remote_retrieve_response_code($response);
         $body = wp_remote_retrieve_body($response);
+        $parsed_body = json_decode($body, true);
+
+        // Check for backend errors
+        if ($status_code >= 400 || (isset($parsed_body['error']) && $parsed_body['error'])) {
+            $error_message = $parsed_body['message'] ?? 'Unknown error from backend';
+            $this->logger->log_api_response($endpoint, $status_code, $parsed_body, $error_message);
+
+            return new WP_Error(
+                'backend_error',
+                $error_message,
+                ['status' => $status_code, 'data' => $parsed_body]
+            );
+        }
+
+        // Extract GitHub API response from backend response
+        $github_status = $parsed_body['status'] ?? 200;
+        $github_data = $parsed_body['data'] ?? null;
+        $github_headers = $parsed_body['headers'] ?? [];
 
         // Log response
-        $parsed_body = json_decode($body);
         $this->logger->log_api_response(
             $endpoint,
-            $status_code,
-            $parsed_body ?: $body,
-            $status_code >= 400 ? "HTTP $status_code" : null
+            $github_status,
+            $github_data,
+            $github_status >= 400 ? "HTTP $github_status" : null
         );
 
-        // Check rate limiting
-        $rate_limit_remaining = wp_remote_retrieve_header($response, 'x-ratelimit-remaining');
-        if ($rate_limit_remaining !== '' && (int) $rate_limit_remaining < 10) {
-            $this->logger->log('GitHub_API', "Rate limit warning: $rate_limit_remaining requests remaining");
-            do_action('github_deploy_rate_limit_warning', $rate_limit_remaining);
+        // Check rate limiting (if headers are provided)
+        if (isset($github_headers['x-ratelimit-remaining'])) {
+            $rate_limit_remaining = (int) $github_headers['x-ratelimit-remaining'];
+            if ($rate_limit_remaining < 10) {
+                $this->logger->log('GitHub_API', "Rate limit warning: $rate_limit_remaining requests remaining");
+                do_action('github_deploy_rate_limit_warning', $rate_limit_remaining);
+            }
         }
 
         return [
-            'status' => $status_code,
-            'body' => json_decode($body),
-            'headers' => wp_remote_retrieve_headers($response),
+            'status' => $github_status,
+            'body' => $github_data, // Keep original type - don't force to object
+            'headers' => $github_headers,
         ];
     }
 
@@ -597,6 +630,102 @@ class GitHub_API
         return [
             'success' => false,
             'message' => $response['body']->message ?? __('Failed to cancel workflow run.', 'github-auto-deploy'),
+        ];
+    }
+
+    /**
+     * Get installation repositories (repos accessible by GitHub App)
+     * This fetches only repos that the GitHub App has been granted access to
+     */
+    public function get_installation_repositories(): array
+    {
+        $cache_key = 'github_deploy_installation_repos';
+        $cached = get_transient($cache_key);
+        if ($cached !== false) {
+            return $cached;
+        }
+
+        // Use the installation/repositories endpoint
+        $response = $this->request('GET', '/installation/repositories');
+
+        if (is_wp_error($response)) {
+            return [
+                'success' => false,
+                'message' => $response->get_error_message(),
+            ];
+        }
+
+        if ($response['status'] === 200) {
+            $body = $response['body'];
+
+            // Debug: Log what we got from the backend
+            error_log('=== INSTALLATION REPOS DEBUG ===');
+            error_log('Body type: ' . gettype($body));
+            error_log('Body content: ' . print_r($body, true));
+
+            if (is_object($body) && isset($body->repositories)) {
+                error_log('Found repositories in object, count: ' . count($body->repositories));
+                if (!empty($body->repositories)) {
+                    error_log('First repo: ' . print_r($body->repositories[0], true));
+                }
+            } else if (is_array($body) && isset($body['repositories'])) {
+                error_log('Found repositories in array, count: ' . count($body['repositories']));
+                if (!empty($body['repositories'])) {
+                    error_log('First repo: ' . print_r($body['repositories'][0], true));
+                }
+            } else {
+                error_log('No repositories found in expected structure');
+                error_log('Available keys: ' . print_r(is_object($body) ? get_object_vars($body) : array_keys($body), true));
+            }
+            error_log('=== END DEBUG ===');
+
+            // Handle both object and array responses
+            $repos = is_object($body) && isset($body->repositories)
+                ? $body->repositories
+                : (is_array($body) && isset($body['repositories']) ? $body['repositories'] : []);
+
+            // Format repos for dropdown
+            $formatted_repos = array_map(function ($repo) {
+                // Handle both object and array
+                $repo_data = is_object($repo) ? (array) $repo : $repo;
+                $owner = is_object($repo->owner ?? null) ? (array) $repo->owner : ($repo_data['owner'] ?? []);
+
+                $formatted = [
+                    'id' => $repo_data['id'] ?? 0,
+                    'full_name' => $repo_data['full_name'] ?? '',
+                    'name' => $repo_data['name'] ?? '',
+                    'owner' => is_array($owner) ? ($owner['login'] ?? '') : ($owner->login ?? ''),
+                    'private' => $repo_data['private'] ?? false,
+                    'default_branch' => $repo_data['default_branch'] ?? 'main',
+                    'updated_at' => $repo_data['updated_at'] ?? '',
+                ];
+
+                // Log first repo for debugging
+                static $logged = false;
+                if (!$logged) {
+                    $this->logger->log('GitHub_API', 'Sample formatted repo', [
+                        'raw_repo' => $repo_data,
+                        'formatted' => $formatted
+                    ]);
+                    $logged = true;
+                }
+
+                return $formatted;
+            }, $repos);
+
+            $result = [
+                'success' => true,
+                'data' => $formatted_repos,
+            ];
+
+            // Cache for 5 minutes
+            set_transient($cache_key, $result, 5 * MINUTE_IN_SECONDS);
+            return $result;
+        }
+
+        return [
+            'success' => false,
+            'message' => $response['body']->message ?? __('Failed to get installation repositories.', 'github-auto-deploy'),
         ];
     }
 }

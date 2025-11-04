@@ -394,6 +394,20 @@
   position: relative;
 }
 
+/* Disconnect GitHub Button */
+#disconnect-github-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+/* Bind Repository Button */
+#bind-repo-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
 /* Cancel Deployment Button */
 .cancel-deployment-btn {
   color: #d63638;

@@ -11,7 +11,8 @@ if (!defined('ABSPATH')) {
 class GitHub_Deploy_Settings {
 
     private const OPTION_NAME = 'github_deploy_settings';
-    private const TOKEN_OPTION = 'github_deploy_token_encrypted';
+    private const API_KEY_OPTION = 'github_deploy_api_key';
+    private const GITHUB_DATA_OPTION = 'github_deploy_github_data';
     private array $settings;
 
     public function __construct() {
@@ -90,78 +91,114 @@ class GitHub_Deploy_Settings {
     }
 
     /**
-     * Get GitHub token (decrypted)
+     * Get GitHub API key (for backend communication)
      */
-    public function get_github_token(): string {
-        $encrypted = get_option(self::TOKEN_OPTION, '');
-
-        if (empty($encrypted)) {
-            return '';
-        }
-
-        return $this->decrypt_token($encrypted);
+    public function get_api_key(): string {
+        return get_option(self::API_KEY_OPTION, '');
     }
 
     /**
-     * Set GitHub token (encrypted)
+     * Set GitHub API key
      */
-    public function set_github_token(string $token): bool {
-        if (empty($token)) {
-            return delete_option(self::TOKEN_OPTION);
+    public function set_api_key(string $api_key): bool {
+        if (empty($api_key)) {
+            return delete_option(self::API_KEY_OPTION);
         }
 
-        $encrypted = $this->encrypt_token($token);
-        return update_option(self::TOKEN_OPTION, $encrypted);
+        return update_option(self::API_KEY_OPTION, $api_key);
     }
 
     /**
-     * Encrypt token using sodium
+     * Get GitHub connection data
      */
-    private function encrypt_token(string $token): string {
-        if (!function_exists('sodium_crypto_secretbox')) {
-            // Fallback to base64 encoding if sodium not available
-            return base64_encode($token);
-        }
+    public function get_github_data(): array {
+        $defaults = [
+            'installation_id' => 0,
+            'account_login' => '',
+            'account_type' => '',
+            'account_avatar' => '',
+            'selected_repo_id' => 0,
+            'selected_repo_name' => '',
+            'selected_repo_full_name' => '',
+            'selected_repo_default_branch' => '',
+            'connected_at' => '',
+        ];
 
-        $key = $this->get_encryption_key();
-        $nonce = random_bytes(SODIUM_CRYPTO_SECRETBOX_NONCEBYTES);
-        $encrypted = sodium_crypto_secretbox($token, $nonce, $key);
-
-        return base64_encode($nonce . $encrypted);
+        return wp_parse_args(get_option(self::GITHUB_DATA_OPTION, []), $defaults);
     }
 
     /**
-     * Decrypt token using sodium
+     * Set GitHub connection data
      */
-    private function decrypt_token(string $encrypted): string {
-        $decoded = base64_decode($encrypted);
-
-        if (!function_exists('sodium_crypto_secretbox_open')) {
-            // Fallback for base64 encoded tokens
-            return $decoded;
-        }
-
-        $key = $this->get_encryption_key();
-        $nonce = mb_substr($decoded, 0, SODIUM_CRYPTO_SECRETBOX_NONCEBYTES, '8bit');
-        $ciphertext = mb_substr($decoded, SODIUM_CRYPTO_SECRETBOX_NONCEBYTES, null, '8bit');
-
-        $decrypted = sodium_crypto_secretbox_open($ciphertext, $nonce, $key);
-
-        return $decrypted !== false ? $decrypted : '';
+    public function set_github_data(array $data): bool {
+        return update_option(self::GITHUB_DATA_OPTION, $data);
     }
 
     /**
-     * Get encryption key derived from WordPress salts
+     * Check if GitHub is connected
      */
-    private function get_encryption_key(): string {
-        $salt = wp_salt('auth') . wp_salt('secure_auth');
+    public function is_github_connected(): bool {
+        return !empty($this->get_api_key()) && !empty($this->get_github_data()['installation_id']);
+    }
 
-        if (function_exists('sodium_crypto_generichash')) {
-            return sodium_crypto_generichash($salt, '', SODIUM_CRYPTO_SECRETBOX_KEYBYTES);
+    /**
+     * Check if repository is bound (locked to a specific repo)
+     */
+    public function is_repo_bound(): bool {
+        $github_data = $this->get_github_data();
+        return !empty($github_data['repo_bound']) && $github_data['repo_bound'] === true;
+    }
+
+    /**
+     * Bind repository (lock it so it cannot be changed without reconnecting GitHub)
+     *
+     * @param string $owner Repository owner
+     * @param string $name Repository name
+     * @param string $default_branch Repository default branch
+     * @return bool Success
+     */
+    public function bind_repository(string $owner, string $name, string $default_branch): bool {
+        // Get current GitHub data
+        $github_data = $this->get_github_data();
+
+        // Check if already bound to prevent re-binding
+        if ($this->is_repo_bound()) {
+            return false;
         }
 
-        // Fallback to hash for environments without sodium
-        return hash('sha256', $salt, true);
+        // Update GitHub data with bound repo info
+        $github_data['repo_bound'] = true;
+        $github_data['selected_repo_name'] = $name;
+        $github_data['selected_repo_full_name'] = $owner . '/' . $name;
+        $github_data['selected_repo_default_branch'] = $default_branch;
+        $github_data['account_login'] = $owner;
+        $github_data['bound_at'] = current_time('mysql');
+
+        // Update plugin settings with repo info
+        $current_settings = $this->get_all();
+        $current_settings['github_repo_owner'] = $owner;
+        $current_settings['github_repo_name'] = $name;
+        $current_settings['github_branch'] = $default_branch;
+
+        // Save both GitHub data and settings
+        return $this->set_github_data($github_data) && $this->save($current_settings);
+    }
+
+    /**
+     * Disconnect from GitHub (remove API key and installation data)
+     */
+    public function disconnect_github(): bool {
+        delete_option(self::API_KEY_OPTION);
+        delete_option(self::GITHUB_DATA_OPTION);
+
+        // Clear repo settings too
+        $current_settings = $this->get_all();
+        $current_settings['github_repo_owner'] = '';
+        $current_settings['github_repo_name'] = '';
+        $current_settings['github_branch'] = 'main';
+        $this->save($current_settings);
+
+        return true;
     }
 
     /**
@@ -186,8 +223,8 @@ class GitHub_Deploy_Settings {
             $errors[] = __('Target theme directory is required.', 'github-auto-deploy');
         }
 
-        if (empty($this->get_github_token())) {
-            $errors[] = __('GitHub personal access token is required.', 'github-auto-deploy');
+        if (!$this->is_github_connected()) {
+            $errors[] = __('GitHub connection is required. Please connect your GitHub account.', 'github-auto-deploy');
         }
 
         $theme_path = WP_CONTENT_DIR . '/themes/' . $this->get('target_theme_directory');
@@ -209,7 +246,7 @@ class GitHub_Deploy_Settings {
             && !empty($this->get('github_repo_name'))
             && !empty($this->get('github_branch'))
             && !empty($this->get('target_theme_directory'))
-            && !empty($this->get_github_token());
+            && $this->is_github_connected();
     }
 
     /**

@@ -11,61 +11,135 @@ if (!defined('ABSPATH')) {
 <div class="wrap github-deploy-settings">
     <h1><?php echo esc_html(get_admin_page_title()); ?></h1>
 
+    <!-- GitHub Connection Status -->
+    <div class="github-connection-card" style="background: #fff; border: 1px solid #ccd0d4; border-radius: 4px; padding: 20px; margin: 20px 0;">
+        <?php if ($is_connected): ?>
+            <h2 style="margin-top: 0;">
+                <span class="dashicons dashicons-yes-alt" style="color: #46b450;"></span>
+                <?php esc_html_e('Connected to GitHub', 'github-auto-deploy'); ?>
+            </h2>
+            <table class="form-table" style="margin-top: 0;">
+                <?php if (!empty($connection_details['account_login'])): ?>
+                <tr>
+                    <th><?php esc_html_e('Account', 'github-auto-deploy'); ?></th>
+                    <td>
+                        <strong><?php echo esc_html($connection_details['account_login']); ?></strong>
+                        <?php if (!empty($connection_details['account_avatar'])): ?>
+                            <img src="<?php echo esc_url($connection_details['account_avatar']); ?>" 
+                                 alt="<?php echo esc_attr($connection_details['account_login']); ?>" 
+                                 style="width: 24px; height: 24px; border-radius: 50%; vertical-align: middle; margin-left: 8px;">
+                        <?php endif; ?>
+                    </td>
+                </tr>
+                <?php endif; ?>
+                <?php if (!empty($connection_details['repo_full_name'])): ?>
+                <tr>
+                    <th><?php esc_html_e('Repository', 'github-auto-deploy'); ?></th>
+                    <td><code><?php echo esc_html($connection_details['repo_full_name']); ?></code></td>
+                </tr>
+                <?php endif; ?>
+                <?php if (!empty($connection_details['repo_branch'])): ?>
+                <tr>
+                    <th><?php esc_html_e('Branch', 'github-auto-deploy'); ?></th>
+                    <td><code><?php echo esc_html($connection_details['repo_branch']); ?></code></td>
+                </tr>
+                <?php endif; ?>
+                <?php if (!empty($connection_details['connected_at'])): ?>
+                <tr>
+                    <th><?php esc_html_e('Connected', 'github-auto-deploy'); ?></th>
+                    <td><?php echo esc_html(human_time_diff(strtotime($connection_details['connected_at']), current_time('timestamp')) . ' ago'); ?></td>
+                </tr>
+                <?php endif; ?>
+            </table>
+            <p>
+                <button type="button" id="disconnect-github-btn" class="button button-secondary">
+                    <span class="dashicons dashicons-dismiss"></span>
+                    <?php esc_html_e('Disconnect from GitHub', 'github-auto-deploy'); ?>
+                </button>
+                <span id="disconnect-loading" class="spinner" style="float: none; margin: 0 10px;"></span>
+            </p>
+        <?php else: ?>
+            <h2 style="margin-top: 0;">
+                <span class="dashicons dashicons-admin-plugins"></span>
+                <?php esc_html_e('Connect to GitHub', 'github-auto-deploy'); ?>
+            </h2>
+            <p><?php esc_html_e('Connect your WordPress site to GitHub to enable automatic theme deployments.', 'github-auto-deploy'); ?></p>
+            <p><?php esc_html_e('You will be redirected to GitHub to install the WordPress Deploy app and select which repository to connect.', 'github-auto-deploy'); ?></p>
+            <p>
+                <button type="button" id="connect-github-btn" class="button button-primary button-hero">
+                    <span class="dashicons dashicons-plus-alt"></span>
+                    <?php esc_html_e('Connect to GitHub', 'github-auto-deploy'); ?>
+                </button>
+                <span id="connect-loading" class="spinner" style="float: none; margin: 0 10px;"></span>
+            </p>
+        <?php endif; ?>
+    </div>
+
     <form method="post" action="">
         <?php wp_nonce_field('github_deploy_settings'); ?>
 
+        <h2><?php esc_html_e('Repository Configuration', 'github-auto-deploy'); ?></h2>
+
         <?php
-        $has_token = !empty($this->settings->get_github_token());
+        $repo_bound = $settings->is_repo_bound();
+        $has_repo_selected = !empty($current_settings['github_repo_owner']) && !empty($current_settings['github_repo_name']);
         ?>
 
-        <h2><?php esc_html_e('GitHub Repository', 'github-auto-deploy'); ?></h2>
+        <?php if ($is_connected && !$repo_bound && !$has_repo_selected): ?>
+            <!-- Repo Selector (shown when connected but no repo selected yet) -->
+            <div id="repo-selector-section" style="background: #f0f6fc; border: 1px solid #0969da; border-radius: 4px; padding: 20px; margin-bottom: 20px;">
+                <h3 style="margin-top: 0;">
+                    <span class="dashicons dashicons-admin-home"></span>
+                    <?php esc_html_e('Select Repository', 'github-auto-deploy'); ?>
+                </h3>
+                <p><?php esc_html_e('Choose which repository to deploy from the list below. Once selected, this cannot be changed without disconnecting from GitHub.', 'github-auto-deploy'); ?></p>
 
-        <?php if ($has_token): ?>
-            <!-- Repository Selector (shown when token exists) -->
-            <table class="form-table">
-                <tr>
-                    <th scope="row">
-                        <label for="repo-selector"><?php esc_html_e('Select Repository', 'github-auto-deploy'); ?></label>
-                    </th>
-                    <td>
-                        <div class="repo-selector-wrapper">
-                            <select id="repo-selector" class="regular-text" style="min-width: 400px;">
-                                <option value=""><?php esc_html_e('-- Select a repository --', 'github-auto-deploy'); ?></option>
-                            </select>
-                            <button type="button" id="load-repos-btn" class="button">
-                                <span class="dashicons dashicons-update"></span>
-                                <?php esc_html_e('Load Repositories', 'github-auto-deploy'); ?>
-                            </button>
-                            <span id="repo-loading" class="spinner" style="float: none; margin: 0 10px;"></span>
-                        </div>
-                        <p class="description">
-                            <?php esc_html_e('Click "Load Repositories" to fetch your GitHub repos, then select one from the dropdown.', 'github-auto-deploy'); ?>
-                        </p>
-                    </td>
-                </tr>
+                <div id="repo-selector-loading" style="padding: 20px; text-align: center;">
+                    <span class="spinner is-active" style="float: none;"></span>
+                    <p><?php esc_html_e('Loading repositories...', 'github-auto-deploy'); ?></p>
+                    <p style="font-size: 12px; color: #666;">
+                        <?php
+                        echo 'Debug: Connected=' . ($is_connected ? 'Yes' : 'No') . ', ';
+                        echo 'Bound=' . ($repo_bound ? 'Yes' : 'No') . ', ';
+                        echo 'Has Repo=' . ($has_repo_selected ? 'Yes' : 'No');
+                        ?>
+                    </p>
+                </div>
 
-                <tr id="workflow-selector-row" style="display: none;">
-                    <th scope="row">
-                        <label for="workflow-selector"><?php esc_html_e('Select Workflow', 'github-auto-deploy'); ?></label>
-                    </th>
-                    <td>
-                        <div class="workflow-selector-wrapper">
-                            <select id="workflow-selector" class="regular-text" style="min-width: 400px;">
-                                <option value=""><?php esc_html_e('-- Select a workflow --', 'github-auto-deploy'); ?></option>
-                            </select>
-                            <span id="workflow-loading" class="spinner" style="float: none; margin: 0 10px;"></span>
-                        </div>
-                        <p class="description">
-                            <?php esc_html_e('Select the GitHub Actions workflow file to use for deployments.', 'github-auto-deploy'); ?>
-                        </p>
-                    </td>
-                </tr>
-            </table>
+                <div id="repo-selector-list" style="display: none;">
+                    <select id="repo-select" class="regular-text" style="width: 100%; max-width: 600px; font-size: 14px;">
+                        <option value=""><?php esc_html_e('-- Select a Repository --', 'github-auto-deploy'); ?></option>
+                    </select>
+                    <p>
+                        <button type="button" id="bind-repo-btn" class="button button-primary" disabled>
+                            <span class="dashicons dashicons-lock"></span>
+                            <?php esc_html_e('Bind Repository', 'github-auto-deploy'); ?>
+                        </button>
+                        <span id="bind-loading" class="spinner" style="float: none; margin: 0 10px;"></span>
+                    </p>
+                    <p class="description" style="color: #d63638;">
+                        <strong><?php esc_html_e('Warning:', 'github-auto-deploy'); ?></strong>
+                        <?php esc_html_e('Once you bind a repository, you cannot change it without disconnecting from GitHub and reconnecting.', 'github-auto-deploy'); ?>
+                    </p>
+                </div>
 
-            <details class="manual-entry-toggle">
-                <summary style="cursor: pointer; font-weight: 600; margin: 20px 0;">
-                    <?php esc_html_e('Or enter repository details manually', 'github-auto-deploy'); ?>
-                </summary>
+                <div id="repo-selector-error" style="display: none; padding: 12px; background: #fcf0f1; border-left: 4px solid #d63638; margin-top: 12px;">
+                    <p id="repo-selector-error-message" style="margin: 0; color: #d63638;"></p>
+                </div>
+            </div>
+        <?php elseif ($is_connected && ($repo_bound || $has_repo_selected)): ?>
+            <div style="background: #d5f5e3; border: 1px solid #27ae60; border-radius: 4px; padding: 12px; margin-bottom: 20px;">
+                <p style="margin: 0;">
+                    <span class="dashicons dashicons-lock" style="color: #27ae60;"></span>
+                    <strong><?php esc_html_e('Repository Bound:', 'github-auto-deploy'); ?></strong>
+                    <?php
+                    echo sprintf(
+                        esc_html__('This site is bound to %s. To change repository, you must disconnect from GitHub and reconnect.', 'github-auto-deploy'),
+                        '<code>' . esc_html($current_settings['github_repo_owner'] . '/' . $current_settings['github_repo_name']) . '</code>'
+                    );
+                    ?>
+                </p>
+            </div>
         <?php endif; ?>
 
         <table class="form-table">
@@ -76,7 +150,8 @@ if (!defined('ABSPATH')) {
                 <td>
                     <input type="text" id="github_repo_owner" name="github_repo_owner"
                            value="<?php echo esc_attr($current_settings['github_repo_owner']); ?>"
-                           class="regular-text" required>
+                           class="regular-text"
+                           <?php echo ($repo_bound || $has_repo_selected) ? 'readonly' : 'required'; ?>>
                     <p class="description"><?php esc_html_e('GitHub username or organization name', 'github-auto-deploy'); ?></p>
                 </td>
             </tr>
@@ -88,7 +163,8 @@ if (!defined('ABSPATH')) {
                 <td>
                     <input type="text" id="github_repo_name" name="github_repo_name"
                            value="<?php echo esc_attr($current_settings['github_repo_name']); ?>"
-                           class="regular-text" required>
+                           class="regular-text"
+                           <?php echo ($repo_bound || $has_repo_selected) ? 'readonly' : 'required'; ?>>
                     <p class="description"><?php esc_html_e('Repository name (e.g., my-theme)', 'github-auto-deploy'); ?></p>
                 </td>
             </tr>
@@ -100,7 +176,8 @@ if (!defined('ABSPATH')) {
                 <td>
                     <input type="text" id="github_branch" name="github_branch"
                            value="<?php echo esc_attr($current_settings['github_branch']); ?>"
-                           class="regular-text" required>
+                           class="regular-text"
+                           <?php echo ($repo_bound || $has_repo_selected) ? 'readonly' : 'required'; ?>>
                     <p class="description"><?php esc_html_e('Branch to monitor (e.g., main, master)', 'github-auto-deploy'); ?></p>
                 </td>
             </tr>
@@ -119,21 +196,6 @@ if (!defined('ABSPATH')) {
 
             <tr>
                 <th scope="row">
-                    <label for="github_token"><?php esc_html_e('Personal Access Token', 'github-auto-deploy'); ?></label>
-                </th>
-                <td>
-                    <input type="password" id="github_token" name="github_token"
-                           value="" placeholder="<?php echo $this->settings->get_github_token() ? '••••••••••••••••' : ''; ?>"
-                           class="regular-text">
-                    <p class="description">
-                        <?php esc_html_e('GitHub Personal Access Token with repo and actions scopes.', 'github-auto-deploy'); ?>
-                        <a href="https://github.com/settings/tokens/new" target="_blank"><?php esc_html_e('Create token', 'github-auto-deploy'); ?></a>
-                    </p>
-                </td>
-            </tr>
-
-            <tr>
-                <th scope="row">
                     <label for="target_theme_directory"><?php esc_html_e('Target Theme Directory', 'github-auto-deploy'); ?></label>
                 </th>
                 <td>
@@ -146,52 +208,6 @@ if (!defined('ABSPATH')) {
                         <strong><?php esc_html_e('Full path:', 'github-auto-deploy'); ?></strong>
                         <code><?php echo esc_html(WP_CONTENT_DIR . '/themes/' . ($current_settings['target_theme_directory'] ?: '[theme-name]')); ?></code>
                     </p>
-                </td>
-            </tr>
-        </table>
-
-        <?php if ($has_token): ?>
-            </details>
-        <?php endif; ?>
-
-        <h2><?php esc_html_e('Webhook Configuration', 'github-auto-deploy'); ?></h2>
-
-        <table class="form-table">
-            <tr>
-                <th scope="row">
-                    <label for="webhook_url"><?php esc_html_e('Webhook URL', 'github-auto-deploy'); ?></label>
-                </th>
-                <td>
-                    <input type="text" id="webhook_url" value="<?php echo esc_attr($webhook_url); ?>"
-                           class="regular-text" readonly>
-                    <button type="button" class="button" onclick="navigator.clipboard.writeText('<?php echo esc_js($webhook_url); ?>')">
-                        <?php esc_html_e('Copy', 'github-auto-deploy'); ?>
-                    </button>
-                    <p class="description"><?php esc_html_e('Add this URL to your GitHub repository webhook settings', 'github-auto-deploy'); ?></p>
-                </td>
-            </tr>
-
-            <tr>
-                <th scope="row">
-                    <label for="webhook_secret"><?php esc_html_e('Webhook Secret', 'github-auto-deploy'); ?></label>
-                </th>
-                <td>
-                    <input type="text" id="webhook_secret" name="webhook_secret"
-                           value="<?php echo esc_attr($current_settings['webhook_secret']); ?>"
-                           class="regular-text" readonly>
-                    <p class="description">
-                        <?php esc_html_e('Use this secret in GitHub webhook configuration for security', 'github-auto-deploy'); ?>
-                    </p>
-                </td>
-            </tr>
-
-            <tr>
-                <th scope="row"></th>
-                <td>
-                    <button type="button" id="generate-secret-btn" class="button">
-                        <?php esc_html_e('Generate New Secret', 'github-auto-deploy'); ?>
-                    </button>
-                    <span id="secret-loading" class="spinner" style="float: none; margin: 0 10px;"></span>
                 </td>
             </tr>
         </table>

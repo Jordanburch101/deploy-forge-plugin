@@ -15,13 +15,15 @@ class GitHub_Deploy_Admin_Pages {
     private GitHub_Deployment_Manager $deployment_manager;
     private GitHub_Deploy_Database $database;
     private GitHub_Deploy_Debug_Logger $logger;
+    private GitHub_Deploy_App_Connector $app_connector;
 
-    public function __construct(GitHub_Deploy_Settings $settings, GitHub_API $github_api, GitHub_Deployment_Manager $deployment_manager, GitHub_Deploy_Database $database, GitHub_Deploy_Debug_Logger $logger) {
+    public function __construct(GitHub_Deploy_Settings $settings, GitHub_API $github_api, GitHub_Deployment_Manager $deployment_manager, GitHub_Deploy_Database $database, GitHub_Deploy_Debug_Logger $logger, GitHub_Deploy_App_Connector $app_connector) {
         $this->settings = $settings;
         $this->github_api = $github_api;
         $this->deployment_manager = $deployment_manager;
         $this->database = $database;
         $this->logger = $logger;
+        $this->app_connector = $app_connector;
 
         add_action('admin_menu', [$this, 'add_admin_menu']);
         add_action('admin_enqueue_scripts', [$this, 'enqueue_admin_assets']);
@@ -39,6 +41,12 @@ class GitHub_Deploy_Admin_Pages {
         add_action('wp_ajax_github_deploy_generate_secret', [$this, 'ajax_generate_secret']);
         add_action('wp_ajax_github_deploy_get_logs', [$this, 'ajax_get_logs']);
         add_action('wp_ajax_github_deploy_clear_logs', [$this, 'ajax_clear_logs']);
+        
+        // GitHub App connection AJAX handlers
+        add_action('wp_ajax_github_deploy_get_connect_url', [$this, 'ajax_get_connect_url']);
+        add_action('wp_ajax_github_deploy_disconnect', [$this, 'ajax_disconnect_github']);
+        add_action('wp_ajax_github_deploy_get_installation_repos', [$this, 'ajax_get_installation_repos']);
+        add_action('wp_ajax_github_deploy_bind_repo', [$this, 'ajax_bind_repo']);
     }
 
     /**
@@ -174,17 +182,15 @@ class GitHub_Deploy_Admin_Pages {
 
                 $this->settings->save($settings);
 
-                // Save token separately
-                if (!empty($_POST['github_token'])) {
-                    $this->settings->set_github_token($_POST['github_token']);
-                }
-
                 echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__('Settings saved successfully!', 'github-auto-deploy') . '</p></div>';
             }
         }
 
         $current_settings = $this->settings->get_all();
         $webhook_url = $this->settings->get_webhook_url();
+        $is_connected = $this->app_connector->is_connected();
+        $connection_details = $this->app_connector->get_connection_details();
+        $settings = $this->settings; // Make settings object available to template
 
         include GITHUB_DEPLOY_PLUGIN_DIR . 'templates/settings-page.php';
     }
@@ -228,52 +234,80 @@ class GitHub_Deploy_Admin_Pages {
             wp_send_json_error(['message' => __('Unauthorized', 'github-auto-deploy')]);
         }
 
-        $commit_hash = sanitize_text_field($_POST['commit_hash'] ?? '');
+        try {
+            $commit_hash = sanitize_text_field($_POST['commit_hash'] ?? '');
 
-        if (empty($commit_hash)) {
-            // Get latest commit
-            $commits = $this->github_api->get_recent_commits(1);
-            if (!$commits['success'] || empty($commits['data'])) {
-                wp_send_json_error(['message' => __('Failed to get latest commit', 'github-auto-deploy')]);
+            if (empty($commit_hash)) {
+                // Get latest commit
+                $commits = $this->github_api->get_recent_commits(1);
+                if (!$commits['success'] || empty($commits['data'])) {
+                    wp_send_json_error(['message' => __('Failed to get latest commit', 'github-auto-deploy')]);
+                }
+
+                // Handle both array and object responses
+                $first_commit = is_array($commits['data']) ? $commits['data'][0] : $commits['data'][0];
+                $commit_hash = is_object($first_commit) ? $first_commit->sha : $first_commit['sha'];
             }
-            $commit_hash = $commits['data'][0]->sha;
-        }
 
-        // Get commit details
-        $commit_result = $this->github_api->get_commit_details($commit_hash);
-        if (!$commit_result['success']) {
-            wp_send_json_error(['message' => __('Failed to get commit details', 'github-auto-deploy')]);
-        }
+            // Get commit details
+            $commit_result = $this->github_api->get_commit_details($commit_hash);
+            if (!$commit_result['success']) {
+                wp_send_json_error(['message' => __('Failed to get commit details', 'github-auto-deploy')]);
+            }
 
-        $commit_data = $commit_result['data'];
-        $deployment_result = $this->deployment_manager->start_deployment($commit_hash, 'manual', get_current_user_id(), [
-            'commit_message' => $commit_data->commit->message ?? '',
-            'commit_author' => $commit_data->commit->author->name ?? '',
-            'commit_date' => $commit_data->commit->author->date ?? current_time('mysql'),
-        ]);
+            $commit_data = $commit_result['data'];
 
-        // Check if result is an array (error) or int (success)
-        if (is_array($deployment_result) && isset($deployment_result['error'])) {
-            // Deployment blocked due to existing build
-            wp_send_json_error([
-                'message' => $deployment_result['message'],
-                'error_code' => $deployment_result['error'],
-                'building_deployment' => [
-                    'id' => $deployment_result['building_deployment']->id ?? 0,
-                    'commit_hash' => $deployment_result['building_deployment']->commit_hash ?? '',
-                    'status' => $deployment_result['building_deployment']->status ?? '',
-                    'created_at' => $deployment_result['building_deployment']->created_at ?? '',
-                ],
+            // Handle both array and object responses for commit data
+            if (is_object($commit_data)) {
+                $commit_message = $commit_data->commit->message ?? '';
+                $commit_author = $commit_data->commit->author->name ?? '';
+                $commit_date = $commit_data->commit->author->date ?? current_time('mysql');
+            } else {
+                $commit_message = $commit_data['commit']['message'] ?? '';
+                $commit_author = $commit_data['commit']['author']['name'] ?? '';
+                $commit_date = $commit_data['commit']['author']['date'] ?? current_time('mysql');
+            }
+
+            $deployment_result = $this->deployment_manager->start_deployment($commit_hash, 'manual', get_current_user_id(), [
+                'commit_message' => $commit_message,
+                'commit_author' => $commit_author,
+                'commit_date' => $commit_date,
             ]);
-        }
 
-        if ($deployment_result) {
-            wp_send_json_success([
-                'message' => __('Deployment started successfully!', 'github-auto-deploy'),
-                'deployment_id' => $deployment_result,
+            // Check if result is an array (error) or int (success)
+            if (is_array($deployment_result) && isset($deployment_result['error'])) {
+                // Deployment blocked due to existing build
+                wp_send_json_error([
+                    'message' => $deployment_result['message'],
+                    'error_code' => $deployment_result['error'],
+                    'building_deployment' => [
+                        'id' => $deployment_result['building_deployment']->id ?? 0,
+                        'commit_hash' => $deployment_result['building_deployment']->commit_hash ?? '',
+                        'status' => $deployment_result['building_deployment']->status ?? '',
+                        'created_at' => $deployment_result['building_deployment']->created_at ?? '',
+                    ],
+                ]);
+            }
+
+            $this->logger->log('Admin', 'Deployment result received', [
+                'deployment_result' => $deployment_result,
+                'type' => gettype($deployment_result),
+                'is_truthy' => (bool)$deployment_result,
             ]);
-        } else {
-            wp_send_json_error(['message' => __('Failed to start deployment', 'github-auto-deploy')]);
+
+            if ($deployment_result) {
+                $this->logger->log('Admin', 'Sending success response', ['deployment_id' => $deployment_result]);
+                wp_send_json_success([
+                    'message' => __('Deployment started successfully!', 'github-auto-deploy'),
+                    'deployment_id' => $deployment_result,
+                ]);
+            } else {
+                $this->logger->log('Admin', 'Sending error response - deployment result was falsy');
+                wp_send_json_error(['message' => __('Failed to start deployment', 'github-auto-deploy')]);
+            }
+        } catch (Exception $e) {
+            $this->logger->error('Admin', 'Manual deploy exception', ['error' => $e->getMessage()]);
+            wp_send_json_error(['message' => sprintf(__('Deployment error: %s', 'github-auto-deploy'), $e->getMessage())]);
         }
     }
 
@@ -483,6 +517,127 @@ class GitHub_Deploy_Admin_Pages {
             wp_send_json_success(['message' => __('Logs cleared successfully', 'github-auto-deploy')]);
         } else {
             wp_send_json_error(['message' => __('Failed to clear logs', 'github-auto-deploy')]);
+        }
+    }
+
+    /**
+     * AJAX: Get GitHub App connect URL
+     */
+    public function ajax_get_connect_url(): void {
+        check_ajax_referer('github_deploy_admin', 'nonce');
+
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error(['message' => __('Unauthorized', 'github-auto-deploy')]);
+        }
+
+        $connect_url = $this->app_connector->get_connect_url();
+
+        if (is_wp_error($connect_url)) {
+            wp_send_json_error(['message' => $connect_url->get_error_message()]);
+        }
+
+        wp_send_json_success(['connect_url' => $connect_url]);
+    }
+
+    /**
+     * AJAX: Disconnect from GitHub
+     */
+    public function ajax_disconnect_github(): void {
+        check_ajax_referer('github_deploy_admin', 'nonce');
+
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error(['message' => __('Unauthorized', 'github-auto-deploy')]);
+        }
+
+        $result = $this->app_connector->disconnect();
+
+        if ($result) {
+            wp_send_json_success(['message' => __('Disconnected from GitHub successfully', 'github-auto-deploy')]);
+        } else {
+            wp_send_json_error(['message' => __('Failed to disconnect', 'github-auto-deploy')]);
+        }
+    }
+
+    /**
+     * AJAX: Get installation repositories (repos accessible by GitHub App)
+     */
+    public function ajax_get_installation_repos(): void {
+        check_ajax_referer('github_deploy_admin', 'nonce');
+
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error(['message' => __('Unauthorized', 'github-auto-deploy')]);
+        }
+
+        // Check if already bound
+        if ($this->settings->is_repo_bound()) {
+            wp_send_json_error(['message' => __('Repository is already bound. Disconnect to change repository.', 'github-auto-deploy')]);
+            return;
+        }
+
+        $this->logger->log('Admin', 'Fetching installation repositories');
+
+        $result = $this->github_api->get_installation_repositories();
+
+        $this->logger->log('Admin', 'Installation repositories result', [
+            'success' => $result['success'],
+            'repo_count' => isset($result['data']) ? count($result['data']) : 0,
+            'message' => $result['message'] ?? 'N/A'
+        ]);
+
+        if ($result['success']) {
+            wp_send_json_success(['repos' => $result['data']]);
+        } else {
+            wp_send_json_error(['message' => $result['message']]);
+        }
+    }
+
+    /**
+     * AJAX: Bind repository (one-time selection, cannot be changed without reconnecting)
+     */
+    public function ajax_bind_repo(): void {
+        check_ajax_referer('github_deploy_admin', 'nonce');
+
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error(['message' => __('Unauthorized', 'github-auto-deploy')]);
+        }
+
+        // Check if already bound
+        if ($this->settings->is_repo_bound()) {
+            wp_send_json_error(['message' => __('Repository is already bound. Disconnect from GitHub to change repository.', 'github-auto-deploy')]);
+            return;
+        }
+
+        $owner = sanitize_text_field($_POST['owner'] ?? '');
+        $name = sanitize_text_field($_POST['name'] ?? '');
+        $default_branch = sanitize_text_field($_POST['default_branch'] ?? 'main');
+
+        if (empty($owner) || empty($name)) {
+            wp_send_json_error(['message' => __('Invalid repository data', 'github-auto-deploy')]);
+            return;
+        }
+
+        $result = $this->settings->bind_repository($owner, $name, $default_branch);
+
+        if ($result) {
+            $this->logger->log('Admin', 'Repository bound', [
+                'repo' => $owner . '/' . $name,
+                'branch' => $default_branch,
+            ]);
+
+            wp_send_json_success([
+                'message' => sprintf(
+                    __('Repository %s successfully bound. This cannot be changed without disconnecting from GitHub.', 'github-auto-deploy'),
+                    $owner . '/' . $name
+                ),
+                'repo' => [
+                    'owner' => $owner,
+                    'name' => $name,
+                    'full_name' => $owner . '/' . $name,
+                    'default_branch' => $default_branch,
+                ],
+            ]);
+        } else {
+            wp_send_json_error(['message' => __('Failed to bind repository', 'github-auto-deploy')]);
         }
     }
 }

@@ -12,6 +12,14 @@
     },
 
     bindEvents: function () {
+      // GitHub App connection
+      $("#connect-github-btn").on("click", this.connectGitHub.bind(this));
+      $("#disconnect-github-btn").on("click", this.disconnectGitHub.bind(this));
+
+      // Repository binding
+      $("#repo-select").on("change", this.onRepoSelectChange.bind(this));
+      $("#bind-repo-btn").on("click", this.bindRepository.bind(this));
+
       // Test connection
       $("#test-connection-btn").on("click", this.testConnection.bind(this));
 
@@ -36,6 +44,86 @@
         if (e.target === this) {
           $(this).hide();
         }
+      });
+
+      // Load installation repos if repo selector is present
+      if ($("#repo-selector-section").length) {
+        console.log('Repo selector found, loading installation repos...');
+        this.loadInstallationRepos();
+      } else {
+        console.log('Repo selector section not found on page');
+      }
+    },
+
+    connectGitHub: function (e) {
+      e.preventDefault();
+
+      const button = $(e.target).closest("button");
+      const spinner = $("#connect-loading");
+
+      button.prop("disabled", true);
+      spinner.addClass("is-active");
+
+      $.ajax({
+        url: githubDeployAdmin.ajaxUrl,
+        method: "POST",
+        data: {
+          action: "github_deploy_get_connect_url",
+          nonce: githubDeployAdmin.nonce,
+        },
+        success: function (response) {
+          if (response.success && response.data.connect_url) {
+            // Redirect to OAuth flow
+            window.location.href = response.data.connect_url;
+          } else {
+            alert(response.data?.message || "Failed to get connection URL");
+            button.prop("disabled", false);
+            spinner.removeClass("is-active");
+          }
+        },
+        error: function () {
+          alert("An error occurred. Please try again.");
+          button.prop("disabled", false);
+          spinner.removeClass("is-active");
+        },
+      });
+    },
+
+    disconnectGitHub: function (e) {
+      e.preventDefault();
+
+      if (!confirm("Are you sure you want to disconnect from GitHub? You will need to reconnect to continue using automatic deployments.")) {
+        return;
+      }
+
+      const button = $(e.target).closest("button");
+      const spinner = $("#disconnect-loading");
+
+      button.prop("disabled", true);
+      spinner.addClass("is-active");
+
+      $.ajax({
+        url: githubDeployAdmin.ajaxUrl,
+        method: "POST",
+        data: {
+          action: "github_deploy_disconnect",
+          nonce: githubDeployAdmin.nonce,
+        },
+        success: function (response) {
+          if (response.success) {
+            // Reload the page to show disconnected state
+            window.location.reload();
+          } else {
+            alert(response.data?.message || "Failed to disconnect");
+            button.prop("disabled", false);
+            spinner.removeClass("is-active");
+          }
+        },
+        error: function () {
+          alert("An error occurred. Please try again.");
+          button.prop("disabled", false);
+          spinner.removeClass("is-active");
+        },
       });
     },
 
@@ -373,6 +461,128 @@
 
     closeModal: function () {
       $(".github-deploy-modal").hide();
+    },
+
+    loadInstallationRepos: function () {
+      const $loading = $("#repo-selector-loading");
+      const $list = $("#repo-selector-list");
+      const $error = $("#repo-selector-error");
+      const $errorMessage = $("#repo-selector-error-message");
+      const $select = $("#repo-select");
+
+      $loading.show();
+      $list.hide();
+      $error.hide();
+
+      $.ajax({
+        url: githubDeployAdmin.ajaxUrl,
+        method: "POST",
+        data: {
+          action: "github_deploy_get_installation_repos",
+          nonce: githubDeployAdmin.nonce,
+        },
+        success: function (response) {
+          console.log('Installation repos response:', response);
+          $loading.hide();
+
+          if (response.success && response.data.repos) {
+            // Populate dropdown
+            $select.html('<option value="">-- Select a Repository --</option>');
+
+            response.data.repos.forEach(function (repo) {
+              const icon = repo.private ? "🔒 " : "📖 ";
+              $select.append(
+                $("<option></option>")
+                  .val(JSON.stringify({
+                    owner: repo.owner,
+                    name: repo.name,
+                    full_name: repo.full_name,
+                    default_branch: repo.default_branch,
+                  }))
+                  .text(icon + repo.full_name)
+              );
+            });
+
+            $list.show();
+          } else {
+            console.error('Failed to load repos:', response);
+            $errorMessage.text(response.data?.message || "Failed to load repositories");
+            $error.show();
+          }
+        },
+        error: function (xhr, status, error) {
+          console.error('AJAX error loading repos:', xhr, status, error);
+          $loading.hide();
+          $errorMessage.text("An error occurred while loading repositories: " + error);
+          $error.show();
+        },
+      });
+    },
+
+    onRepoSelectChange: function () {
+      const $select = $("#repo-select");
+      const $button = $("#bind-repo-btn");
+
+      if ($select.val()) {
+        $button.prop("disabled", false);
+      } else {
+        $button.prop("disabled", true);
+      }
+    },
+
+    bindRepository: function (e) {
+      e.preventDefault();
+
+      const $select = $("#repo-select");
+      const $button = $("#bind-repo-btn");
+      const $spinner = $("#bind-loading");
+
+      if (!$select.val()) {
+        return;
+      }
+
+      const repoData = JSON.parse($select.val());
+
+      if (!confirm(
+        "Are you sure you want to bind to " + repoData.full_name + "?\n\n" +
+        "This action is permanent and cannot be undone without disconnecting from GitHub."
+      )) {
+        return;
+      }
+
+      $button.prop("disabled", true);
+      $select.prop("disabled", true);
+      $spinner.addClass("is-active");
+
+      $.ajax({
+        url: githubDeployAdmin.ajaxUrl,
+        method: "POST",
+        data: {
+          action: "github_deploy_bind_repo",
+          nonce: githubDeployAdmin.nonce,
+          owner: repoData.owner,
+          name: repoData.name,
+          default_branch: repoData.default_branch,
+        },
+        success: function (response) {
+          if (response.success) {
+            alert(response.data.message || "Repository bound successfully!");
+            // Reload page to show bound state
+            window.location.reload();
+          } else {
+            alert(response.data?.message || "Failed to bind repository");
+            $button.prop("disabled", false);
+            $select.prop("disabled", false);
+            $spinner.removeClass("is-active");
+          }
+        },
+        error: function () {
+          alert("An error occurred. Please try again.");
+          $button.prop("disabled", false);
+          $select.prop("disabled", false);
+          $spinner.removeClass("is-active");
+        },
+      });
     },
 
     autoRefresh: function () {
