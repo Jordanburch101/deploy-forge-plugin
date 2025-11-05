@@ -279,6 +279,18 @@ class GitHub_Deployment_Manager
             return;
         }
 
+        // Skip if already deployed
+        if ($deployment->status === 'success') {
+            $this->logger->log('Deployment', "Deployment #$deployment_id already completed, skipping");
+            return;
+        }
+
+        // Skip if deployment failed (don't retry)
+        if ($deployment->status === 'failed') {
+            $this->logger->log('Deployment', "Deployment #$deployment_id previously failed, skipping");
+            return;
+        }
+
         $this->logger->log_deployment_step($deployment_id, 'Process Build Success', 'started');
         $this->log_deployment($deployment_id, 'Build completed successfully. Starting deployment...');
 
