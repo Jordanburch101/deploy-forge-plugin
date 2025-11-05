@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Debug logs page template
  */
@@ -13,11 +14,9 @@ if (!defined('ABSPATH')) {
 
     <div class="debug-logs-controls" style="margin: 20px 0;">
         <button type="button" id="refresh-logs-btn" class="button button-primary">
-            <span class="dashicons dashicons-update"></span>
             <?php esc_html_e('Refresh Logs', 'github-auto-deploy'); ?>
         </button>
         <button type="button" id="clear-logs-btn" class="button button-secondary">
-            <span class="dashicons dashicons-trash"></span>
             <?php esc_html_e('Clear Logs', 'github-auto-deploy'); ?>
         </button>
 
@@ -64,93 +63,93 @@ if (!defined('ABSPATH')) {
 </div>
 
 <script type="text/javascript">
-(function($) {
-    'use strict';
+    (function($) {
+        'use strict';
 
-    const LogsViewer = {
-        init: function() {
-            $('#refresh-logs-btn').on('click', this.refreshLogs.bind(this));
-            $('#clear-logs-btn').on('click', this.clearLogs.bind(this));
-            $('#log-lines-select').on('change', this.refreshLogs.bind(this));
-        },
+        const LogsViewer = {
+            init: function() {
+                $('#refresh-logs-btn').on('click', this.refreshLogs.bind(this));
+                $('#clear-logs-btn').on('click', this.clearLogs.bind(this));
+                $('#log-lines-select').on('change', this.refreshLogs.bind(this));
+            },
 
-        refreshLogs: function(e) {
-            if (e) e.preventDefault();
+            refreshLogs: function(e) {
+                if (e) e.preventDefault();
 
-            const $spinner = $('#log-loading');
-            const $output = $('#log-output');
-            const lines = $('#log-lines-select').val();
+                const $spinner = $('#log-loading');
+                const $output = $('#log-output');
+                const lines = $('#log-lines-select').val();
 
-            $spinner.addClass('is-active');
+                $spinner.addClass('is-active');
 
-            $.ajax({
-                url: githubDeployAdmin.ajaxUrl,
-                type: 'POST',
-                data: {
-                    action: 'github_deploy_get_logs',
-                    nonce: githubDeployAdmin.nonce,
-                    lines: lines
-                },
-                success: function(response) {
-                    if (response.success) {
-                        $output.text(response.data.logs);
-                        $('#log-size strong').text(response.data.size);
+                $.ajax({
+                    url: githubDeployAdmin.ajaxUrl,
+                    type: 'POST',
+                    data: {
+                        action: 'github_deploy_get_logs',
+                        nonce: githubDeployAdmin.nonce,
+                        lines: lines
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                            $output.text(response.data.logs);
+                            $('#log-size strong').text(response.data.size);
 
-                        // Scroll to bottom
-                        $output.scrollTop($output[0].scrollHeight);
-                    } else {
-                        alert('Failed to load logs: ' + (response.data.message || 'Unknown error'));
+                            // Scroll to bottom
+                            $output.scrollTop($output[0].scrollHeight);
+                        } else {
+                            alert('Failed to load logs: ' + (response.data.message || 'Unknown error'));
+                        }
+                    },
+                    error: function() {
+                        alert('Failed to load logs. Please try again.');
+                    },
+                    complete: function() {
+                        $spinner.removeClass('is-active');
                     }
-                },
-                error: function() {
-                    alert('Failed to load logs. Please try again.');
-                },
-                complete: function() {
-                    $spinner.removeClass('is-active');
+                });
+            },
+
+            clearLogs: function(e) {
+                e.preventDefault();
+
+                if (!confirm('Are you sure you want to clear all debug logs? This cannot be undone.')) {
+                    return;
                 }
-            });
-        },
 
-        clearLogs: function(e) {
-            e.preventDefault();
+                const $spinner = $('#log-loading');
+                const $output = $('#log-output');
 
-            if (!confirm('Are you sure you want to clear all debug logs? This cannot be undone.')) {
-                return;
+                $spinner.addClass('is-active');
+
+                $.ajax({
+                    url: githubDeployAdmin.ajaxUrl,
+                    type: 'POST',
+                    data: {
+                        action: 'github_deploy_clear_logs',
+                        nonce: githubDeployAdmin.nonce
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                            $output.text('Logs cleared. New entries will appear here.');
+                            $('#log-size strong').text('0 bytes');
+                        } else {
+                            alert('Failed to clear logs: ' + (response.data.message || 'Unknown error'));
+                        }
+                    },
+                    error: function() {
+                        alert('Failed to clear logs. Please try again.');
+                    },
+                    complete: function() {
+                        $spinner.removeClass('is-active');
+                    }
+                });
             }
+        };
 
-            const $spinner = $('#log-loading');
-            const $output = $('#log-output');
+        $(document).ready(function() {
+            LogsViewer.init();
+        });
 
-            $spinner.addClass('is-active');
-
-            $.ajax({
-                url: githubDeployAdmin.ajaxUrl,
-                type: 'POST',
-                data: {
-                    action: 'github_deploy_clear_logs',
-                    nonce: githubDeployAdmin.nonce
-                },
-                success: function(response) {
-                    if (response.success) {
-                        $output.text('Logs cleared. New entries will appear here.');
-                        $('#log-size strong').text('0 bytes');
-                    } else {
-                        alert('Failed to clear logs: ' + (response.data.message || 'Unknown error'));
-                    }
-                },
-                error: function() {
-                    alert('Failed to clear logs. Please try again.');
-                },
-                complete: function() {
-                    $spinner.removeClass('is-active');
-                }
-            });
-        }
-    };
-
-    $(document).ready(function() {
-        LogsViewer.init();
-    });
-
-})(jQuery);
+    })(jQuery);
 </script>

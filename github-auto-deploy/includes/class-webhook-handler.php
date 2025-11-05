@@ -136,8 +136,12 @@ class GitHub_Webhook_Handler {
         // Verify webhook signature (skip if payload is empty - likely a test)
         // For form-encoded webhooks, GitHub signs the raw form data, not the extracted JSON
         $signature_payload = (strpos($content_type, 'application/x-www-form-urlencoded') !== false) ? $raw_payload : $payload;
-        
-        if (!empty($payload) && !$this->verify_signature($signature_payload, $signature)) {
+
+        // Check if webhook secret is configured
+        $webhook_secret = $this->settings->get('webhook_secret');
+
+        // Only validate signature if a secret is configured
+        if (!empty($webhook_secret) && !empty($payload) && !$this->verify_signature($signature_payload, $signature)) {
             $this->logger->error('Webhook', 'Invalid webhook signature', [
                 'content_type' => $content_type,
                 'payload_length' => strlen($payload),
@@ -147,6 +151,11 @@ class GitHub_Webhook_Handler {
                 'success' => false,
                 'message' => __('Invalid webhook signature.', 'github-auto-deploy'),
             ], 401);
+        }
+
+        // If no secret configured, log warning (insecure but allows GitHub App webhooks)
+        if (empty($webhook_secret)) {
+            $this->logger->log('Webhook', 'Webhook accepted without signature validation (no secret configured)');
         }
 
         // Parse payload

@@ -237,18 +237,23 @@ class GitHub_Deployment_Manager
 
         // Find workflow run matching this commit
         foreach ($result['data'] as $run) {
-            $this->logger->log('Deployment', "Checking run #{$run->id} with SHA: {$run->head_sha} vs {$commit_hash}");
+            // Handle both array and object
+            $runId = is_object($run) ? $run->id : $run['id'];
+            $runSha = is_object($run) ? $run->head_sha : $run['head_sha'];
+            $runUrl = is_object($run) ? $run->html_url : $run['html_url'];
 
-            if ($run->head_sha === $commit_hash) {
+            $this->logger->log('Deployment', "Checking run #{$runId} with SHA: {$runSha} vs {$commit_hash}");
+
+            if ($runSha === $commit_hash) {
                 $this->database->update_deployment($deployment_id, [
-                    'workflow_run_id' => $run->id,
-                    'build_url' => $run->html_url,
+                    'workflow_run_id' => $runId,
+                    'build_url' => $runUrl,
                 ]);
                 $this->logger->log_deployment_step($deployment_id, 'Workflow Run Matched', 'success', [
-                    'workflow_run_id' => $run->id,
-                    'build_url' => $run->html_url,
+                    'workflow_run_id' => $runId,
+                    'build_url' => $runUrl,
                 ]);
-                $this->log_deployment($deployment_id, 'Found workflow run ID: ' . $run->id);
+                $this->log_deployment($deployment_id, 'Found workflow run ID: ' . $runId);
 
                 // Immediately check the status now that we have the run ID
                 $this->check_build_status($deployment_id);
@@ -293,14 +298,27 @@ class GitHub_Deployment_Manager
             return;
         }
 
-        $this->logger->log_deployment_step($deployment_id, 'Artifacts Found', 'success', [
-            'artifact_count' => count($artifacts_result['data']),
-            'artifact_name' => $artifacts_result['data'][0]->name ?? 'unknown',
-        ]);
-
         // Get first artifact (assuming single artifact)
         $artifact = $artifacts_result['data'][0];
-        $artifact_id = $artifact->id;
+
+        // Handle both array and object formats
+        $artifact_name = is_array($artifact) ? ($artifact['name'] ?? 'unknown') : ($artifact->name ?? 'unknown');
+        $artifact_id = is_array($artifact) ? ($artifact['id'] ?? null) : ($artifact->id ?? null);
+
+        $this->logger->log_deployment_step($deployment_id, 'Artifacts Found', 'success', [
+            'artifact_count' => count($artifacts_result['data']),
+            'artifact_name' => $artifact_name,
+            'artifact_id' => $artifact_id,
+        ]);
+
+        if (!$artifact_id) {
+            $this->logger->error('Deployment', "Deployment #$deployment_id artifact has no ID", ['artifact' => $artifact]);
+            $this->database->update_deployment($deployment_id, [
+                'status' => 'failed',
+                'error_message' => __('Artifact ID not found.', 'github-auto-deploy'),
+            ]);
+            return;
+        }
 
         // Download and deploy
         $this->download_and_deploy($deployment_id, $artifact_id);
@@ -548,28 +566,15 @@ class GitHub_Deployment_Manager
             }
         }
 
-        // Get theme path
-        $theme_path = $this->settings->get_theme_path();
+        // Extract artifact directly to themes folder (preserves directory structure)
+        $themes_base_path = WP_CONTENT_DIR . '/themes';
 
-        $this->logger->log_deployment_step($deployment_id, 'Copy to Theme Directory', 'started', [
+        $this->logger->log_deployment_step($deployment_id, 'Copy to Themes Directory', 'started', [
             'source' => $temp_extract_dir,
-            'destination' => $theme_path,
+            'destination' => $themes_base_path,
         ]);
 
-        // Ensure theme directory exists
-        if (!is_dir($theme_path)) {
-            if (!mkdir($theme_path, 0755, true)) {
-                $this->logger->error('Deployment', "Failed to create theme directory: {$theme_path}");
-                $this->database->update_deployment($deployment_id, [
-                    'status' => 'failed',
-                    'error_message' => __('Failed to create theme directory.', 'github-auto-deploy'),
-                ]);
-                return;
-            }
-            $this->logger->log('Deployment', "Created theme directory: $theme_path");
-        }
-
-        $this->log_deployment($deployment_id, 'Deploying files to theme directory...');
+        $this->log_deployment($deployment_id, 'Deploying theme files...');
 
         // Count files to be copied for logging
         $file_count = 0;
@@ -593,11 +598,12 @@ class GitHub_Deployment_Manager
             'directory_count' => $dir_count,
         ]);
 
-        // Copy files from extracted directory to theme directory using native PHP
+        // Copy entire extracted structure to themes directory
+        // This preserves whatever directory structure the artifact has
         // Increase timeout for large theme deployments
         @set_time_limit(300);
 
-        $copy_result = $this->recursive_copy($temp_extract_dir, $theme_path);
+        $copy_result = $this->recursive_copy($temp_extract_dir, $themes_base_path);
 
         if (!$copy_result) {
             $this->logger->error('Deployment', "Deployment #$deployment_id file copy failed");
@@ -829,6 +835,72 @@ class GitHub_Deployment_Manager
         }
 
         return $temp_dir;
+    }
+
+    /**
+     * Find the actual theme directory within extracted artifact
+     * Handles nested structures like reponame/theme/ or just reponame/
+     *
+     * @param string $extract_dir The directory where artifact was extracted
+     * @return string|false Path to theme directory or false if not found
+     */
+    private function find_theme_directory(string $extract_dir)
+    {
+        // Recursively search for theme files (style.css or functions.php)
+        // Max depth of 3 levels to handle structures like:
+        // - reponame/style.css
+        // - reponame/theme/style.css
+        // - reponame/subdir/theme/style.css
+
+        $max_depth = 3;
+
+        $this->logger->log('Deployment', 'Searching for theme files in extracted artifact', [
+            'search_root' => $extract_dir,
+            'max_depth' => $max_depth,
+        ]);
+
+        return $this->find_theme_directory_recursive($extract_dir, 0, $max_depth);
+    }
+
+    /**
+     * Recursively search for theme directory
+     */
+    private function find_theme_directory_recursive(string $dir, int $current_depth, int $max_depth)
+    {
+        if ($current_depth > $max_depth) {
+            return false;
+        }
+
+        // Check if current directory has theme files
+        if (file_exists($dir . '/style.css') || file_exists($dir . '/functions.php')) {
+            $this->logger->log('Deployment', 'Found theme files', [
+                'directory' => $dir,
+                'depth' => $current_depth,
+            ]);
+            return $dir;
+        }
+
+        // Search subdirectories
+        if (!is_dir($dir)) {
+            return false;
+        }
+
+        $items = scandir($dir);
+        foreach ($items as $item) {
+            if ($item === '.' || $item === '..') {
+                continue;
+            }
+
+            $item_path = $dir . '/' . $item;
+            if (is_dir($item_path)) {
+                $result = $this->find_theme_directory_recursive($item_path, $current_depth + 1, $max_depth);
+                if ($result) {
+                    return $result;
+                }
+            }
+        }
+
+        return false;
     }
 
     /**

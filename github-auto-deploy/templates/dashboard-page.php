@@ -136,7 +136,6 @@ if (!defined('ABSPATH')) {
                             <td>
                                 <?php if (in_array($deployment->status, ['pending', 'building'])): ?>
                                     <button type="button" class="button button-small cancel-deployment-btn" data-deployment-id="<?php echo esc_attr($deployment->id); ?>">
-                                        <span class="dashicons dashicons-no"></span>
                                         <?php esc_html_e('Cancel', 'github-auto-deploy'); ?>
                                     </button>
                                 <?php else: ?>

@@ -196,17 +196,15 @@ if (!defined('ABSPATH')) {
 
             <tr>
                 <th scope="row">
-                    <label for="target_theme_directory"><?php esc_html_e('Target Theme Directory', 'github-auto-deploy'); ?></label>
+                    <?php esc_html_e('Target Theme Directory', 'github-auto-deploy'); ?>
                 </th>
                 <td>
-                    <input type="text" id="target_theme_directory" name="target_theme_directory"
-                           value="<?php echo esc_attr($current_settings['target_theme_directory']); ?>"
-                           class="regular-text" required>
                     <p class="description">
-                        <?php esc_html_e('Theme folder name in wp-content/themes/', 'github-auto-deploy'); ?>
+                        <?php esc_html_e('The theme will be deployed to:', 'github-auto-deploy'); ?>
                         <br>
-                        <strong><?php esc_html_e('Full path:', 'github-auto-deploy'); ?></strong>
-                        <code><?php echo esc_html(WP_CONTENT_DIR . '/themes/' . ($current_settings['target_theme_directory'] ?: '[theme-name]')); ?></code>
+                        <code><?php echo esc_html(WP_CONTENT_DIR . '/themes/' . ($current_settings['github_repo_name'] ?: '[repository-name]')); ?></code>
+                        <br>
+                        <em><?php esc_html_e('(Automatically uses the repository name)', 'github-auto-deploy'); ?></em>
                     </p>
                 </td>
             </tr>

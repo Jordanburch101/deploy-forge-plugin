@@ -401,6 +401,12 @@
   gap: 5px;
 }
 
+#refresh-status-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
 /* Bind Repository Button */
 #bind-repo-btn {
   display: flex;

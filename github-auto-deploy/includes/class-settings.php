@@ -28,7 +28,6 @@ class GitHub_Deploy_Settings {
             'github_repo_name' => '',
             'github_branch' => 'main',
             'github_workflow_name' => 'build-theme.yml',
-            'target_theme_directory' => '',
             'auto_deploy_enabled' => false,
             'require_manual_approval' => false,
             'create_backups' => true,
@@ -64,7 +63,6 @@ class GitHub_Deploy_Settings {
             'github_repo_name' => sanitize_text_field($settings['github_repo_name'] ?? ''),
             'github_branch' => sanitize_text_field($settings['github_branch'] ?? 'main'),
             'github_workflow_name' => sanitize_text_field($settings['github_workflow_name'] ?? 'build-theme.yml'),
-            'target_theme_directory' => sanitize_text_field($settings['target_theme_directory'] ?? ''),
             'auto_deploy_enabled' => (bool) ($settings['auto_deploy_enabled'] ?? false),
             'require_manual_approval' => (bool) ($settings['require_manual_approval'] ?? false),
             'create_backups' => (bool) ($settings['create_backups'] ?? true),
@@ -219,16 +217,13 @@ class GitHub_Deploy_Settings {
             $errors[] = __('GitHub branch is required.', 'github-auto-deploy');
         }
 
-        if (empty($this->get('target_theme_directory'))) {
-            $errors[] = __('Target theme directory is required.', 'github-auto-deploy');
-        }
-
         if (!$this->is_github_connected()) {
             $errors[] = __('GitHub connection is required. Please connect your GitHub account.', 'github-auto-deploy');
         }
 
-        $theme_path = WP_CONTENT_DIR . '/themes/' . $this->get('target_theme_directory');
-        if (!empty($this->get('target_theme_directory')) && !is_dir($theme_path)) {
+        // Validate theme directory exists (uses repo name)
+        $theme_path = $this->get_theme_path();
+        if (!empty($this->get('github_repo_name')) && !is_dir($theme_path)) {
             $errors[] = sprintf(
                 __('Theme directory does not exist: %s', 'github-auto-deploy'),
                 $theme_path
@@ -245,7 +240,6 @@ class GitHub_Deploy_Settings {
         return !empty($this->get('github_repo_owner'))
             && !empty($this->get('github_repo_name'))
             && !empty($this->get('github_branch'))
-            && !empty($this->get('target_theme_directory'))
             && $this->is_github_connected();
     }
 
@@ -257,10 +251,11 @@ class GitHub_Deploy_Settings {
     }
 
     /**
-     * Get theme path
+     * Get theme path (uses repository name)
      */
     public function get_theme_path(): string {
-        return WP_CONTENT_DIR . '/themes/' . $this->get('target_theme_directory');
+        $repo_name = $this->get('github_repo_name');
+        return WP_CONTENT_DIR . '/themes/' . $repo_name;
     }
 
     /**

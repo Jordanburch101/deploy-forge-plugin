@@ -178,15 +178,24 @@ class GitHub_API
         }
 
         if ($response['status'] === 200) {
+            // $response['body'] can be array or object depending on backend response
+            $artifacts = is_array($response['body'])
+                ? ($response['body']['artifacts'] ?? [])
+                : ($response['body']->artifacts ?? []);
+
             return [
                 'success' => true,
-                'data' => $response['body']->artifacts ?? [],
+                'data' => $artifacts,
             ];
         }
 
+        $error_message = is_array($response['body'])
+            ? ($response['body']['message'] ?? __('Failed to get artifacts.', 'github-auto-deploy'))
+            : ($response['body']->message ?? __('Failed to get artifacts.', 'github-auto-deploy'));
+
         return [
             'success' => false,
-            'message' => $response['body']->message ?? __('Failed to get artifacts.', 'github-auto-deploy'),
+            'message' => $error_message,
         ];
     }
 
@@ -218,46 +227,77 @@ class GitHub_API
         // For now, we'll use a workaround: make a direct request with installation token
         // This requires the backend to expose a download endpoint or we handle it differently
 
-        // Alternative: Use the backend proxy to get the redirect location
+        // Use backend proxy to get installation token for direct download
         $backend_url = defined('GITHUB_DEPLOY_BACKEND_URL')
             ? GITHUB_DEPLOY_BACKEND_URL
             : 'https://deploy-forge.vercel.app';
 
-        $proxy_url = $backend_url . '/api/github/proxy';
+        $token_url = $backend_url . '/api/github/get-token';
 
-        $args = [
-            'method' => 'POST',
+        $token_response = wp_remote_post($token_url, [
             'headers' => [
                 'Content-Type' => 'application/json',
                 'X-API-Key' => $api_key,
             ],
-            'body' => wp_json_encode([
-                'method' => 'GET',
-                'endpoint' => $endpoint,
-                'data' => null,
-            ]),
-            'timeout' => 30,
-            'redirection' => 0, // Don't follow redirects
-        ];
+            'timeout' => 15,
+        ]);
 
-        $response = wp_remote_post($proxy_url, $args);
-
-        if (is_wp_error($response)) {
-            $this->logger->error('GitHub_API', "Failed to get artifact download URL", $response);
-            return $response;
+        if (is_wp_error($token_response)) {
+            $this->logger->error('GitHub_API', "Failed to get installation token", $token_response);
+            return $token_response;
         }
 
-        $body = json_decode(wp_remote_retrieve_body($response), true);
+        $token_response_code = wp_remote_retrieve_response_code($token_response);
+        $token_response_body = wp_remote_retrieve_body($token_response);
+        $token_body = json_decode($token_response_body, true);
 
-        // Extract the download location from GitHub response
-        // The backend should return the Location header if it's a redirect
-        if (isset($body['headers']['location'])) {
-            $location = $body['headers']['location'];
-        } elseif (isset($body['data']['url'])) {
-            $location = $body['data']['url'];
-        } else {
-            // Fallback: try to extract from response
-            $this->logger->error('GitHub_API', "No redirect location in response", $body);
+        $this->logger->log('GitHub_API', "Token endpoint response", [
+            'status' => $token_response_code,
+            'body_length' => strlen($token_response_body),
+            'has_token' => isset($token_body['token']),
+            'response_keys' => $token_body ? array_keys($token_body) : [],
+        ]);
+
+        if (!isset($token_body['token'])) {
+            $this->logger->error('GitHub_API', "No token in response", [
+                'status' => $token_response_code,
+                'body' => $token_body
+            ]);
+            return new WP_Error('no_token', __('Could not get GitHub installation token', 'github-auto-deploy'));
+        }
+
+        $installation_token = $token_body['token'];
+
+        $this->logger->log('GitHub_API', "Got installation token, requesting artifact download URL");
+
+        // Make direct GitHub API request to get redirect URL (don't follow redirect)
+        $github_api_url = 'https://api.github.com' . $endpoint;
+
+        $redirect_response = wp_remote_get($github_api_url, [
+            'headers' => [
+                'Authorization' => 'Bearer ' . $installation_token,
+                'Accept' => 'application/vnd.github+json',
+                'X-GitHub-Api-Version' => '2022-11-28',
+                'User-Agent' => 'WordPress-GitHub-Deploy',
+            ],
+            'timeout' => 30,
+            'redirection' => 0, // Don't follow redirects - we want the Location header
+        ]);
+
+        if (is_wp_error($redirect_response)) {
+            $this->logger->error('GitHub_API', "Failed to get artifact redirect", $redirect_response);
+            return $redirect_response;
+        }
+
+        // GitHub returns 302 redirect with Location header pointing to Azure blob storage
+        $location = wp_remote_retrieve_header($redirect_response, 'location');
+
+        if (empty($location)) {
+            $status = wp_remote_retrieve_response_code($redirect_response);
+            $this->logger->error('GitHub_API', "No redirect location in response", [
+                'status' => $status,
+                'headers' => wp_remote_retrieve_headers($redirect_response)->getAll()
+            ]);
             return new WP_Error('no_redirect', __('Could not get artifact download URL', 'github-auto-deploy'));
         }
 
