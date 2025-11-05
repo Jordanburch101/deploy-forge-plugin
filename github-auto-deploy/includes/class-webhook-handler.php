@@ -29,46 +29,6 @@ class GitHub_Webhook_Handler {
             'callback' => [$this, 'handle_webhook'],
             'permission_callback' => '__return_true', // We validate via signature
         ]);
-        
-        // Debug endpoint to test webhook reception
-        register_rest_route('github-deploy/v1', '/webhook-test', [
-            'methods' => ['GET', 'POST'],
-            'callback' => [$this, 'test_webhook_reception'],
-            'permission_callback' => '__return_true',
-        ]);
-    }
-    
-    /**
-     * Test webhook reception (debug endpoint)
-     */
-    public function test_webhook_reception(WP_REST_Request $request): WP_REST_Response {
-        $methods = [
-            'get_body' => $request->get_body(),
-            'get_json_params' => $request->get_json_params(),
-            'get_body_params' => $request->get_body_params(),
-            'get_params' => $request->get_params(),
-        ];
-        
-        $diagnostics = [
-            'request_method' => $request->get_method(),
-            'content_type' => $request->get_header('content-type'),
-            'headers' => $request->get_headers(),
-            'php_input' => file_get_contents('php://input'),
-        ];
-        
-        foreach ($methods as $method => $data) {
-            $diagnostics[$method] = [
-                'is_empty' => empty($data),
-                'length' => is_string($data) ? strlen($data) : (is_array($data) ? count($data) : 0),
-                'preview' => is_string($data) ? substr($data, 0, 200) : $data,
-            ];
-        }
-        
-        return new WP_REST_Response([
-            'success' => true,
-            'message' => 'Debug info',
-            'diagnostics' => $diagnostics,
-        ], 200);
     }
 
     /**
@@ -137,15 +97,34 @@ class GitHub_Webhook_Handler {
         // For form-encoded webhooks, GitHub signs the raw form data, not the extracted JSON
         $signature_payload = (strpos($content_type, 'application/x-www-form-urlencoded') !== false) ? $raw_payload : $payload;
 
-        // Check if webhook secret is configured
+        // Get webhook secret - ALWAYS required for security
         $webhook_secret = $this->settings->get('webhook_secret');
 
-        // Only validate signature if a secret is configured
-        if (!empty($webhook_secret) && !empty($payload) && !$this->verify_signature($signature_payload, $signature)) {
+        // ALWAYS require webhook secret - no exceptions
+        if (empty($webhook_secret)) {
+            $this->logger->error('Webhook', 'Webhook secret not configured - rejecting request');
+            return new WP_REST_Response([
+                'success' => false,
+                'message' => __('Webhook secret must be configured. Please configure webhook secret in plugin settings.', 'github-auto-deploy'),
+            ], 401);
+        }
+
+        // Require non-empty payload
+        if (empty($payload)) {
+            $this->logger->error('Webhook', 'Empty payload received');
+            return new WP_REST_Response([
+                'success' => false,
+                'message' => __('Empty payload received.', 'github-auto-deploy'),
+            ], 400);
+        }
+
+        // ALWAYS validate signature - no exceptions
+        if (!$this->verify_signature($signature_payload, $signature)) {
             $this->logger->error('Webhook', 'Invalid webhook signature', [
                 'content_type' => $content_type,
                 'payload_length' => strlen($payload),
                 'signature_payload_length' => strlen($signature_payload),
+                'has_signature' => !empty($signature),
             ]);
             return new WP_REST_Response([
                 'success' => false,
@@ -153,10 +132,8 @@ class GitHub_Webhook_Handler {
             ], 401);
         }
 
-        // If no secret configured, log warning (insecure but allows GitHub App webhooks)
-        if (empty($webhook_secret)) {
-            $this->logger->log('Webhook', 'Webhook accepted without signature validation (no secret configured)');
-        }
+        // Signature validated successfully
+        $this->logger->log('Webhook', 'Webhook signature validated successfully');
 
         // Parse payload
         $data = json_decode($payload, true);
@@ -405,6 +382,7 @@ class GitHub_Webhook_Handler {
 
     /**
      * Verify webhook signature
+     * Note: Secret existence is validated before calling this method
      */
     private function verify_signature(string $payload, ?string $signature): bool {
         if (empty($signature)) {
@@ -413,10 +391,10 @@ class GitHub_Webhook_Handler {
 
         $secret = $this->settings->get('webhook_secret');
 
+        // Secret should always exist at this point (validated in handle_webhook)
+        // But double-check for safety
         if (empty($secret)) {
-            // If no secret is configured, log warning but allow (for initial setup)
-            error_log('GitHub Deploy: Webhook secret not configured. This is insecure!');
-            return true;
+            return false;
         }
 
         // GitHub sends signature as sha256=<hash>
