@@ -645,7 +645,7 @@ class GitHub_Deploy_Admin_Pages {
      * AJAX: Reset all plugin data (DANGER!)
      */
     public function ajax_reset_all_data(): void {
-        check_ajax_referer('github-deploy-nonce', 'nonce');
+        check_ajax_referer('github_deploy_admin', 'nonce');
 
         if (!current_user_can('manage_options')) {
             wp_send_json_error(['message' => __('Unauthorized', 'github-auto-deploy')]);

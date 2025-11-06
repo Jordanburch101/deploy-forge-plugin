@@ -9,6 +9,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Architecture
 
 ### Workflow
+
 1. Developer commits to GitHub → GitHub webhook notifies WordPress plugin
 2. Plugin validates webhook and triggers GitHub Actions workflow
 3. GitHub Actions builds theme (npm install, compile assets, etc.)
@@ -35,6 +36,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ```
 
 **Core Classes:**
+
 - `class-github-api.php` - GitHub REST API v3 wrapper using `wp_remote_request()`
 - `class-deployment-manager.php` - Orchestrates deployment workflow, backup/rollback
 - `class-webhook-handler.php` - REST API endpoint for GitHub webhooks with HMAC validation
@@ -66,6 +68,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Database Schema
 
 Custom table `{prefix}_github_deployments`:
+
 - `id` - Primary key
 - `commit_hash` - 40 char SHA
 - `commit_message`, `commit_author` - Git metadata
@@ -110,6 +113,7 @@ github-auto-deploy/
 ## Scoping Notes
 
 **v1.0 Scope (In):**
+
 - Single repository/branch connection
 - Theme deployment only (NOT plugins)
 - GitHub Actions integration only
@@ -119,6 +123,7 @@ github-auto-deploy/
 - Webhook support
 
 **Out of Scope:**
+
 - Plugin deployments
 - Multiple repositories
 - Multi-environment (staging/prod)
@@ -149,3 +154,4 @@ github-auto-deploy/
 - **No jQuery plugins** (vanilla JS only)
 - **No ORMs** (wpdb is sufficient)
 - **Keep it simple:** WordPress best practices, maximum compatibility
+- **Adding .md Files** Add these to /app-docs to keep the root file clean. Also add a date when made to help you keep track of major changes
