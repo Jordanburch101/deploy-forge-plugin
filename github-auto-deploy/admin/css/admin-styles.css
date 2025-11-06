@@ -396,20 +396,27 @@
 
 /* Disconnect GitHub Button */
 #disconnect-github-btn {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 5px;
 }
 
 #refresh-status-btn {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 5px;
 }
 
 /* Bind Repository Button */
 #bind-repo-btn {
-  display: flex;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+/* Reset All Data Button */
+#reset-all-data-btn {
+  display: inline-flex;
   align-items: center;
   gap: 5px;
 }

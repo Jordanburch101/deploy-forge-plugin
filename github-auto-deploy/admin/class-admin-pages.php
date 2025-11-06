@@ -171,7 +171,7 @@ class GitHub_Deploy_Admin_Pages {
                     'github_repo_owner' => $_POST['github_repo_owner'] ?? '',
                     'github_repo_name' => $_POST['github_repo_name'] ?? '',
                     'github_branch' => $_POST['github_branch'] ?? 'main',
-                    'github_workflow_name' => $_POST['github_workflow_name'] ?? 'build-theme.yml',
+                    'github_workflow_name' => $_POST['github_workflow_name'] ?? 'deploy-theme.yml',
                     'auto_deploy_enabled' => isset($_POST['auto_deploy_enabled']),
                     'require_manual_approval' => isset($_POST['require_manual_approval']),
                     'create_backups' => isset($_POST['create_backups']),
