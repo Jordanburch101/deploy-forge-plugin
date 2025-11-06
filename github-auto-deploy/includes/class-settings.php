@@ -178,8 +178,60 @@ class GitHub_Deploy_Settings {
         $current_settings['github_repo_name'] = $name;
         $current_settings['github_branch'] = $default_branch;
 
-        // Save both GitHub data and settings
-        return $this->set_github_data($github_data) && $this->save($current_settings);
+        // Save both GitHub data and settings locally
+        $saved = $this->set_github_data($github_data) && $this->save($current_settings);
+
+        if (!$saved) {
+            return false;
+        }
+
+        // Notify backend about repository binding
+        $this->notify_backend_repo_binding($owner . '/' . $name, $name, $default_branch);
+
+        return true;
+    }
+
+    /**
+     * Notify backend about repository binding
+     *
+     * @param string $repo_full_name Full repository name (owner/repo)
+     * @param string $repo_name Repository name
+     * @param string $default_branch Default branch
+     */
+    private function notify_backend_repo_binding(string $repo_full_name, string $repo_name, string $default_branch): void {
+        $api_key = $this->get_api_key();
+
+        if (empty($api_key)) {
+            return;
+        }
+
+        $backend_url = defined('GITHUB_DEPLOY_BACKEND_URL')
+            ? GITHUB_DEPLOY_BACKEND_URL
+            : 'https://deploy-forge.vercel.app';
+
+        $response = wp_remote_post($backend_url . '/api/repo/bind', [
+            'headers' => [
+                'Content-Type' => 'application/json',
+                'X-API-Key' => $api_key,
+            ],
+            'body' => wp_json_encode([
+                'repo_full_name' => $repo_full_name,
+                'repo_name' => $repo_name,
+                'default_branch' => $default_branch,
+            ]),
+            'timeout' => 15,
+        ]);
+
+        // Log the response (non-blocking, just for debugging)
+        if (is_wp_error($response)) {
+            error_log('GitHub Auto Deploy: Failed to notify backend about repo binding - ' . $response->get_error_message());
+        } else {
+            $status_code = wp_remote_retrieve_response_code($response);
+            if ($status_code !== 200) {
+                $body = wp_remote_retrieve_body($response);
+                error_log('GitHub Auto Deploy: Backend repo binding failed - Status: ' . $status_code . ', Body: ' . $body);
+            }
+        }
     }
 
     /**
