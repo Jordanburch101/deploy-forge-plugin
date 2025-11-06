@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Debug Logger class
  * Handles opt-in debug logging for troubleshooting
@@ -8,12 +9,14 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-class GitHub_Deploy_Debug_Logger {
+class GitHub_Deploy_Debug_Logger
+{
 
     private GitHub_Deploy_Settings $settings;
     private string $log_file;
 
-    public function __construct(GitHub_Deploy_Settings $settings) {
+    public function __construct(GitHub_Deploy_Settings $settings)
+    {
         $this->settings = $settings;
         $this->log_file = WP_CONTENT_DIR . '/github-deploy-debug.log';
     }
@@ -21,7 +24,8 @@ class GitHub_Deploy_Debug_Logger {
     /**
      * Check if debug mode is enabled
      */
-    public function is_enabled(): bool {
+    public function is_enabled(): bool
+    {
         $all_settings = $this->settings->get_all();
         return !empty($all_settings['debug_mode']);
     }
@@ -29,7 +33,8 @@ class GitHub_Deploy_Debug_Logger {
     /**
      * Log a debug message
      */
-    public function log(string $context, string $message, array $data = []): void {
+    public function log(string $context, string $message, array $data = []): void
+    {
         if (!$this->is_enabled()) {
             return;
         }
@@ -56,7 +61,8 @@ class GitHub_Deploy_Debug_Logger {
     /**
      * Log an error
      */
-    public function error(string $context, string $message, $error_data = null): void {
+    public function error(string $context, string $message, $error_data = null): void
+    {
         if (!$this->is_enabled()) {
             return;
         }
@@ -82,7 +88,8 @@ class GitHub_Deploy_Debug_Logger {
     /**
      * Log API request
      */
-    public function log_api_request(string $method, string $endpoint, array $params = [], array $headers = []): void {
+    public function log_api_request(string $method, string $endpoint, array $params = [], array $headers = []): void
+    {
         if (!$this->is_enabled()) {
             return;
         }
@@ -104,7 +111,8 @@ class GitHub_Deploy_Debug_Logger {
     /**
      * Log API response
      */
-    public function log_api_response(string $endpoint, int $status_code, $response_body, ?string $error = null): void {
+    public function log_api_response(string $endpoint, int $status_code, $response_body, ?string $error = null): void
+    {
         if (!$this->is_enabled()) {
             return;
         }
@@ -137,7 +145,8 @@ class GitHub_Deploy_Debug_Logger {
     /**
      * Log deployment step
      */
-    public function log_deployment_step(int $deployment_id, string $step, string $status, array $details = []): void {
+    public function log_deployment_step(int $deployment_id, string $step, string $status, array $details = []): void
+    {
         if (!$this->is_enabled()) {
             return;
         }
@@ -148,11 +157,16 @@ class GitHub_Deploy_Debug_Logger {
     /**
      * Get recent log entries
      */
-    public function get_recent_logs(int $lines = 100): string {
+    public function get_recent_logs(int $lines = 100): string
+    {
         if (!file_exists($this->log_file)) {
             return "No log file found.";
         }
 
+        /**
+         * @var \SplFileObject $file
+         * @noinspection PhpUndefinedClassInspection
+         */
         $file = new SplFileObject($this->log_file);
         $file->seek(PHP_INT_MAX);
         $total_lines = $file->key();
@@ -172,7 +186,8 @@ class GitHub_Deploy_Debug_Logger {
     /**
      * Clear log file
      */
-    public function clear_logs(): bool {
+    public function clear_logs(): bool
+    {
         if (file_exists($this->log_file)) {
             return unlink($this->log_file);
         }
@@ -182,7 +197,8 @@ class GitHub_Deploy_Debug_Logger {
     /**
      * Get log file size
      */
-    public function get_log_size(): string {
+    public function get_log_size(): string
+    {
         if (!file_exists($this->log_file)) {
             return '0 bytes';
         }

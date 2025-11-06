@@ -229,7 +229,7 @@ class GitHub_API
 
         // Use backend proxy to get installation token for direct download
         $backend_url = defined('GITHUB_DEPLOY_BACKEND_URL')
-            ? GITHUB_DEPLOY_BACKEND_URL
+            ? constant('GITHUB_DEPLOY_BACKEND_URL')
             : 'https://deploy-forge.vercel.app';
 
         $token_url = $backend_url . '/api/github/token';
@@ -432,7 +432,7 @@ class GitHub_API
 
         // Get backend URL from constant or use default
         $backend_url = defined('GITHUB_DEPLOY_BACKEND_URL')
-            ? GITHUB_DEPLOY_BACKEND_URL
+            ? constant('GITHUB_DEPLOY_BACKEND_URL')
             : 'https://deploy-forge.vercel.app';
 
         // Prepare proxy request

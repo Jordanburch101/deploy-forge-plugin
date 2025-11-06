@@ -110,7 +110,7 @@ class GitHub_Deploy_App_Connector
         }
 
         // Exchange connection token for credentials via backend API
-        $backend_url = defined('GITHUB_DEPLOY_BACKEND_URL') ? GITHUB_DEPLOY_BACKEND_URL : 'https://deploy-forge.vercel.app';
+        $backend_url = defined('GITHUB_DEPLOY_BACKEND_URL') ? constant('GITHUB_DEPLOY_BACKEND_URL') : 'https://deploy-forge.vercel.app';
         $exchange_url = $backend_url . '/api/auth/exchange-token';
 
         $this->logger->log('GitHub_App_Connector', 'Calling token exchange endpoint', [
@@ -259,7 +259,7 @@ class GitHub_Deploy_App_Connector
         }
 
         $backend_url = defined('GITHUB_DEPLOY_BACKEND_URL')
-            ? GITHUB_DEPLOY_BACKEND_URL
+            ? constant('GITHUB_DEPLOY_BACKEND_URL')
             : 'https://deploy-forge.vercel.app';
 
         $disconnect_url = $backend_url . '/api/auth/disconnect';
@@ -346,7 +346,6 @@ class GitHub_Deploy_App_Connector
             ]);
 
             return true;
-
         } catch (Exception $e) {
             $this->logger->error('GitHub_App_Connector', 'RESET: Failed to reset plugin data', [
                 'error' => $e->getMessage()
@@ -369,7 +368,7 @@ class GitHub_Deploy_App_Connector
         }
 
         $backend_url = defined('GITHUB_DEPLOY_BACKEND_URL')
-            ? GITHUB_DEPLOY_BACKEND_URL
+            ? constant('GITHUB_DEPLOY_BACKEND_URL')
             : 'https://deploy-forge.vercel.app';
 
         $disconnect_url = $backend_url . '/api/auth/disconnect';
@@ -480,7 +479,7 @@ class GitHub_Deploy_App_Connector
     private function get_backend_url(): string
     {
         return defined('GITHUB_DEPLOY_BACKEND_URL')
-            ? GITHUB_DEPLOY_BACKEND_URL
+            ? constant('GITHUB_DEPLOY_BACKEND_URL')
             : 'https://deploy-forge.vercel.app';
     }
 }

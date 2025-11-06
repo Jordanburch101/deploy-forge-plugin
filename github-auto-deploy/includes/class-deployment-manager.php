@@ -3,6 +3,10 @@
 /**
  * Deployment manager class
  * Orchestrates the entire deployment workflow
+ * 
+ * @phpstan-type ZipArchive \ZipArchive
+ * @phpstan-type RecursiveIteratorIterator \RecursiveIteratorIterator
+ * @phpstan-type RecursiveDirectoryIterator \RecursiveDirectoryIterator
  */
 
 if (!defined('ABSPATH')) {
@@ -446,6 +450,10 @@ class GitHub_Deployment_Manager
             return;
         }
 
+        /**
+         * @var \ZipArchive $zip
+         * @noinspection PhpUndefinedClassInspection
+         */
         $zip = new ZipArchive();
         $zip_open_result = $zip->open($artifact_zip);
 
@@ -475,6 +483,7 @@ class GitHub_Deployment_Manager
         $unzip_result = true; // Set for compatibility with rest of code
 
         if (is_wp_error($unzip_result)) {
+            /** @var WP_Error $unzip_result */
             $this->logger->error('Deployment', "Deployment #$deployment_id unzip failed", $unzip_result);
             $this->database->update_deployment($deployment_id, [
                 'status' => 'failed',
@@ -527,6 +536,10 @@ class GitHub_Deployment_Manager
                     'inner_zip_size' => file_exists($single_file_path) ? filesize($single_file_path) : 0,
                 ]);
 
+                /**
+                 * @var \ZipArchive $inner_zip
+                 * @noinspection PhpUndefinedClassInspection
+                 */
                 $inner_zip = new ZipArchive();
                 $inner_zip_open = $inner_zip->open($single_file_path);
 
@@ -592,7 +605,12 @@ class GitHub_Deployment_Manager
         $file_count = 0;
         $dir_count = 0;
         if (is_dir($temp_extract_dir)) {
+            /**
+             * @var \RecursiveIteratorIterator $iterator
+             * @noinspection PhpUndefinedClassInspection
+             */
             $iterator = new RecursiveIteratorIterator(
+                /** @noinspection PhpUndefinedClassInspection */
                 new RecursiveDirectoryIterator($temp_extract_dir, RecursiveDirectoryIterator::SKIP_DOTS),
                 RecursiveIteratorIterator::SELF_FIRST
             );
@@ -684,7 +702,12 @@ class GitHub_Deployment_Manager
 
         // Create zip of current theme
         if (class_exists('ZipArchive')) {
+            /**
+             * @var \ZipArchive $zip
+             * @noinspection PhpUndefinedClassInspection
+             */
             $zip = new ZipArchive();
+            /** @noinspection PhpUndefinedClassInspection */
             if ($zip->open($backup_path, ZipArchive::CREATE) === true) {
                 $this->logger->log('Deployment', "Adding files to backup ZIP...");
                 $this->add_directory_to_zip($zip, $theme_path, basename($theme_path));
@@ -708,10 +731,19 @@ class GitHub_Deployment_Manager
 
     /**
      * Add directory to zip recursively
+     * @param object $zip ZipArchive instance
+     * @param string $dir Directory path
+     * @param string $zip_path Path in zip
+     * @suppress PhanUndeclaredClassReference
      */
-    private function add_directory_to_zip(ZipArchive $zip, string $dir, string $zip_path): void
+    private function add_directory_to_zip($zip, string $dir, string $zip_path): void
     {
+        /**
+         * @var \RecursiveIteratorIterator $files
+         * @noinspection PhpUndefinedClassInspection
+         */
         $files = new RecursiveIteratorIterator(
+            /** @noinspection PhpUndefinedClassInspection */
             new RecursiveDirectoryIterator($dir),
             RecursiveIteratorIterator::LEAVES_ONLY
         );
@@ -749,6 +781,10 @@ class GitHub_Deployment_Manager
         }
 
         // Extract backup using native ZipArchive
+        /**
+         * @var \ZipArchive $zip
+         * @noinspection PhpUndefinedClassInspection
+         */
         $zip = new ZipArchive();
         if ($zip->open($deployment->backup_path) !== true) {
             $this->logger->error('Deployment', "Failed to open backup ZIP for rollback");
@@ -953,7 +989,12 @@ class GitHub_Deployment_Manager
             }
         }
 
+        /**
+         * @var \RecursiveIteratorIterator $iterator
+         * @noinspection PhpUndefinedClassInspection
+         */
         $iterator = new RecursiveIteratorIterator(
+            /** @noinspection PhpUndefinedClassInspection */
             new RecursiveDirectoryIterator($source, RecursiveDirectoryIterator::SKIP_DOTS),
             RecursiveIteratorIterator::SELF_FIRST
         );
@@ -987,7 +1028,12 @@ class GitHub_Deployment_Manager
             return false;
         }
 
+        /**
+         * @var \RecursiveIteratorIterator $iterator
+         * @noinspection PhpUndefinedClassInspection
+         */
         $iterator = new RecursiveIteratorIterator(
+            /** @noinspection PhpUndefinedClassInspection */
             new RecursiveDirectoryIterator($dir, RecursiveDirectoryIterator::SKIP_DOTS),
             RecursiveIteratorIterator::CHILD_FIRST
         );

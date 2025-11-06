@@ -25,7 +25,9 @@
       "json",
       "mbstring",
       "pcre",
+      "SPL",
       "standard",
+      "zip",
       "wordpress",
       "acf-pro"
     ],

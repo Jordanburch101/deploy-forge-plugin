@@ -206,7 +206,7 @@ class GitHub_Deploy_Settings {
         }
 
         $backend_url = defined('GITHUB_DEPLOY_BACKEND_URL')
-            ? GITHUB_DEPLOY_BACKEND_URL
+            ? constant('GITHUB_DEPLOY_BACKEND_URL')
             : 'https://deploy-forge.vercel.app';
 
         $response = wp_remote_post($backend_url . '/api/repo/bind', [
