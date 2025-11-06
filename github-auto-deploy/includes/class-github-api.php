@@ -232,7 +232,7 @@ class GitHub_API
             ? GITHUB_DEPLOY_BACKEND_URL
             : 'https://deploy-forge.vercel.app';
 
-        $token_url = $backend_url . '/api/github/get-token';
+        $token_url = $backend_url . '/api/github/token';
 
         $token_response = wp_remote_post($token_url, [
             'headers' => [

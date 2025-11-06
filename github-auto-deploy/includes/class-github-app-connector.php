@@ -229,19 +229,75 @@ class GitHub_Deploy_App_Connector
 
     /**
      * Disconnect from GitHub
-     * 
+     *
      * @return bool True on success
      */
     public function disconnect(): bool
     {
         $this->logger->log('GitHub_App_Connector', 'Disconnecting from GitHub');
 
-        // TODO: Optionally call backend to cleanup installation data
-        // For now, just remove local data
+        // Notify backend to cleanup installation data (graceful disconnect)
+        $this->notify_backend_disconnect();
 
+        // Remove local data
         $this->settings->disconnect_github();
 
         return true;
+    }
+
+    /**
+     * Notify backend about disconnect (graceful cleanup)
+     */
+    private function notify_backend_disconnect(): void
+    {
+        $api_key = $this->settings->get_api_key();
+
+        // If no API key, nothing to clean up on backend
+        if (empty($api_key)) {
+            $this->logger->log('GitHub_App_Connector', 'No API key found, skipping backend notification');
+            return;
+        }
+
+        $backend_url = defined('GITHUB_DEPLOY_BACKEND_URL')
+            ? GITHUB_DEPLOY_BACKEND_URL
+            : 'https://deploy-forge.vercel.app';
+
+        $disconnect_url = $backend_url . '/api/auth/disconnect';
+
+        $this->logger->log('GitHub_App_Connector', 'Notifying backend of disconnect', [
+            'url' => $disconnect_url
+        ]);
+
+        $response = wp_remote_post($disconnect_url, [
+            'headers' => [
+                'Content-Type' => 'application/json',
+                'X-API-Key' => $api_key,
+            ],
+            'body' => json_encode([]),
+            'timeout' => 15,
+        ]);
+
+        if (is_wp_error($response)) {
+            // Log error but don't fail the disconnect - local cleanup should still happen
+            $this->logger->error('GitHub_App_Connector', 'Failed to notify backend of disconnect', [
+                'error' => $response->get_error_message()
+            ]);
+            return;
+        }
+
+        $status_code = wp_remote_retrieve_response_code($response);
+        $body = wp_remote_retrieve_body($response);
+
+        if ($status_code === 200) {
+            $this->logger->log('GitHub_App_Connector', 'Backend notified successfully', [
+                'response' => json_decode($body, true)
+            ]);
+        } else {
+            $this->logger->error('GitHub_App_Connector', 'Backend disconnect notification failed', [
+                'status' => $status_code,
+                'body' => $body
+            ]);
+        }
     }
 
     /**
