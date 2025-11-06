@@ -47,6 +47,7 @@ class GitHub_Deploy_Admin_Pages {
         add_action('wp_ajax_github_deploy_disconnect', [$this, 'ajax_disconnect_github']);
         add_action('wp_ajax_github_deploy_get_installation_repos', [$this, 'ajax_get_installation_repos']);
         add_action('wp_ajax_github_deploy_bind_repo', [$this, 'ajax_bind_repo']);
+        add_action('wp_ajax_github_deploy_reset_all_data', [$this, 'ajax_reset_all_data']);
     }
 
     /**
@@ -637,6 +638,30 @@ class GitHub_Deploy_Admin_Pages {
             ]);
         } else {
             wp_send_json_error(['message' => __('Failed to bind repository', 'github-auto-deploy')]);
+        }
+    }
+
+    /**
+     * AJAX: Reset all plugin data (DANGER!)
+     */
+    public function ajax_reset_all_data(): void {
+        check_ajax_referer('github-deploy-nonce', 'nonce');
+
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error(['message' => __('Unauthorized', 'github-auto-deploy')]);
+            return;
+        }
+
+        $result = $this->app_connector->reset_all_data();
+
+        if (is_wp_error($result)) {
+            wp_send_json_error([
+                'message' => $result->get_error_message()
+            ]);
+        } else {
+            wp_send_json_success([
+                'message' => __('All plugin data has been reset. The page will reload.', 'github-auto-deploy')
+            ]);
         }
     }
 }

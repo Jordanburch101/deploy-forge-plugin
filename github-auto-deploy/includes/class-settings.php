@@ -252,6 +252,19 @@ class GitHub_Deploy_Settings {
     }
 
     /**
+     * Reset all plugin settings (for complete reset)
+     */
+    public function reset_all_settings(): bool {
+        // Delete all options
+        delete_option(self::OPTION_NAME);
+        delete_option(self::API_KEY_OPTION);
+        delete_option(self::GITHUB_DATA_OPTION);
+        delete_option('github_deploy_db_version');
+
+        return true;
+    }
+
+    /**
      * Validate settings
      */
     public function validate(): array {

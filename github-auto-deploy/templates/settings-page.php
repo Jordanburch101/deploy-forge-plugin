@@ -296,4 +296,36 @@ if (!defined('ABSPATH')) {
     </form>
 
     <div id="connection-result" style="margin-top: 20px;"></div>
+
+    <!-- Danger Zone -->
+    <div class="github-deploy-danger-zone" style="background: #fff; border: 2px solid #d63638; border-radius: 4px; padding: 20px; margin: 30px 0 20px 0;">
+        <h2 style="margin-top: 0; color: #d63638;">
+            <span class="dashicons dashicons-warning"></span>
+            <?php esc_html_e('Danger Zone', 'github-auto-deploy'); ?>
+        </h2>
+        <p><?php esc_html_e('These actions are irreversible and will permanently delete data.', 'github-auto-deploy'); ?></p>
+
+        <div style="background: #fcf0f1; border-left: 4px solid #d63638; padding: 12px; margin: 12px 0;">
+            <h3 style="margin: 0 0 8px 0;"><?php esc_html_e('Reset All Plugin Data', 'github-auto-deploy'); ?></h3>
+            <p style="margin: 0 0 12px 0;">
+                <?php esc_html_e('This will permanently delete:', 'github-auto-deploy'); ?>
+            </p>
+            <ul style="margin: 0 0 12px 20px;">
+                <li><?php esc_html_e('GitHub connection and API credentials', 'github-auto-deploy'); ?></li>
+                <li><?php esc_html_e('All deployment history and logs', 'github-auto-deploy'); ?></li>
+                <li><?php esc_html_e('All theme backup files', 'github-auto-deploy'); ?></li>
+                <li><?php esc_html_e('All plugin settings', 'github-auto-deploy'); ?></li>
+                <li><?php esc_html_e('Backend server data (webhooks, installation)', 'github-auto-deploy'); ?></li>
+            </ul>
+            <p style="margin: 0 0 12px 0; color: #d63638;">
+                <strong><?php esc_html_e('Warning:', 'github-auto-deploy'); ?></strong>
+                <?php esc_html_e('This action cannot be undone. You will need to reconnect to GitHub and reconfigure all settings.', 'github-auto-deploy'); ?>
+            </p>
+            <button type="button" id="reset-all-data-btn" class="button button-secondary" style="background: #d63638; border-color: #d63638; color: #fff;">
+                <span class="dashicons dashicons-trash"></span>
+                <?php esc_html_e('Reset All Plugin Data', 'github-auto-deploy'); ?>
+            </button>
+            <span id="reset-loading" class="spinner" style="float: none; margin: 0 10px;"></span>
+        </div>
+    </div>
 </div>

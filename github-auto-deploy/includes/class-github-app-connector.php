@@ -301,8 +301,143 @@ class GitHub_Deploy_App_Connector
     }
 
     /**
+     * Reset all plugin data (DANGER: Cannot be undone!)
+     *
+     * Deletes:
+     * - GitHub connection
+     * - All deployment history
+     * - All backups
+     * - All settings
+     * - Backend KV store data
+     *
+     * @return bool|WP_Error True on success, WP_Error on failure
+     */
+    public function reset_all_data()
+    {
+        $this->logger->log('GitHub_App_Connector', 'RESET: Starting complete plugin data reset');
+
+        try {
+            // 1. Notify backend to delete all data (if connected)
+            $backend_deleted = $this->notify_backend_reset();
+
+            // 2. Clear deployment history from database
+            require_once plugin_dir_path(__FILE__) . 'class-database.php';
+            $database = new GitHub_Deploy_Database();
+            $database->clear_all_deployments();
+            $this->logger->log('GitHub_App_Connector', 'RESET: Deployment history cleared');
+
+            // 3. Delete all backup files
+            $backups_deleted = $this->delete_all_backups();
+            $this->logger->log('GitHub_App_Connector', 'RESET: Backup files deleted', [
+                'deleted' => $backups_deleted
+            ]);
+
+            // 4. Clear all settings
+            $this->settings->reset_all_settings();
+            $this->logger->log('GitHub_App_Connector', 'RESET: All settings cleared');
+
+            // 5. Clear debug logs
+            $this->logger->clear_logs();
+            $this->logger->log('GitHub_App_Connector', 'RESET: Debug logs cleared');
+
+            $this->logger->log('GitHub_App_Connector', 'RESET: Complete plugin reset finished successfully', [
+                'backend_deleted' => $backend_deleted,
+                'backups_deleted' => $backups_deleted
+            ]);
+
+            return true;
+
+        } catch (Exception $e) {
+            $this->logger->error('GitHub_App_Connector', 'RESET: Failed to reset plugin data', [
+                'error' => $e->getMessage()
+            ]);
+            return new WP_Error('reset_failed', $e->getMessage());
+        }
+    }
+
+    /**
+     * Notify backend to delete all site data (for reset)
+     */
+    private function notify_backend_reset(): bool
+    {
+        $api_key = $this->settings->get_api_key();
+
+        // If no API key, nothing to clean up on backend
+        if (empty($api_key)) {
+            $this->logger->log('GitHub_App_Connector', 'RESET: No API key found, skipping backend notification');
+            return true;
+        }
+
+        $backend_url = defined('GITHUB_DEPLOY_BACKEND_URL')
+            ? GITHUB_DEPLOY_BACKEND_URL
+            : 'https://deploy-forge.vercel.app';
+
+        $disconnect_url = $backend_url . '/api/auth/disconnect';
+
+        $this->logger->log('GitHub_App_Connector', 'RESET: Notifying backend to delete data', [
+            'url' => $disconnect_url
+        ]);
+
+        $response = wp_remote_post($disconnect_url, [
+            'headers' => [
+                'Content-Type' => 'application/json',
+                'X-API-Key' => $api_key,
+            ],
+            'body' => json_encode([]),
+            'timeout' => 15,
+        ]);
+
+        if (is_wp_error($response)) {
+            $this->logger->error('GitHub_App_Connector', 'RESET: Failed to notify backend', [
+                'error' => $response->get_error_message()
+            ]);
+            return false;
+        }
+
+        $status_code = wp_remote_retrieve_response_code($response);
+
+        if ($status_code === 200) {
+            $this->logger->log('GitHub_App_Connector', 'RESET: Backend data deleted successfully');
+            return true;
+        } else {
+            $this->logger->error('GitHub_App_Connector', 'RESET: Backend deletion failed', [
+                'status' => $status_code
+            ]);
+            return false;
+        }
+    }
+
+    /**
+     * Delete all backup files
+     */
+    private function delete_all_backups(): int
+    {
+        $backup_dir = wp_upload_dir()['basedir'] . '/github-deploy-backups';
+
+        if (!is_dir($backup_dir)) {
+            return 0;
+        }
+
+        $files = glob($backup_dir . '/*');
+        $deleted = 0;
+
+        foreach ($files as $file) {
+            if (is_file($file)) {
+                if (unlink($file)) {
+                    $deleted++;
+                }
+            }
+        }
+
+        // Try to remove the directory itself
+        @rmdir($backup_dir);
+
+        return $deleted;
+    }
+
+    /**
      * Check if GitHub is connected
-     * 
+     *
      * @return bool True if connected
      */
     public function is_connected(): bool
@@ -312,7 +447,7 @@ class GitHub_Deploy_App_Connector
 
     /**
      * Get connection details
-     * 
+     *
      * @return array Connection details (installation_id, account, repo, etc.)
      */
     public function get_connection_details(): array

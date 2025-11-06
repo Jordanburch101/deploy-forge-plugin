@@ -215,6 +215,28 @@ class GitHub_Deploy_Database {
     }
 
     /**
+     * Delete all deployment records (for reset)
+     */
+    public function clear_all_deployments(): bool {
+        global $wpdb;
+
+        $result = $wpdb->query("TRUNCATE TABLE {$this->table_name}");
+
+        return $result !== false;
+    }
+
+    /**
+     * Drop the deployments table (for complete uninstall)
+     */
+    public function drop_table(): bool {
+        global $wpdb;
+
+        $result = $wpdb->query("DROP TABLE IF EXISTS {$this->table_name}");
+
+        return $result !== false;
+    }
+
+    /**
      * Get total deployment count
      */
     public function get_deployment_count(?string $status = null): int {

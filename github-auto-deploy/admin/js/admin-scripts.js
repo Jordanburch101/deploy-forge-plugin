@@ -38,6 +38,9 @@
       // View details
       $(".view-details-btn").on("click", this.viewDetails.bind(this));
 
+      // Reset all data
+      $("#reset-all-data-btn").on("click", this.resetAllData.bind(this));
+
       // Close modal
       $(".github-deploy-modal-close").on("click", this.closeModal.bind(this));
       $(".github-deploy-modal").on("click", function (e) {
@@ -461,6 +464,74 @@
 
     closeModal: function () {
       $(".github-deploy-modal").hide();
+    },
+
+    resetAllData: function (e) {
+      e.preventDefault();
+
+      // First confirmation
+      if (!confirm(
+        "⚠️ WARNING: This will permanently delete ALL plugin data!\n\n" +
+        "This includes:\n" +
+        "• GitHub connection and credentials\n" +
+        "• All deployment history\n" +
+        "• All backup files\n" +
+        "• All settings\n" +
+        "• Backend server data\n\n" +
+        "This action CANNOT be undone!\n\n" +
+        "Are you sure you want to continue?"
+      )) {
+        return;
+      }
+
+      // Second confirmation with type-to-confirm
+      const confirmText = prompt(
+        "To confirm this destructive action, please type: RESET\n\n" +
+        "(Type RESET in all caps to proceed)"
+      );
+
+      if (confirmText !== "RESET") {
+        if (confirmText !== null) {
+          alert("Reset cancelled. You must type 'RESET' exactly to confirm.");
+        }
+        return;
+      }
+
+      const button = $(e.target).closest("button");
+      const spinner = $("#reset-loading");
+
+      button.prop("disabled", true);
+      spinner.addClass("is-active");
+
+      $.ajax({
+        url: githubDeployAdmin.ajaxUrl,
+        method: "POST",
+        data: {
+          action: "github_deploy_reset_all_data",
+          nonce: githubDeployAdmin.nonce,
+        },
+        success: function (response) {
+          if (response.success) {
+            alert(
+              "✓ All plugin data has been reset successfully.\n\n" +
+              "The page will now reload. You will need to reconnect to GitHub."
+            );
+            window.location.reload();
+          } else {
+            alert(
+              "Failed to reset plugin data:\n\n" +
+              (response.data?.message || "Unknown error")
+            );
+            button.prop("disabled", false);
+            spinner.removeClass("is-active");
+          }
+        },
+        error: function () {
+          alert("An error occurred while resetting plugin data. Please try again.");
+          button.prop("disabled", false);
+          spinner.removeClass("is-active");
+        },
+      });
     },
 
     loadInstallationRepos: function () {
