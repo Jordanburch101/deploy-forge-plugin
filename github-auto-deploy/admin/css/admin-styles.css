@@ -414,6 +414,13 @@
   gap: 5px;
 }
 
+/* Load Workflows Button */
+#load-workflows-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
 /* Reset All Data Button */
 #reset-all-data-btn {
   display: inline-flex;

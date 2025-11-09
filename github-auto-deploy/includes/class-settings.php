@@ -43,6 +43,13 @@ class GitHub_Deploy_Settings {
      * Get a setting value
      */
     public function get(string $key, $default = null) {
+        // CRITICAL FIX: For webhook_secret, always read fresh from database
+        // This ensures we get the latest value even if it was updated after this instance was created
+        if ($key === 'webhook_secret') {
+            $fresh_settings = get_option(self::OPTION_NAME, []);
+            return $fresh_settings['webhook_secret'] ?? $default;
+        }
+
         return $this->settings[$key] ?? $default;
     }
 
@@ -67,7 +74,8 @@ class GitHub_Deploy_Settings {
             'require_manual_approval' => (bool) ($settings['require_manual_approval'] ?? false),
             'create_backups' => (bool) ($settings['create_backups'] ?? true),
             'notification_email' => sanitize_email($settings['notification_email'] ?? get_option('admin_email')),
-            'webhook_secret' => sanitize_text_field($settings['webhook_secret'] ?? ''),
+            // Webhook secret is a hex string - only allow a-f0-9
+            'webhook_secret' => preg_replace('/[^a-f0-9]/i', '', $settings['webhook_secret'] ?? ''),
             'debug_mode' => (bool) ($settings['debug_mode'] ?? false),
         ];
 
@@ -85,7 +93,15 @@ class GitHub_Deploy_Settings {
      */
     public function update(string $key, $value): bool {
         $this->settings[$key] = $value;
-        return update_option(self::OPTION_NAME, $this->settings);
+        $result = update_option(self::OPTION_NAME, $this->settings);
+
+        // CRITICAL: Reload settings from database to ensure in-memory cache is fresh
+        // This is necessary because other instances of this class may have stale cached data
+        if ($result) {
+            $this->load_settings();
+        }
+
+        return $result;
     }
 
     /**
@@ -171,6 +187,10 @@ class GitHub_Deploy_Settings {
         $github_data['selected_repo_default_branch'] = $default_branch;
         $github_data['account_login'] = $owner;
         $github_data['bound_at'] = current_time('mysql');
+
+        // CRITICAL: Reload settings from database FIRST to ensure we have latest values
+        // This prevents overwriting values (like webhook_secret) that may have been set recently
+        $this->load_settings();
 
         // Update plugin settings with repo info
         $current_settings = $this->get_all();
@@ -260,6 +280,9 @@ class GitHub_Deploy_Settings {
         delete_option(self::API_KEY_OPTION);
         delete_option(self::GITHUB_DATA_OPTION);
         delete_option('github_deploy_db_version');
+
+        // Reload settings from defaults after reset
+        $this->load_settings();
 
         return true;
     }

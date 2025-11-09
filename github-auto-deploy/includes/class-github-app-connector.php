@@ -170,6 +170,15 @@ class GitHub_Deploy_App_Connector
         $webhook_secret = sanitize_text_field($body['webhook_secret'] ?? '');
         $installation_id = intval($body['installation_id'] ?? 0);
 
+        // DEBUG: Log what we received
+        $this->logger->log('GitHub_App_Connector', 'Extracted credentials from token exchange', [
+            'has_api_key' => !empty($api_key),
+            'api_key_length' => strlen($api_key ?? ''),
+            'has_webhook_secret' => !empty($webhook_secret),
+            'webhook_secret_length' => strlen($webhook_secret ?? ''),
+            'installation_id' => $installation_id
+        ]);
+
         if (empty($api_key) || empty($installation_id)) {
             $this->logger->error('GitHub_App_Connector', 'Missing credentials in token exchange response');
             add_action('admin_notices', function () {
@@ -185,10 +194,17 @@ class GitHub_Deploy_App_Connector
 
         // Store webhook secret (used to verify webhooks from backend)
         if (!empty($webhook_secret)) {
-            $this->settings->update('webhook_secret', $webhook_secret);
-            $this->logger->log('GitHub_App_Connector', 'Webhook secret received and stored', [
-                'secret_length' => strlen($webhook_secret),
-                'secret_preview' => substr($webhook_secret, 0, 8) . '...'
+            $this->logger->log('GitHub_App_Connector', 'BEFORE saving webhook secret', [
+                'webhook_secret_length' => strlen($webhook_secret),
+                'webhook_secret_preview' => substr($webhook_secret, 0, 8) . '...'
+            ]);
+
+            $save_result = $this->settings->update('webhook_secret', $webhook_secret);
+
+            $this->logger->log('GitHub_App_Connector', 'AFTER saving webhook secret', [
+                'save_result' => $save_result,
+                'verification_length' => strlen($this->settings->get('webhook_secret') ?? ''),
+                'verification_preview' => !empty($this->settings->get('webhook_secret')) ? substr($this->settings->get('webhook_secret'), 0, 8) . '...' : 'EMPTY'
             ]);
         } else {
             $this->logger->error('GitHub_App_Connector', 'No webhook secret received from backend!');

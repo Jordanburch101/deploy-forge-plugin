@@ -184,13 +184,28 @@ if (!defined('ABSPATH')) {
 
             <tr>
                 <th scope="row">
-                    <label for="github_workflow_name"><?php esc_html_e('Workflow File Name', 'github-auto-deploy'); ?></label>
+                    <label for="github_workflow_name"><?php esc_html_e('Workflow File', 'github-auto-deploy'); ?></label>
                 </th>
                 <td>
-                    <input type="text" id="github_workflow_name" name="github_workflow_name"
-                           value="<?php echo esc_attr($current_settings['github_workflow_name']); ?>"
-                           class="regular-text" required>
-                    <p class="description"><?php esc_html_e('GitHub Actions workflow file (e.g., build-theme.yml)', 'github-auto-deploy'); ?></p>
+                    <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                        <select id="github_workflow_dropdown" name="github_workflow_name" class="regular-text" style="display: none;">
+                            <option value=""><?php esc_html_e('Select a workflow...', 'github-auto-deploy'); ?></option>
+                        </select>
+                        <input type="text" id="github_workflow_name" name="github_workflow_name"
+                               value="<?php echo esc_attr($current_settings['github_workflow_name']); ?>"
+                               class="regular-text" required
+                               placeholder="e.g., deploy-theme.yml">
+                        <button type="button" id="load-workflows-btn" class="button button-secondary" style="display: none;">
+                            <span class="dashicons dashicons-update"></span>
+                            <?php esc_html_e('Load Workflows', 'github-auto-deploy'); ?>
+                        </button>
+                        <span id="workflow-loading" class="spinner" style="float: none; margin: 0;"></span>
+                    </div>
+                    <p class="description">
+                        <?php esc_html_e('Select from available workflows or enter manually', 'github-auto-deploy'); ?>
+                        <span id="workflow-count" style="display: none; margin-left: 10px; color: #2271b1;"></span>
+                    </p>
+                    <p id="workflow-error" class="description" style="display: none; color: #d63638;"></p>
                 </td>
             </tr>
 

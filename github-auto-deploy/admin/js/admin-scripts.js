@@ -20,6 +20,10 @@
       $("#repo-select").on("change", this.onRepoSelectChange.bind(this));
       $("#bind-repo-btn").on("click", this.bindRepository.bind(this));
 
+      // Workflow loading
+      $("#load-workflows-btn").on("click", this.loadWorkflows.bind(this));
+      $("#github_workflow_dropdown").on("change", this.onWorkflowSelect.bind(this));
+
       // Test connection
       $("#test-connection-btn").on("click", this.testConnection.bind(this));
 
@@ -56,6 +60,9 @@
       } else {
         console.log('Repo selector section not found on page');
       }
+
+      // Show workflow button if repo is bound (after page load)
+      this.checkWorkflowButtonVisibility();
     },
 
     connectGitHub: function (e) {
@@ -592,13 +599,16 @@
 
     onRepoSelectChange: function () {
       const $select = $("#repo-select");
-      const $button = $("#bind-repo-btn");
+      const $bindButton = $("#bind-repo-btn");
 
       if ($select.val()) {
-        $button.prop("disabled", false);
+        $bindButton.prop("disabled", false);
       } else {
-        $button.prop("disabled", true);
+        $bindButton.prop("disabled", true);
       }
+
+      // Update workflow button visibility based on selection
+      this.checkWorkflowButtonVisibility();
     },
 
     bindRepository: function (e) {
@@ -654,6 +664,175 @@
           $spinner.removeClass("is-active");
         },
       });
+    },
+
+    /**
+     * Load available workflows from selected repository
+     * SECURITY: Validates repo data before making AJAX request
+     */
+    loadWorkflows: function (e) {
+      e.preventDefault();
+
+      const $repoSelect = $("#repo-select");
+      const $button = $("#load-workflows-btn");
+      const $spinner = $("#workflow-loading");
+      const $dropdown = $("#github_workflow_dropdown");
+      const $manualInput = $("#github_workflow_name");
+      const $error = $("#workflow-error");
+      const $count = $("#workflow-count");
+
+      // Get repository from either bound repo or selector
+      let owner, repo;
+
+      if ($repoSelect.length && $repoSelect.val()) {
+        // From repo selector during setup
+        try {
+          const repoData = JSON.parse($repoSelect.val());
+          owner = repoData.owner;
+          repo = repoData.name;
+        } catch (e) {
+          $error.text("Invalid repository selection").show();
+          return;
+        }
+      } else {
+        // From bound repository (read from hidden fields or data attributes)
+        owner = $("#github_repo_owner").val();
+        repo = $("#github_repo_name").val();
+      }
+
+      if (!owner || !repo) {
+        $error.text("Please select a repository first").show();
+        return;
+      }
+
+      // SECURITY: Client-side validation of repo format
+      if (!/^[a-zA-Z0-9_-]+$/.test(owner) || !/^[a-zA-Z0-9_.-]+$/.test(repo)) {
+        $error.text("Invalid repository format").show();
+        return;
+      }
+
+      $button.prop("disabled", true);
+      $spinner.addClass("is-active");
+      $error.hide();
+      $count.hide();
+
+      $.ajax({
+        url: githubDeployAdmin.ajaxUrl,
+        method: "POST",
+        data: {
+          action: "github_deploy_get_workflows",
+          nonce: githubDeployAdmin.nonce,
+          owner: owner,
+          repo: repo,
+        },
+        success: function (response) {
+          $spinner.removeClass("is-active");
+          $button.prop("disabled", false);
+
+          console.log('Workflows response:', response);
+
+          if (response.success && response.data.workflows) {
+            const workflows = response.data.workflows;
+
+            console.log('Workflows count:', workflows.length);
+            console.log('Workflows data:', workflows);
+
+            if (workflows.length === 0) {
+              $error
+                .text("No workflows found. Make sure your repository has .github/workflows/*.yml files.")
+                .show();
+              return;
+            }
+
+            // Populate dropdown
+            $dropdown.empty();
+            $dropdown.append(
+              $("<option></option>")
+                .val("")
+                .text("Select a workflow...")
+            );
+
+            // Check if current value matches any workflow
+            const currentValue = $manualInput.val();
+            let matchFound = false;
+
+            workflows.forEach(function (workflow) {
+              const isSelected = workflow.filename === currentValue;
+              if (isSelected) matchFound = true;
+
+              $dropdown.append(
+                $("<option></option>")
+                  .val(workflow.filename)
+                  .text(workflow.name + " (" + workflow.filename + ")")
+                  .prop("selected", isSelected)
+              );
+            });
+
+            // Add "Or enter manually" option
+            $dropdown.append(
+              $("<option></option>")
+                .val("__manual__")
+                .text("✏️ Or enter manually...")
+            );
+
+            // Show dropdown, hide manual input initially
+            $dropdown.show().prop("name", "github_workflow_name");
+            $manualInput.hide().removeAttr("name");
+            $count.text("✓ " + workflows.length + " workflow(s) found").show();
+
+          } else {
+            $error.text(response.data?.message || "Failed to load workflows").show();
+          }
+        },
+        error: function () {
+          $spinner.removeClass("is-active");
+          $button.prop("disabled", false);
+          $error.text("An error occurred while loading workflows").show();
+        },
+      });
+    },
+
+    /**
+     * Handle workflow selection from dropdown
+     * Allows switching back to manual entry
+     */
+    onWorkflowSelect: function () {
+      const $dropdown = $("#github_workflow_dropdown");
+      const $manualInput = $("#github_workflow_name");
+      const selectedValue = $dropdown.val();
+
+      if (selectedValue === "__manual__") {
+        // User wants to enter manually
+        $dropdown.hide().removeAttr("name");
+        $manualInput.show().prop("name", "github_workflow_name").focus();
+        $("#workflow-count").hide();
+      } else if (selectedValue) {
+        // Valid workflow selected - keep it in sync
+        $manualInput.val(selectedValue);
+      }
+    },
+
+    /**
+     * Check if workflow button should be visible
+     * Shows button if repo is bound OR selected from dropdown
+     */
+    checkWorkflowButtonVisibility: function () {
+      const $workflowButton = $("#load-workflows-btn");
+      const $repoOwner = $("#github_repo_owner");
+      const $repoName = $("#github_repo_name");
+      const $repoSelect = $("#repo-select");
+
+      // Show if repo is bound (fields are populated and readonly)
+      const isRepoBound = $repoOwner.length && $repoOwner.val() && $repoOwner.prop("readonly");
+
+      // Show if repo is selected from dropdown
+      const isRepoSelected = $repoSelect.length && $repoSelect.val();
+
+      if (isRepoBound || isRepoSelected) {
+        $workflowButton.show();
+      } else {
+        $workflowButton.hide();
+      }
     },
 
     autoRefresh: function () {

@@ -29,6 +29,28 @@ class GitHub_Webhook_Handler {
             'callback' => [$this, 'handle_webhook'],
             'permission_callback' => '__return_true', // We validate via signature
         ]);
+
+        // Diagnostic endpoint to check webhook secret status
+        register_rest_route('github-deploy/v1', '/webhook-status', [
+            'methods' => 'GET',
+            'callback' => [$this, 'check_webhook_status'],
+            'permission_callback' => function() {
+                return current_user_can('manage_options');
+            },
+        ]);
+    }
+
+    /**
+     * Diagnostic endpoint to check if webhook secret is configured
+     */
+    public function check_webhook_status(): WP_REST_Response {
+        $webhook_secret = $this->settings->get('webhook_secret');
+
+        return new WP_REST_Response([
+            'configured' => !empty($webhook_secret),
+            'length' => strlen($webhook_secret ?? ''),
+            'preview' => !empty($webhook_secret) ? substr($webhook_secret, 0, 8) . '...' : 'EMPTY',
+        ]);
     }
 
     /**
@@ -99,6 +121,17 @@ class GitHub_Webhook_Handler {
 
         // Get webhook secret - ALWAYS required for security
         $webhook_secret = $this->settings->get('webhook_secret');
+
+        // DEBUG: Log detailed webhook secret retrieval info
+        $direct_option = get_option('github_deploy_settings');
+        $this->logger->log('Webhook', 'Webhook secret debug info', [
+            'from_settings_get' => strlen($webhook_secret ?? ''),
+            'direct_option_type' => gettype($direct_option),
+            'direct_option_is_array' => is_array($direct_option),
+            'direct_option_has_webhook_secret' => is_array($direct_option) && isset($direct_option['webhook_secret']),
+            'direct_option_webhook_secret_length' => is_array($direct_option) && isset($direct_option['webhook_secret']) ? strlen($direct_option['webhook_secret']) : 0,
+            'all_option_keys' => is_array($direct_option) ? array_keys($direct_option) : []
+        ]);
 
         // ALWAYS require webhook secret - no exceptions
         if (empty($webhook_secret)) {

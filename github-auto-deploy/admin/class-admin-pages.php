@@ -167,6 +167,9 @@ class GitHub_Deploy_Admin_Pages {
             if (!isset($_POST['_wpnonce']) || !wp_verify_nonce($_POST['_wpnonce'], 'github_deploy_settings')) {
                 echo '<div class="notice notice-error"><p>' . esc_html__('Security verification failed. Please try again.', 'github-auto-deploy') . '</p></div>';
             } else {
+                // Get current settings to preserve webhook_secret
+                $current = $this->settings->get_all();
+
                 $settings = [
                     'github_repo_owner' => $_POST['github_repo_owner'] ?? '',
                     'github_repo_name' => $_POST['github_repo_name'] ?? '',
@@ -176,7 +179,8 @@ class GitHub_Deploy_Admin_Pages {
                     'require_manual_approval' => isset($_POST['require_manual_approval']),
                     'create_backups' => isset($_POST['create_backups']),
                     'notification_email' => $_POST['notification_email'] ?? '',
-                    'webhook_secret' => $_POST['webhook_secret'] ?? '',
+                    // CRITICAL: Preserve webhook_secret from current settings (not editable in form)
+                    'webhook_secret' => $current['webhook_secret'] ?? '',
                     'debug_mode' => isset($_POST['debug_mode']),
                 ];
 
@@ -418,25 +422,38 @@ class GitHub_Deploy_Admin_Pages {
 
     /**
      * AJAX: Get repository workflows
+     * SECURITY: Validates nonce, capability, and sanitizes inputs
      */
     public function ajax_get_workflows(): void {
         check_ajax_referer('github_deploy_admin', 'nonce');
 
         if (!current_user_can('manage_options')) {
             wp_send_json_error(['message' => __('Unauthorized', 'github-auto-deploy')]);
+            return;
         }
 
+        // SECURITY: Sanitize and validate input parameters
         $owner = sanitize_text_field($_POST['owner'] ?? '');
         $repo = sanitize_text_field($_POST['repo'] ?? '');
 
         if (empty($owner) || empty($repo)) {
             wp_send_json_error(['message' => __('Missing owner or repo parameter', 'github-auto-deploy')]);
+            return;
         }
 
-        $result = $this->github_api->get_repository_workflows($owner, $repo);
+        // Additional validation: Check for valid characters
+        if (!preg_match('/^[a-zA-Z0-9_-]+$/', $owner) || !preg_match('/^[a-zA-Z0-9_.-]+$/', $repo)) {
+            wp_send_json_error(['message' => __('Invalid repository format', 'github-auto-deploy')]);
+            return;
+        }
+
+        $result = $this->github_api->get_workflows($owner, $repo);
 
         if ($result['success']) {
-            wp_send_json_success(['workflows' => $result['data']]);
+            wp_send_json_success([
+                'workflows' => $result['workflows'],
+                'total_count' => $result['total_count']
+            ]);
         } else {
             wp_send_json_error(['message' => $result['message']]);
         }

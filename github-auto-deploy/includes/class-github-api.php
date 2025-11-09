@@ -47,7 +47,7 @@ class GitHub_API
 
         return [
             'success' => false,
-            'message' => $response['body']->message ?? __('Failed to connect to repository.', 'github-auto-deploy'),
+            'message' => $response['body']['message'] ?? __('Failed to connect to repository.', 'github-auto-deploy'),
         ];
     }
 
@@ -83,7 +83,95 @@ class GitHub_API
 
         return [
             'success' => false,
-            'message' => $response['body']->message ?? __('Failed to trigger workflow.', 'github-auto-deploy'),
+            'message' => $response['body']['message'] ?? __('Failed to trigger workflow.', 'github-auto-deploy'),
+        ];
+    }
+
+    /**
+     * Get available workflows for a repository
+     * SECURITY: Only returns workflows with workflow_dispatch trigger enabled
+     */
+    public function get_workflows(string $repo_owner, string $repo_name): array
+    {
+        // Validate repository owner and name to prevent injection
+        if (!preg_match('/^[a-zA-Z0-9_-]+$/', $repo_owner) || !preg_match('/^[a-zA-Z0-9_.-]+$/', $repo_name)) {
+            return [
+                'success' => false,
+                'message' => __('Invalid repository owner or name format.', 'github-auto-deploy'),
+            ];
+        }
+
+        $endpoint = "/repos/{$repo_owner}/{$repo_name}/actions/workflows";
+
+        $response = $this->request('GET', $endpoint);
+
+        if (is_wp_error($response)) {
+            return [
+                'success' => false,
+                'message' => $response->get_error_message(),
+            ];
+        }
+
+        if ($response['status'] !== 200) {
+            return [
+                'success' => false,
+                'message' => $response['body']['message'] ?? __('Failed to fetch workflows.', 'github-auto-deploy'),
+            ];
+        }
+
+        // Filter workflows to only include those with workflow_dispatch trigger
+        // SECURITY: This prevents selecting workflows that can't be manually triggered
+        $all_workflows = $response['body']['workflows'] ?? [];
+        $dispatchable_workflows = [];
+
+        $this->logger->log('GitHub_API', 'Processing workflows', [
+            'total_workflows' => count($all_workflows),
+            'workflows_raw' => $all_workflows,
+        ]);
+
+        foreach ($all_workflows as $workflow) {
+            // Check if workflow state is active
+            if (isset($workflow['state']) && $workflow['state'] !== 'active') {
+                $this->logger->log('GitHub_API', 'Skipping inactive workflow', [
+                    'name' => $workflow['name'] ?? 'unknown',
+                    'state' => $workflow['state'] ?? 'unknown',
+                ]);
+                continue;
+            }
+
+            // Extract filename from path (e.g., ".github/workflows/deploy.yml" -> "deploy.yml")
+            $filename = basename($workflow['path'] ?? '');
+
+            // Only include .yml and .yaml files
+            if (!preg_match('/\.(yml|yaml)$/i', $filename)) {
+                $this->logger->log('GitHub_API', 'Skipping non-yml/yaml workflow', [
+                    'name' => $workflow['name'] ?? 'unknown',
+                    'filename' => $filename,
+                ]);
+                continue;
+            }
+
+            $workflow_data = [
+                'name' => sanitize_text_field($workflow['name'] ?? $filename),
+                'filename' => sanitize_file_name($filename),
+                'path' => sanitize_text_field($workflow['path'] ?? ''),
+                'state' => sanitize_text_field($workflow['state'] ?? 'unknown'),
+            ];
+
+            $this->logger->log('GitHub_API', 'Adding workflow to result', $workflow_data);
+
+            $dispatchable_workflows[] = $workflow_data;
+        }
+
+        $this->logger->log('GitHub_API', 'Workflows processed', [
+            'total_filtered' => count($dispatchable_workflows),
+            'workflows' => $dispatchable_workflows,
+        ]);
+
+        return [
+            'success' => true,
+            'workflows' => $dispatchable_workflows,
+            'total_count' => count($dispatchable_workflows),
         ];
     }
 
@@ -112,7 +200,7 @@ class GitHub_API
 
         return [
             'success' => false,
-            'message' => $response['body']->message ?? __('Failed to get workflow run status.', 'github-auto-deploy'),
+            'message' => $response['body']['message'] ?? __('Failed to get workflow run status.', 'github-auto-deploy'),
         ];
     }
 
@@ -157,7 +245,7 @@ class GitHub_API
 
         return [
             'success' => false,
-            'message' => $response['body']->message ?? __('Failed to get workflow runs.', 'github-auto-deploy'),
+            'message' => $response['body']['message'] ?? __('Failed to get workflow runs.', 'github-auto-deploy'),
         ];
     }
 
@@ -178,10 +266,8 @@ class GitHub_API
         }
 
         if ($response['status'] === 200) {
-            // $response['body'] can be array or object depending on backend response
-            $artifacts = is_array($response['body'])
-                ? ($response['body']['artifacts'] ?? [])
-                : ($response['body']->artifacts ?? []);
+            // $response['body'] is always an array (parsed with json_decode($body, true))
+            $artifacts = $response['body']['artifacts'] ?? [];
 
             return [
                 'success' => true,
@@ -189,13 +275,9 @@ class GitHub_API
             ];
         }
 
-        $error_message = is_array($response['body'])
-            ? ($response['body']['message'] ?? __('Failed to get artifacts.', 'github-auto-deploy'))
-            : ($response['body']->message ?? __('Failed to get artifacts.', 'github-auto-deploy'));
-
         return [
             'success' => false,
-            'message' => $error_message,
+            'message' => $response['body']['message'] ?? __('Failed to get artifacts.', 'github-auto-deploy'),
         ];
     }
 
@@ -384,7 +466,7 @@ class GitHub_API
 
         return [
             'success' => false,
-            'message' => $response['body']->message ?? __('Failed to get commits.', 'github-auto-deploy'),
+            'message' => $response['body']['message'] ?? __('Failed to get commits.', 'github-auto-deploy'),
         ];
     }
 
@@ -413,7 +495,7 @@ class GitHub_API
 
         return [
             'success' => false,
-            'message' => $response['body']->message ?? __('Failed to get commit details.', 'github-auto-deploy'),
+            'message' => $response['body']['message'] ?? __('Failed to get commit details.', 'github-auto-deploy'),
         ];
     }
 
@@ -564,14 +646,14 @@ class GitHub_API
             // Format repos for dropdown
             $formatted_repos = array_map(function ($repo) {
                 return [
-                    'id' => $repo->id ?? 0,
-                    'full_name' => $repo->full_name ?? '',
-                    'name' => $repo->name ?? '',
-                    'owner' => $repo->owner->login ?? '',
-                    'private' => $repo->private ?? false,
-                    'default_branch' => $repo->default_branch ?? 'main',
-                    'updated_at' => $repo->updated_at ?? '',
-                    'has_workflows' => $repo->has_actions ?? false,
+                    'id' => $repo['id'] ?? 0,
+                    'full_name' => $repo['full_name'] ?? '',
+                    'name' => $repo['name'] ?? '',
+                    'owner' => $repo['owner']['login'] ?? '',
+                    'private' => $repo['private'] ?? false,
+                    'default_branch' => $repo['default_branch'] ?? 'main',
+                    'updated_at' => $repo['updated_at'] ?? '',
+                    'has_workflows' => $repo['has_actions'] ?? false,
                 ];
             }, $repos);
 
@@ -586,7 +668,7 @@ class GitHub_API
 
         return [
             'success' => false,
-            'message' => $response['body']->message ?? __('Failed to get repositories.', 'github-auto-deploy'),
+            'message' => $response['body']['message'] ?? __('Failed to get repositories.', 'github-auto-deploy'),
         ];
     }
 
@@ -612,19 +694,19 @@ class GitHub_API
         }
 
         if ($response['status'] === 200) {
-            $workflows = $response['body']->workflows ?? [];
+            $workflows = $response['body']['workflows'] ?? [];
 
             // Format workflows for dropdown
             $formatted_workflows = array_map(function ($workflow) {
-                $path_parts = explode('/', $workflow->path ?? '');
+                $path_parts = explode('/', $workflow['path'] ?? '');
                 $filename = end($path_parts);
 
                 return [
-                    'id' => $workflow->id ?? 0,
-                    'name' => $workflow->name ?? '',
-                    'path' => $workflow->path ?? '',
+                    'id' => $workflow['id'] ?? 0,
+                    'name' => $workflow['name'] ?? '',
+                    'path' => $workflow['path'] ?? '',
                     'filename' => $filename,
-                    'state' => $workflow->state ?? 'unknown',
+                    'state' => $workflow['state'] ?? 'unknown',
                 ];
             }, $workflows);
 
@@ -639,7 +721,7 @@ class GitHub_API
 
         return [
             'success' => false,
-            'message' => $response['body']->message ?? __('Failed to get workflows.', 'github-auto-deploy'),
+            'message' => $response['body']['message'] ?? __('Failed to get workflows.', 'github-auto-deploy'),
         ];
     }
 
@@ -669,7 +751,7 @@ class GitHub_API
 
         return [
             'success' => false,
-            'message' => $response['body']->message ?? __('Failed to cancel workflow run.', 'github-auto-deploy'),
+            'message' => $response['body']['message'] ?? __('Failed to cancel workflow run.', 'github-auto-deploy'),
         ];
     }
 
@@ -765,7 +847,7 @@ class GitHub_API
 
         return [
             'success' => false,
-            'message' => $response['body']->message ?? __('Failed to get installation repositories.', 'github-auto-deploy'),
+            'message' => $response['body']['message'] ?? __('Failed to get installation repositories.', 'github-auto-deploy'),
         ];
     }
 }
