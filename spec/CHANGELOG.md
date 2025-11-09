@@ -11,6 +11,7 @@ This changelog replaces individual feature markdown files (e.g., `NEW-FEATURE.md
 ## Format
 
 Each entry should include:
+
 - **Date:** When the change was made/planned
 - **Type:** Feature, Enhancement, Fix, Security, Breaking Change
 - **Description:** What changed and why
@@ -23,6 +24,7 @@ Each entry should include:
 ### High Priority
 
 **Setup Wizard** (2025-11-09)
+
 - Type: Feature
 - Description: Multi-step onboarding wizard for first-time setup with modern, sleek UI
 - Features:
@@ -69,6 +71,7 @@ Each entry should include:
 - Related: spec/setup-wizard.md
 
 **Multi-Environment Support** (Planned)
+
 - Date Planned: TBD
 - Type: Feature
 - Description: Support for staging and production environments with separate configuration
@@ -79,6 +82,7 @@ Each entry should include:
 - Related Spec: To be created
 
 **Deployment Scheduling** (Planned)
+
 - Date Planned: TBD
 - Type: Feature
 - Description: Schedule deployments for specific times
@@ -89,6 +93,7 @@ Each entry should include:
 - Related Spec: To be created
 
 **Email Notifications** (Planned)
+
 - Date Planned: TBD
 - Type: Feature
 - Description: Email notifications for deployment events
@@ -101,6 +106,7 @@ Each entry should include:
 ### Medium Priority
 
 **Plugin Deployment Support** (Planned)
+
 - Date Planned: TBD
 - Type: Feature
 - Description: Extend beyond themes to support plugin deployments
@@ -108,6 +114,7 @@ Each entry should include:
 - Related Spec: To be created
 
 **Deployment Approval Workflow** (Planned)
+
 - Date Planned: TBD
 - Type: Feature
 - Description: Multi-step approval process for deployments
@@ -118,6 +125,7 @@ Each entry should include:
 - Related Spec: To be created
 
 **Advanced Logging & Analytics** (Planned)
+
 - Date Planned: TBD
 - Type: Enhancement
 - Description: Enhanced logging with search, filtering, and analytics dashboard
@@ -130,6 +138,7 @@ Each entry should include:
 ### Low Priority / Nice to Have
 
 **Slack Integration** (Planned)
+
 - Date Planned: TBD
 - Type: Feature
 - Description: Send deployment notifications to Slack
@@ -138,18 +147,21 @@ Each entry should include:
   - Configurable message templates
 
 **GitLab/Bitbucket Support** (Planned)
+
 - Date Planned: TBD
 - Type: Feature
 - Description: Support other Git hosting providers
 - Breaking: Yes (requires abstraction layer)
 
 **WP-CLI Commands** (Planned)
+
 - Date Planned: TBD
 - Type: Feature
 - Description: Command-line interface for deployments
 - Example: `wp github-deploy deploy --commit=abc123`
 
 **Deployment Health Checks** (Planned)
+
 - Date Planned: TBD
 - Type: Feature
 - Description: Pre and post-deployment validation
@@ -159,6 +171,7 @@ Each entry should include:
   - Auto-rollback on failure
 
 **Progressive Deployments** (Planned)
+
 - Date Planned: TBD
 - Type: Feature
 - Description: Staged rollout to percentage of traffic
@@ -173,6 +186,7 @@ Each entry should include:
 ### Added
 
 **Workflow Selection Feature** (2025-11-07)
+
 - Type: Feature
 - Description: Dynamic workflow selection instead of hardcoded workflow names
 - Changes:
@@ -188,6 +202,7 @@ Each entry should include:
 - Related: `app-docs/workflow-dropdown-feature-2025-11-07.md` (now archived)
 
 **Direct Clone Deployment Method** (2025-11-09)
+
 - Type: Feature
 - Description: Added alternative deployment method that clones repository directly without GitHub Actions build step
 - Use Case: Perfect for simple themes using plain CSS/JS without build processes (webpack, npm, etc.)
@@ -225,6 +240,7 @@ Each entry should include:
 - Related: FR010 in requirements.md
 
 **Manual Approval Workflow - Deploy Button** (2025-11-09)
+
 - Type: Fix
 - Description: Added missing "Deploy" button for pending deployments in manual approval workflow
 - Issue: When manual approval was enabled, pending deployments only showed "Cancel" button, making approval impossible from the UI
@@ -244,6 +260,7 @@ Each entry should include:
 - Impact: Manual approval feature now fully functional
 
 **Deployment Cancellation** (2025-11-09)
+
 - Type: Feature
 - Description: Ability to cancel in-progress deployments
 - Changes:
@@ -259,6 +276,7 @@ Each entry should include:
 - Related: `app-docs/CANCEL-DEPLOYMENT-FEATURE.md` (now archived)
 
 **Webhook Improvements** (2025-11-08)
+
 - Type: Enhancement
 - Description: Better webhook handling and workflow_run event support
 - Changes:
@@ -269,6 +287,7 @@ Each entry should include:
 - Related: `app-docs/WORKFLOW-WEBHOOK-IMPROVEMENT.md` (now archived)
 
 **GitHub App Integration** (2025-11-07)
+
 - Type: Enhancement
 - Description: Switched from Personal Access Tokens to GitHub App authentication
 - Changes:
@@ -284,6 +303,7 @@ Each entry should include:
 - Related: `app-docs/GITHUB-APP-SETUP-GUIDE.md`
 
 **Reset All Data Feature** (2025-11-06)
+
 - Type: Feature
 - Description: Ability to completely reset plugin configuration and data
 - Changes:
@@ -299,6 +319,7 @@ Each entry should include:
 ### Security Fixes
 
 **Critical Security Patches** (2025-11-05)
+
 - Type: Security
 - Description: Multiple critical security vulnerabilities fixed
 - Fixes:
@@ -312,6 +333,7 @@ Each entry should include:
 - CVE: None assigned (private disclosure)
 
 **Backend Security Improvements** (2025-11-05)
+
 - Type: Security
 - Description: Enhanced backend API security
 - Changes:
@@ -324,6 +346,7 @@ Each entry should include:
 ### Enhanced
 
 **Setup Wizard Improvements** (2025-01-27)
+
 - Type: Enhancement
 - Description: Enhanced setup wizard with repository binding, improved OAuth flow, and better UX
 - Changes:
@@ -347,6 +370,7 @@ Each entry should include:
 - Impact: More robust wizard flow, better user experience, improved error handling
 
 **GitHub API Enhancements** (2025-01-27)
+
 - Type: Enhancement
 - Description: Added branch fetching capability to GitHub API class
 - Changes:
@@ -360,12 +384,14 @@ Each entry should include:
 ### Fixed
 
 **Nonce Verification** (2025-11-06)
+
 - Type: Fix
 - Description: Fixed AJAX reset all data nonce verification
 - Issue: Wrong nonce name in verification
 - Fix: Updated to use correct nonce field
 
 **Workflow Loading** (2025-11-07)
+
 - Type: Fix
 - Description: Improved workflow loading reliability
 - Changes:
@@ -376,6 +402,7 @@ Each entry should include:
 ### Documentation
 
 **Comprehensive Specifications Created** (2025-11-09)
+
 - Type: Documentation
 - Description: Created spec/ folder with comprehensive technical documentation
 - Files Created:
@@ -455,6 +482,7 @@ None yet
 ### Database Migrations
 
 **v1.0.0:**
+
 - Initial schema creation
 - `wp_github_deployments` table
 - `wp_github_deploy_logs` table
