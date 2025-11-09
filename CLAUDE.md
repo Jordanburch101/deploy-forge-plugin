@@ -154,4 +154,45 @@ github-auto-deploy/
 - **No jQuery plugins** (vanilla JS only)
 - **No ORMs** (wpdb is sufficient)
 - **Keep it simple:** WordPress best practices, maximum compatibility
-- **Adding .md Files** Add these to /app-docs to keep the root file clean. Also add a date when made to help you keep track of major changes
+
+## Documentation Policy
+
+**Comprehensive specifications are located in the `spec/` directory.**
+
+For detailed technical documentation, see:
+- `spec/architecture.md` - System architecture and components
+- `spec/requirements.md` - Functional and non-functional requirements
+- `spec/database.md` - Database schema and operations
+- `spec/api-integration.md` - GitHub API and webhook specifications
+- `spec/security.md` - Security requirements and best practices
+- `spec/deployment-workflow.md` - Deployment lifecycle and states
+- `spec/testing.md` - Testing procedures and test cases
+- `spec/CHANGELOG.md` - **Feature tracking and version history**
+
+### Documentation Rules
+
+**When making changes to the codebase:**
+
+1. ✅ **Update `spec/CHANGELOG.md`** - Track all features, fixes, and changes with dates
+2. ✅ **Update relevant spec files** - Keep technical docs in sync with implementation
+3. ✅ **Create new spec files** - Only for documenting major new subsystems
+4. ❌ **DO NOT create feature markdown files** - No files like `NEW-FEATURE.md`, `FEATURE-NOTES.md`, `IMPLEMENTATION.md`, etc.
+5. ❌ **DO NOT add to `app-docs/`** - Legacy documentation directory (archived)
+
+**Examples:**
+
+**✅ Correct:**
+```
+- Add feature entry to spec/CHANGELOG.md with date (2025-11-09)
+- Update spec/architecture.md if architecture changed
+- Update spec/deployment-workflow.md if workflow changed
+```
+
+**❌ Incorrect:**
+```
+- Create app-docs/new-feature-2025-11-09.md
+- Create NEW-WEBHOOK-HANDLER.md
+- Create IMPLEMENTATION-NOTES.md
+```
+
+**Use `spec/CHANGELOG.md` as the single source for tracking changes, features, and notes.**
