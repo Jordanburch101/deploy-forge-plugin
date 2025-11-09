@@ -172,7 +172,58 @@ This document defines all system requirements, both functional and non-functiona
 
 **Status:** ✅ Implemented (2025-11-09)
 
-### FR010: Deployment History
+### FR010: Direct Clone Deployment
+
+**Priority:** Medium
+
+**Description:** Alternative deployment method that downloads repository directly without GitHub Actions build step, ideal for simple themes with no build process.
+
+**Acceptance Criteria:**
+- Setting to choose deployment method: GitHub Actions or Direct Clone
+- Direct Clone mode downloads repository ZIP at specific commit
+- Skips GitHub Actions workflow entirely
+- Reuses existing backup and extraction logic
+- UI shows/hides workflow field based on method
+- Works with webhooks and manual deployments
+- Deploys faster than GitHub Actions (no build time)
+- Backend provides pre-signed download URLs
+
+**Use Cases:**
+- Simple themes using plain CSS/JS
+- No webpack, npm, or build tools required
+- Faster deployments for static files
+- Lower GitHub Actions usage
+- Development environments where builds aren't needed
+
+**Technical Implementation:**
+- WordPress calls backend: `POST /api/github/download-repo`
+- Backend authenticates with GitHub using installation token
+- Backend requests: `GET /repos/{owner}/{repo}/zipball/{ref}` (returns 302)
+- Backend extracts `Location` header (pre-signed download URL)
+- Backend returns: `{ download_url }` to WordPress
+- WordPress downloads ZIP using pre-signed URL
+- Same backup/rollback/extraction flow as artifact deployments
+- Workflow field becomes optional when Direct Clone selected
+
+**Backend Requirements:**
+- New endpoint: `/api/github/download-repo`
+- Request: `{ owner, repo, ref }` + `X-API-Key` header
+- Response: `{ download_url }` or `{ error, message }`
+- Uses same authentication pattern as `/api/github/proxy`
+
+**Security:**
+- Download URLs are pre-signed and time-limited by GitHub
+- No direct GitHub token exposure to WordPress
+- Same X-API-Key validation as other endpoints
+
+**Dependencies:**
+- FR001 (GitHub connectivity)
+- FR003 or FR004 (deployment methods)
+- Backend proxy service
+
+**Status:** ✅ Implemented (2025-11-09) - Backend endpoint pending
+
+### FR011: Deployment History
 
 **Priority:** Medium
 
@@ -189,7 +240,7 @@ This document defines all system requirements, both functional and non-functiona
 **Dependencies:**
 - FR003 or FR004
 
-### FR011: Settings Management
+### FR012: Settings Management
 
 **Priority:** High
 
@@ -209,7 +260,7 @@ This document defines all system requirements, both functional and non-functiona
 **Dependencies:**
 - User has `manage_options` capability
 
-### FR012: Debug Logging
+### FR013: Debug Logging
 
 **Priority:** Medium
 
@@ -227,7 +278,7 @@ This document defines all system requirements, both functional and non-functiona
 **Dependencies:**
 - Any feature that performs operations
 
-### FR013: Concurrent Deployment Prevention
+### FR014: Concurrent Deployment Prevention
 
 **Priority:** High
 

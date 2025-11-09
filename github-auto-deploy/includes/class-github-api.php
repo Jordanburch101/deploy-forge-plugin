@@ -428,6 +428,114 @@ class GitHub_API
     }
 
     /**
+     * Download repository as ZIP archive (for direct clone deployment)
+     * Downloads the repository at a specific commit/branch without build artifacts
+     */
+    public function download_repository(string $ref, string $destination): bool|WP_Error
+    {
+        $api_key = $this->settings->get_api_key();
+        if (empty($api_key)) {
+            return new WP_Error('no_api_key', __('Not connected to GitHub', 'github-auto-deploy'));
+        }
+
+        $this->logger->log('GitHub_API', "Downloading repository at ref: $ref to $destination");
+
+        // Get backend URL from constant or use default
+        $backend_url = defined('GITHUB_DEPLOY_BACKEND_URL')
+            ? constant('GITHUB_DEPLOY_BACKEND_URL')
+            : 'https://deploy-forge.vercel.app';
+
+        // Request download URL from backend
+        $proxy_url = $backend_url . '/api/github/download-repo';
+
+        $args = [
+            'method' => 'POST',
+            'headers' => [
+                'Content-Type' => 'application/json',
+                'X-API-Key' => $api_key,
+            ],
+            'body' => wp_json_encode([
+                'owner' => $this->settings->get('github_repo_owner'),
+                'repo' => $this->settings->get('github_repo_name'),
+                'ref' => $ref,
+            ]),
+            'timeout' => 30,
+        ];
+
+        $this->logger->log('GitHub_API', "Requesting download URL from backend", [
+            'backend_url' => $backend_url,
+            'ref' => $ref,
+        ]);
+
+        $response = wp_remote_post($proxy_url, $args);
+
+        if (is_wp_error($response)) {
+            $this->logger->error('GitHub_API', "Failed to get download URL from backend", $response);
+            return $response;
+        }
+
+        $status_code = wp_remote_retrieve_response_code($response);
+        $body = wp_remote_retrieve_body($response);
+        $parsed_body = json_decode($body, true);
+
+        if ($status_code >= 400 || (isset($parsed_body['error']) && $parsed_body['error'])) {
+            $error_message = $parsed_body['message'] ?? 'Failed to get repository download URL';
+            $this->logger->error('GitHub_API', "Backend error getting download URL", [
+                'status' => $status_code,
+                'message' => $error_message,
+            ]);
+            return new WP_Error('backend_error', $error_message);
+        }
+
+        $download_url = $parsed_body['download_url'] ?? null;
+
+        if (empty($download_url)) {
+            $this->logger->error('GitHub_API', "No download URL in response", $parsed_body);
+            return new WP_Error('no_download_url', __('Could not get repository download URL', 'github-auto-deploy'));
+        }
+
+        $this->logger->log('GitHub_API', "Got download URL, downloading repository archive...");
+
+        // Download from the URL
+        $download_args = [
+            'timeout' => 300,
+            'stream' => true,
+            'filename' => $destination,
+        ];
+
+        $download_response = wp_remote_get($download_url, $download_args);
+
+        if (is_wp_error($download_response)) {
+            $this->logger->error('GitHub_API', "Repository download failed", $download_response);
+            return $download_response;
+        }
+
+        $download_status = wp_remote_retrieve_response_code($download_response);
+
+        $this->logger->log('GitHub_API', "Repository download response", [
+            'status_code' => $download_status,
+            'file_exists' => file_exists($destination),
+            'file_size' => file_exists($destination) ? filesize($destination) : 0,
+        ]);
+
+        if ($download_status === 200 && file_exists($destination) && filesize($destination) > 0) {
+            $this->logger->log('GitHub_API', "Repository download successful!");
+            return true;
+        }
+
+        $this->logger->error('GitHub_API', "Repository download failed", [
+            'status_code' => $download_status,
+            'file_exists' => file_exists($destination),
+            'file_size' => file_exists($destination) ? filesize($destination) : 0,
+        ]);
+
+        return new WP_Error(
+            'download_failed',
+            sprintf(__('Failed to download repository. Status: %d', 'github-auto-deploy'), $download_status)
+        );
+    }
+
+    /**
      * Get recent commits
      */
     public function get_recent_commits(int $limit = 10): array

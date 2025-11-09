@@ -97,7 +97,27 @@ class GitHub_Deployment_Manager
             'deployment_id' => $deployment_id,
         ]);
 
-        // Trigger GitHub Actions workflow
+        // Check deployment method
+        $deployment_method = $this->settings->get('deployment_method', 'github_actions');
+
+        if ($deployment_method === 'direct_clone') {
+            // Direct clone - skip GitHub Actions, download and deploy immediately
+            $this->logger->log_deployment_step($deployment_id, 'Direct Clone Mode', 'started');
+            $direct_result = $this->direct_clone_deployment($deployment_id, $commit_hash);
+
+            if (!$direct_result) {
+                $this->logger->error('Deployment', "Deployment #$deployment_id direct clone failed");
+                $this->database->update_deployment($deployment_id, [
+                    'status' => 'failed',
+                    'error_message' => __('Failed to deploy via direct clone.', 'github-auto-deploy'),
+                ]);
+                return false;
+            }
+
+            return $deployment_id;
+        }
+
+        // GitHub Actions workflow (default)
         $workflow_result = $this->trigger_github_build($deployment_id, $commit_hash);
 
         if (!$workflow_result) {
@@ -135,6 +155,68 @@ class GitHub_Deployment_Manager
         ]);
 
         $this->log_deployment($deployment_id, 'GitHub Actions workflow triggered for commit: ' . $commit_hash);
+
+        return true;
+    }
+
+    /**
+     * Deploy directly from repository clone (no GitHub Actions)
+     * Downloads repository ZIP at specific commit and deploys immediately
+     */
+    private function direct_clone_deployment(int $deployment_id, string $commit_hash): bool
+    {
+        // Create temp directory
+        $temp_dir = $this->get_temp_directory();
+        $repo_zip = $temp_dir . '/repo-' . $deployment_id . '.zip';
+
+        $this->logger->log_deployment_step($deployment_id, 'Direct Clone', 'started', [
+            'commit_hash' => $commit_hash,
+            'temp_dir' => $temp_dir,
+            'repo_zip' => $repo_zip,
+        ]);
+
+        $this->log_deployment($deployment_id, 'Downloading repository from GitHub (direct clone)...');
+
+        // Update status to building (downloading)
+        $this->database->update_deployment($deployment_id, [
+            'status' => 'building',
+            'deployment_logs' => 'Downloading repository via direct clone...',
+        ]);
+
+        // Download repository at specific commit
+        $download_result = $this->github_api->download_repository($commit_hash, $repo_zip);
+
+        if (is_wp_error($download_result)) {
+            $this->logger->error('Deployment', "Deployment #$deployment_id repository download failed", $download_result);
+            $this->database->update_deployment($deployment_id, [
+                'status' => 'failed',
+                'error_message' => $download_result->get_error_message(),
+            ]);
+            $this->log_deployment($deployment_id, 'Download failed: ' . $download_result->get_error_message());
+            return false;
+        }
+
+        $this->logger->log_deployment_step($deployment_id, 'Repository Downloaded', 'success', [
+            'file_size' => file_exists($repo_zip) ? filesize($repo_zip) : 0,
+        ]);
+
+        $this->log_deployment($deployment_id, 'Repository downloaded successfully.');
+
+        // Create backup if enabled
+        if ($this->settings->get('create_backups')) {
+            $this->logger->log_deployment_step($deployment_id, 'Create Backup', 'started');
+            $backup_path = $this->backup_current_theme($deployment_id);
+            if ($backup_path) {
+                $this->database->update_deployment($deployment_id, ['backup_path' => $backup_path]);
+                $this->log_deployment($deployment_id, 'Backup created: ' . $backup_path);
+                $this->logger->log_deployment_step($deployment_id, 'Backup Created', 'success', [
+                    'backup_path' => $backup_path,
+                ]);
+            }
+        }
+
+        // Extract and deploy (reuse existing method)
+        $this->extract_and_deploy($deployment_id, $repo_zip);
 
         return true;
     }

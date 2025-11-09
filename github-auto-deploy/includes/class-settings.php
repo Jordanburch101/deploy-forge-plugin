@@ -28,6 +28,7 @@ class GitHub_Deploy_Settings {
             'github_repo_name' => '',
             'github_branch' => 'main',
             'github_workflow_name' => 'deploy-theme.yml',
+            'deployment_method' => 'github_actions', // 'github_actions' or 'direct_clone'
             'auto_deploy_enabled' => false,
             'require_manual_approval' => false,
             'create_backups' => true,
@@ -70,6 +71,9 @@ class GitHub_Deploy_Settings {
             'github_repo_name' => sanitize_text_field($settings['github_repo_name'] ?? ''),
             'github_branch' => sanitize_text_field($settings['github_branch'] ?? 'main'),
             'github_workflow_name' => sanitize_text_field($settings['github_workflow_name'] ?? 'deploy-theme.yml'),
+            'deployment_method' => in_array($settings['deployment_method'] ?? '', ['github_actions', 'direct_clone'])
+                ? $settings['deployment_method']
+                : 'github_actions',
             'auto_deploy_enabled' => (bool) ($settings['auto_deploy_enabled'] ?? false),
             'require_manual_approval' => (bool) ($settings['require_manual_approval'] ?? false),
             'create_backups' => (bool) ($settings['create_backups'] ?? true),

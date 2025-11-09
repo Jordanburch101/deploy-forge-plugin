@@ -141,6 +141,43 @@ Each entry should include:
   - `admin/js/admin-scripts.js`
 - Related: `app-docs/workflow-dropdown-feature-2025-11-07.md` (now archived)
 
+**Direct Clone Deployment Method** (2025-11-09)
+- Type: Feature
+- Description: Added alternative deployment method that clones repository directly without GitHub Actions build step
+- Use Case: Perfect for simple themes using plain CSS/JS without build processes (webpack, npm, etc.)
+- Technical Implementation:
+  - Added `deployment_method` setting: `github_actions` (default) or `direct_clone`
+  - New `download_repository()` method in GitHub API class to download repo ZIP at specific commit
+  - New `direct_clone_deployment()` method in deployment manager
+  - Reuses existing extract/deploy/backup logic
+  - Downloads repository using GitHub's `/repos/{owner}/{repo}/zipball/{ref}` endpoint via backend proxy
+  - Backend endpoint: `POST /api/github/download-repo` returns pre-signed download URL
+- Changes:
+  - Settings: Added deployment method dropdown in settings UI
+  - JavaScript: Show/hide workflow field based on method selection
+  - Deployment flow: Checks method and routes to appropriate deployment path
+  - Backend: New endpoint required for getting repository download URLs
+  - No GitHub Actions workflow required for direct clone mode
+- Files Modified:
+  - `includes/class-settings.php` - Added deployment_method setting and validation
+  - `includes/class-github-api.php` - Added download_repository() method with backend proxy integration
+  - `includes/class-deployment-manager.php` - Added direct_clone_deployment() and routing logic
+  - `templates/settings-page.php` - Added deployment method selector UI
+  - `admin/js/admin-scripts.js` - Added UI toggle for workflow field
+  - `admin/class-admin-pages.php` - Added deployment_method to settings save handler
+- Backend Requirements:
+  - New endpoint: `POST /api/github/download-repo`
+  - Accepts: `{ owner, repo, ref }`
+  - Returns: `{ download_url }` (pre-signed GitHub download URL)
+  - Authentication: Same X-API-Key pattern as existing endpoints
+- Benefits:
+  - Faster deployments for simple themes (no build time)
+  - No need to maintain GitHub Actions workflow file
+  - Lower GitHub Actions usage (reduced costs)
+  - Simpler setup for non-technical users
+  - Works with webhooks and manual deployments
+- Related: FR010 in requirements.md
+
 **Manual Approval Workflow - Deploy Button** (2025-11-09)
 - Type: Fix
 - Description: Added missing "Deploy" button for pending deployments in manual approval workflow

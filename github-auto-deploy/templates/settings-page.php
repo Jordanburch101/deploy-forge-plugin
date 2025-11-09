@@ -184,6 +184,29 @@ if (!defined('ABSPATH')) {
 
             <tr>
                 <th scope="row">
+                    <label for="deployment_method"><?php esc_html_e('Deployment Method', 'github-auto-deploy'); ?></label>
+                </th>
+                <td>
+                    <select id="deployment_method" name="deployment_method" class="regular-text">
+                        <option value="github_actions" <?php selected($current_settings['deployment_method'], 'github_actions'); ?>>
+                            <?php esc_html_e('GitHub Actions (Build + Deploy)', 'github-auto-deploy'); ?>
+                        </option>
+                        <option value="direct_clone" <?php selected($current_settings['deployment_method'], 'direct_clone'); ?>>
+                            <?php esc_html_e('Direct Clone (No Build)', 'github-auto-deploy'); ?>
+                        </option>
+                    </select>
+                    <p class="description">
+                        <strong><?php esc_html_e('GitHub Actions:', 'github-auto-deploy'); ?></strong>
+                        <?php esc_html_e('Uses GitHub workflow to build assets (webpack, npm, etc.) before deploying. Ideal for themes with build processes.', 'github-auto-deploy'); ?>
+                        <br>
+                        <strong><?php esc_html_e('Direct Clone:', 'github-auto-deploy'); ?></strong>
+                        <?php esc_html_e('Downloads repository directly without building. Perfect for simple themes using plain CSS/JS.', 'github-auto-deploy'); ?>
+                    </p>
+                </td>
+            </tr>
+
+            <tr id="workflow-row">
+                <th scope="row">
                     <label for="github_workflow_name"><?php esc_html_e('Workflow File', 'github-auto-deploy'); ?></label>
                 </th>
                 <td>

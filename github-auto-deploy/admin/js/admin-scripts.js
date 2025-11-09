@@ -66,6 +66,10 @@
 
       // Show workflow button if repo is bound (after page load)
       this.checkWorkflowButtonVisibility();
+
+      // Handle deployment method change
+      $("#deployment_method").on("change", this.onDeploymentMethodChange.bind(this));
+      this.onDeploymentMethodChange(); // Run on page load
     },
 
     connectGitHub: function (e) {
@@ -874,6 +878,25 @@
         $workflowButton.show();
       } else {
         $workflowButton.hide();
+      }
+    },
+
+    onDeploymentMethodChange: function () {
+      const $deploymentMethod = $("#deployment_method");
+      const $workflowRow = $("#workflow-row");
+
+      if (!$deploymentMethod.length) {
+        return;
+      }
+
+      const method = $deploymentMethod.val();
+
+      if (method === "direct_clone") {
+        // Hide workflow field for direct clone
+        $workflowRow.hide();
+      } else {
+        // Show workflow field for GitHub Actions
+        $workflowRow.show();
       }
     },
 
