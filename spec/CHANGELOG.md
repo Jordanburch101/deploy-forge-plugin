@@ -141,6 +141,25 @@ Each entry should include:
   - `admin/js/admin-scripts.js`
 - Related: `app-docs/workflow-dropdown-feature-2025-11-07.md` (now archived)
 
+**Manual Approval Workflow - Deploy Button** (2025-11-09)
+- Type: Fix
+- Description: Added missing "Deploy" button for pending deployments in manual approval workflow
+- Issue: When manual approval was enabled, pending deployments only showed "Cancel" button, making approval impossible from the UI
+- Changes:
+  - Added "Deploy" button (primary/blue) for pending deployments
+  - Shows both "Deploy" and "Cancel" buttons in Actions column
+  - Building deployments show only "Cancel" button
+  - Added `approve_pending_deployment()` method to deployment manager
+  - Added AJAX handler `ajax_approve_deployment()`
+  - JavaScript function `approveDeployment()` with confirmation dialog
+- Files Modified:
+  - `templates/dashboard-page.php`
+  - `templates/history-page.php`
+  - `admin/js/admin-scripts.js`
+  - `admin/class-admin-pages.php`
+  - `includes/class-deployment-manager.php`
+- Impact: Manual approval feature now fully functional
+
 **Deployment Cancellation** (2025-11-09)
 - Type: Feature
 - Description: Ability to cancel in-progress deployments

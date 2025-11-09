@@ -820,6 +820,51 @@ class GitHub_Deployment_Manager
     }
 
     /**
+     * Approve a pending deployment (manual approval workflow)
+     * Updates the existing pending deployment and triggers the workflow
+     */
+    public function approve_pending_deployment(int $deployment_id, int $user_id): bool
+    {
+        $deployment = $this->database->get_deployment($deployment_id);
+
+        if (!$deployment) {
+            $this->logger->error('Deployment', "Deployment #$deployment_id not found");
+            return false;
+        }
+
+        if ($deployment->status !== 'pending') {
+            $this->logger->error('Deployment', "Deployment #$deployment_id cannot be approved (status: {$deployment->status})");
+            return false;
+        }
+
+        $this->logger->log_deployment_step($deployment_id, 'Approve Deployment', 'initiated', [
+            'approved_by_user_id' => $user_id,
+        ]);
+
+        // Update deployment to be triggered by the user who approved it
+        $this->database->update_deployment($deployment_id, [
+            'trigger_type' => 'manual',
+            'triggered_by_user_id' => $user_id,
+        ]);
+
+        // Trigger GitHub Actions workflow
+        $workflow_result = $this->trigger_github_build($deployment_id, $deployment->commit_hash);
+
+        if (!$workflow_result) {
+            $this->logger->error('Deployment', "Deployment #$deployment_id failed to trigger workflow after approval");
+            $this->database->update_deployment($deployment_id, [
+                'status' => 'failed',
+                'error_message' => __('Failed to trigger GitHub Actions workflow after approval.', 'github-auto-deploy'),
+            ]);
+            return false;
+        }
+
+        $this->logger->log_deployment_step($deployment_id, 'Deployment Approved', 'success');
+
+        return true;
+    }
+
+    /**
      * Cancel a deployment
      */
     public function cancel_deployment(int $deployment_id): bool

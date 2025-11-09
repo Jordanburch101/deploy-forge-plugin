@@ -151,7 +151,28 @@ This document defines all system requirements, both functional and non-functiona
 - FR003 or FR004
 - Deployment in building state
 
-### FR009: Deployment History
+### FR009: Manual Approval Workflow
+
+**Priority:** Medium
+
+**Description:** When enabled, deployments should require manual approval before execution.
+
+**Acceptance Criteria:**
+- Setting to enable/disable manual approval
+- Webhook events create "pending" deployments (not auto-deployed)
+- Dashboard shows "Deploy" button for pending deployments
+- Admin can approve or cancel pending deployments
+- Approved deployments trigger workflow and proceed normally
+- Cancelled deployments are marked as such in history
+- Manual deployments bypass approval requirement
+
+**Dependencies:**
+- FR004 (webhooks)
+- User has `manage_options` capability
+
+**Status:** ✅ Implemented (2025-11-09)
+
+### FR010: Deployment History
 
 **Priority:** Medium
 
@@ -168,7 +189,7 @@ This document defines all system requirements, both functional and non-functiona
 **Dependencies:**
 - FR003 or FR004
 
-### FR010: Settings Management
+### FR011: Settings Management
 
 **Priority:** High
 
@@ -179,6 +200,7 @@ This document defines all system requirements, both functional and non-functiona
 - Workflow selection
 - Branch selection
 - Auto-deploy enable/disable
+- Manual approval enable/disable
 - Backup enable/disable
 - Webhook secret configuration
 - Settings validation
@@ -187,7 +209,7 @@ This document defines all system requirements, both functional and non-functiona
 **Dependencies:**
 - User has `manage_options` capability
 
-### FR011: Debug Logging
+### FR012: Debug Logging
 
 **Priority:** Medium
 
@@ -205,7 +227,7 @@ This document defines all system requirements, both functional and non-functiona
 **Dependencies:**
 - Any feature that performs operations
 
-### FR012: Concurrent Deployment Prevention
+### FR013: Concurrent Deployment Prevention
 
 **Priority:** High
 

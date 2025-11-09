@@ -34,6 +34,7 @@ class GitHub_Deploy_Admin_Pages {
         add_action('wp_ajax_github_deploy_manual_deploy', [$this, 'ajax_manual_deploy']);
         add_action('wp_ajax_github_deploy_get_status', [$this, 'ajax_get_status']);
         add_action('wp_ajax_github_deploy_rollback', [$this, 'ajax_rollback']);
+        add_action('wp_ajax_github_deploy_approve', [$this, 'ajax_approve_deployment']);
         add_action('wp_ajax_github_deploy_cancel', [$this, 'ajax_cancel_deployment']);
         add_action('wp_ajax_github_deploy_get_commits', [$this, 'ajax_get_commits']);
         add_action('wp_ajax_github_deploy_get_repos', [$this, 'ajax_get_repos']);
@@ -359,6 +360,43 @@ class GitHub_Deploy_Admin_Pages {
             wp_send_json_success(['message' => __('Rollback completed successfully!', 'github-auto-deploy')]);
         } else {
             wp_send_json_error(['message' => __('Rollback failed', 'github-auto-deploy')]);
+        }
+    }
+
+    /**
+     * AJAX: Approve pending deployment (manual approval)
+     */
+    public function ajax_approve_deployment(): void {
+        check_ajax_referer('github_deploy_admin', 'nonce');
+
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error(['message' => __('Unauthorized', 'github-auto-deploy')]);
+        }
+
+        $deployment_id = intval($_POST['deployment_id'] ?? 0);
+
+        if (!$deployment_id) {
+            wp_send_json_error(['message' => __('Invalid deployment ID', 'github-auto-deploy')]);
+        }
+
+        // Get deployment details
+        $deployment = $this->database->get_deployment($deployment_id);
+
+        if (!$deployment) {
+            wp_send_json_error(['message' => __('Deployment not found', 'github-auto-deploy')]);
+        }
+
+        if ($deployment->status !== 'pending') {
+            wp_send_json_error(['message' => __('Only pending deployments can be approved', 'github-auto-deploy')]);
+        }
+
+        // Approve the deployment by triggering the workflow
+        $result = $this->deployment_manager->approve_pending_deployment($deployment_id, get_current_user_id());
+
+        if ($result) {
+            wp_send_json_success(['message' => __('Deployment approved and started successfully!', 'github-auto-deploy')]);
+        } else {
+            wp_send_json_error(['message' => __('Failed to start deployment', 'github-auto-deploy')]);
         }
     }
 

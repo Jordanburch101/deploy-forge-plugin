@@ -36,6 +36,9 @@
       // Rollback
       $(".rollback-btn").on("click", this.rollback.bind(this));
 
+      // Approve deployment (manual approval)
+      $(".approve-deployment-btn").on("click", this.approveDeployment.bind(this));
+
       // Cancel deployment
       $(".cancel-deployment-btn").on("click", this.cancelDeployment.bind(this));
 
@@ -341,6 +344,45 @@
         error: function () {
           alert("Rollback request failed.");
           button.prop("disabled", false).text(originalText);
+        },
+      });
+    },
+
+    approveDeployment: function (e) {
+      e.preventDefault();
+
+      if (!confirm("Are you sure you want to deploy this commit?")) {
+        return;
+      }
+
+      const button = $(e.target).closest("button");
+      const deploymentId = button.data("deployment-id");
+      const originalHtml = button.html();
+
+      button
+        .prop("disabled", true)
+        .html('<span class="github-deploy-loading"></span> Deploying...');
+
+      $.ajax({
+        url: githubDeployAdmin.ajaxUrl,
+        type: "POST",
+        data: {
+          action: "github_deploy_approve",
+          nonce: githubDeployAdmin.nonce,
+          deployment_id: deploymentId,
+        },
+        success: function (response) {
+          if (response.success) {
+            alert(response.data.message || "Deployment started successfully!");
+            location.reload();
+          } else {
+            alert(response.data.message || "Approval failed.");
+            button.prop("disabled", false).html(originalHtml);
+          }
+        },
+        error: function () {
+          alert("Approval request failed.");
+          button.prop("disabled", false).html(originalHtml);
         },
       });
     },

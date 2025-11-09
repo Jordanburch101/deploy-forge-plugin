@@ -134,7 +134,14 @@ if (!defined('ABSPATH')) {
                             </td>
                             <td><?php echo esc_html(ucfirst($deployment->trigger_type)); ?></td>
                             <td>
-                                <?php if (in_array($deployment->status, ['pending', 'building'])): ?>
+                                <?php if ($deployment->status === 'pending'): ?>
+                                    <button type="button" class="button button-primary button-small approve-deployment-btn" data-deployment-id="<?php echo esc_attr($deployment->id); ?>">
+                                        <?php esc_html_e('Deploy', 'github-auto-deploy'); ?>
+                                    </button>
+                                    <button type="button" class="button button-small cancel-deployment-btn" data-deployment-id="<?php echo esc_attr($deployment->id); ?>">
+                                        <?php esc_html_e('Cancel', 'github-auto-deploy'); ?>
+                                    </button>
+                                <?php elseif ($deployment->status === 'building'): ?>
                                     <button type="button" class="button button-small cancel-deployment-btn" data-deployment-id="<?php echo esc_attr($deployment->id); ?>">
                                         <?php esc_html_e('Cancel', 'github-auto-deploy'); ?>
                                     </button>
