@@ -10,7 +10,7 @@ if (!defined('ABSPATH')) {
 
 <div class="wizard-welcome">
     <div class="wizard-welcome-icon">
-        <span class="dashicons dashicons-update"></span>
+        <img src="https://bucket.jordanburch.dev/mythic-white-cropped.png" alt="Mythic Logo" style="width: 80px; height: 80px; object-fit: contain;" />
     </div>
 
     <h1 class="wizard-welcome-title">
