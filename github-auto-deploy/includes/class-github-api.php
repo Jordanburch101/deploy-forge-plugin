@@ -958,4 +958,70 @@ class GitHub_API
             'message' => $response['body']['message'] ?? __('Failed to get installation repositories.', 'github-auto-deploy'),
         ];
     }
+
+    /**
+     * Get branches for current repository
+     *
+     * @return array Success status and branch list
+     */
+    public function get_branches(): array
+    {
+        $repo_owner = $this->settings->get('github_repo_owner');
+        $repo_name = $this->settings->get('github_repo_name');
+
+        if (empty($repo_owner) || empty($repo_name)) {
+            return [
+                'success' => false,
+                'message' => __('Repository not configured', 'github-auto-deploy'),
+            ];
+        }
+
+        $this->logger->log('GitHub_API', 'Fetching branches for ' . $repo_owner . '/' . $repo_name);
+
+        // Cache key based on repo
+        $cache_key = 'github_deploy_branches_' . md5($repo_owner . '/' . $repo_name);
+        $cached = get_transient($cache_key);
+        if ($cached !== false) {
+            $this->logger->log('GitHub_API', 'Returning cached branches');
+            return $cached;
+        }
+
+        // Get branches from GitHub API
+        $endpoint = '/repos/' . rawurlencode($repo_owner) . '/' . rawurlencode($repo_name) . '/branches';
+        $response = $this->request('GET', $endpoint);
+
+        if (is_wp_error($response)) {
+            return [
+                'success' => false,
+                'message' => $response->get_error_message(),
+            ];
+        }
+
+        if ($response['status'] === 200) {
+            $branches = $response['body'];
+
+            if (is_array($branches)) {
+                // Extract just branch names
+                $branch_names = array_map(function($branch) {
+                    return is_object($branch) ? $branch->name : $branch['name'];
+                }, $branches);
+
+                $result = [
+                    'success' => true,
+                    'data' => $branch_names,
+                ];
+
+                $this->logger->log('GitHub_API', 'Successfully fetched ' . count($branch_names) . ' branches');
+
+                // Cache for 5 minutes
+                set_transient($cache_key, $result, 5 * MINUTE_IN_SECONDS);
+                return $result;
+            }
+        }
+
+        return [
+            'success' => false,
+            'message' => $response['body']['message'] ?? __('Failed to get branches.', 'github-auto-deploy'),
+        ];
+    }
 }

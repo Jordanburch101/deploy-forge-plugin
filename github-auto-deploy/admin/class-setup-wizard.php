@@ -40,21 +40,37 @@ class GitHub_Deploy_Setup_Wizard {
         add_action('wp_ajax_github_deploy_wizard_get_branches', [$this, 'ajax_get_branches']);
         add_action('wp_ajax_github_deploy_wizard_get_workflows', [$this, 'ajax_get_workflows']);
         add_action('wp_ajax_github_deploy_wizard_validate_repo', [$this, 'ajax_validate_repo']);
+        add_action('wp_ajax_github_deploy_wizard_bind_repo', [$this, 'ajax_bind_repo']);
         add_action('wp_ajax_github_deploy_wizard_save_step', [$this, 'ajax_save_step']);
         add_action('wp_ajax_github_deploy_wizard_complete', [$this, 'ajax_complete']);
         add_action('wp_ajax_github_deploy_wizard_skip', [$this, 'ajax_skip']);
 
         // Redirect to wizard on activation if needed
         add_action('admin_init', [$this, 'maybe_redirect_to_wizard']);
-
-        // Handle OAuth callback during wizard
-        add_action('admin_init', [$this, 'handle_wizard_oauth_callback']);
     }
 
     /**
      * Check if wizard should be shown
      */
     public function should_show_wizard(): bool {
+        // Force show if explicitly requested via URL parameter
+        if (isset($_GET['show_wizard']) && $_GET['show_wizard'] == '1') {
+            return true;
+        }
+
+        // Reset wizard state if requested (for testing/troubleshooting)
+        if (isset($_GET['reset_wizard']) && $_GET['reset_wizard'] == '1' && current_user_can('manage_options')) {
+            delete_option('github_deploy_wizard_completed');
+            delete_option('github_deploy_wizard_skipped');
+            delete_option('github_deploy_wizard_completed_at');
+            for ($i = 1; $i <= 6; $i++) {
+                delete_transient('github_deploy_wizard_step_' . $i);
+            }
+            $this->logger->log('Setup_Wizard', 'Wizard state reset via URL parameter');
+            wp_safe_redirect(admin_url('admin.php?page=github-deploy-wizard'));
+            exit;
+        }
+
         // Don't show if already completed
         if (get_option('github_deploy_wizard_completed')) {
             return false;
@@ -121,20 +137,6 @@ class GitHub_Deploy_Setup_Wizard {
     }
 
     /**
-     * Handle OAuth callback during wizard
-     */
-    public function handle_wizard_oauth_callback(): void {
-        // Check if this is an OAuth callback during wizard
-        if (!isset($_GET['github_connected']) || !isset($_GET['wizard_mode'])) {
-            return;
-        }
-
-        // Redirect back to wizard at step 2
-        wp_safe_redirect(admin_url('admin.php?page=github-deploy-wizard&step=2&connected=1'));
-        exit;
-    }
-
-    /**
      * Enqueue wizard assets
      */
     public function enqueue_assets($hook): void {
@@ -143,20 +145,20 @@ class GitHub_Deploy_Setup_Wizard {
             return;
         }
 
-        // Select2
+        // Select2 - use unpkg CDN which is more reliable
         wp_enqueue_style(
             'select2',
-            'https://cdn.jsdelivr.net/npm/select2@4.1.0/dist/css/select2.min.css',
+            'https://unpkg.com/select2@4.1.0-rc.0/dist/css/select2.min.css',
             [],
             '4.1.0'
         );
 
         wp_enqueue_script(
             'select2',
-            'https://cdn.jsdelivr.net/npm/select2@4.1.0/dist/js/select2.min.js',
+            'https://unpkg.com/select2@4.1.0-rc.0/dist/js/select2.min.js',
             ['jquery'],
             '4.1.0',
-            true
+            false  // Load in header, not footer
         );
 
         // Wizard CSS
@@ -302,14 +304,17 @@ class GitHub_Deploy_Setup_Wizard {
 
         $this->logger->log('Setup_Wizard', 'Fetching workflows for ' . $repo_owner . '/' . $repo_name);
 
-        $workflows = $this->github_api->get_workflows($repo_owner, $repo_name);
+        $result = $this->github_api->get_workflows($repo_owner, $repo_name);
 
-        if (!$workflows['success']) {
-            $this->logger->error('Setup_Wizard', 'Failed to fetch workflows', $workflows);
-            wp_send_json_error(['message' => $workflows['message'] ?? __('Failed to fetch workflows', 'github-auto-deploy')]);
+        if (!$result['success']) {
+            $this->logger->error('Setup_Wizard', 'Failed to fetch workflows', $result);
+            wp_send_json_error(['message' => $result['message'] ?? __('Failed to fetch workflows', 'github-auto-deploy')]);
         }
 
-        wp_send_json_success(['workflows' => $workflows['data']]);
+        wp_send_json_success([
+            'workflows' => $result['workflows'],
+            'total_count' => $result['total_count']
+        ]);
     }
 
     /**
@@ -348,6 +353,67 @@ class GitHub_Deploy_Setup_Wizard {
         }
 
         wp_send_json_success(['message' => __('Repository accessible', 'github-auto-deploy')]);
+    }
+
+    /**
+     * AJAX: Bind repository to backend
+     */
+    public function ajax_bind_repo(): void {
+        check_ajax_referer('github_deploy_wizard', 'nonce');
+
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error(['message' => __('Unauthorized', 'github-auto-deploy')]);
+        }
+
+        $owner = sanitize_text_field($_POST['owner'] ?? '');
+        $name = sanitize_text_field($_POST['name'] ?? '');
+        $default_branch = sanitize_text_field($_POST['default_branch'] ?? 'main');
+
+        if (empty($owner) || empty($name)) {
+            wp_send_json_error(['message' => __('Invalid repository data', 'github-auto-deploy')]);
+            return;
+        }
+
+        $this->logger->log('Setup_Wizard', 'Binding repository', [
+            'repo' => $owner . '/' . $name,
+            'branch' => $default_branch,
+        ]);
+
+        // During wizard, allow re-binding by unbinding first if needed
+        if ($this->settings->is_repo_bound()) {
+            $this->logger->log('Setup_Wizard', 'Repository already bound, unbinding first to allow wizard re-selection');
+
+            // Get GitHub data and clear bind status
+            $github_data = $this->settings->get_github_data();
+            $github_data['repo_bound'] = false;
+            unset($github_data['selected_repo_name']);
+            unset($github_data['selected_repo_full_name']);
+            unset($github_data['selected_repo_default_branch']);
+            unset($github_data['bound_at']);
+            $this->settings->set_github_data($github_data);
+        }
+
+        $result = $this->settings->bind_repository($owner, $name, $default_branch);
+
+        if ($result) {
+            $this->logger->log('Setup_Wizard', 'Repository bound successfully');
+
+            wp_send_json_success([
+                'message' => sprintf(
+                    __('Repository %s bound successfully', 'github-auto-deploy'),
+                    $owner . '/' . $name
+                ),
+                'repo' => [
+                    'owner' => $owner,
+                    'name' => $name,
+                    'full_name' => $owner . '/' . $name,
+                    'default_branch' => $default_branch,
+                ],
+            ]);
+        } else {
+            $this->logger->error('Setup_Wizard', 'Failed to bind repository');
+            wp_send_json_error(['message' => __('Failed to bind repository', 'github-auto-deploy')]);
+        }
     }
 
     /**
@@ -401,8 +467,13 @@ class GitHub_Deploy_Setup_Wizard {
 
         // Save final settings
         if (!empty($wizard_data)) {
-            $this->settings->save($wizard_data);
-            $this->logger->log('Setup_Wizard', 'Saved wizard configuration', $wizard_data);
+            // IMPORTANT: Merge with existing settings to preserve webhook_secret and other values
+            // that were set during OAuth (Step 2) but aren't in the wizard step data
+            $current_settings = $this->settings->get_all();
+            $final_settings = array_merge($current_settings, $wizard_data);
+
+            $this->settings->save($final_settings);
+            $this->logger->log('Setup_Wizard', 'Saved wizard configuration', $final_settings);
         }
 
         // Mark wizard as completed

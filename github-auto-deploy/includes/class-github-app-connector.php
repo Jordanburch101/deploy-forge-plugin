@@ -34,8 +34,14 @@ class GitHub_Deploy_App_Connector
         // Get backend URL
         $backend_url = $this->get_backend_url();
 
-        // Get current page URL for return
-        $return_url = admin_url('admin.php?page=github-deploy-settings');
+        // Determine return URL based on context
+        // If we're on the wizard page, return to wizard; otherwise return to settings
+        $current_page = $_GET['page'] ?? '';
+        if ($current_page === 'github-deploy-wizard') {
+            $return_url = admin_url('admin.php?page=github-deploy-wizard&step=2');
+        } else {
+            $return_url = admin_url('admin.php?page=github-deploy-settings');
+        }
 
         // Generate nonce for security
         $nonce = wp_create_nonce('github_deploy_oauth');
@@ -48,6 +54,7 @@ class GitHub_Deploy_App_Connector
         ], $backend_url . '/api/auth/connect');
 
         $this->logger->log('GitHub_App_Connector', 'Generated connect URL', [
+            'current_page' => $current_page,
             'return_url' => $return_url,
         ]);
 
@@ -64,6 +71,12 @@ class GitHub_Deploy_App_Connector
         if (!isset($_GET['github_connected'])) {
             return;
         }
+
+        $this->logger->log('GitHub_App_Connector', 'OAuth callback detected', [
+            'url' => $_SERVER['REQUEST_URI'] ?? '',
+            'github_connected' => $_GET['github_connected'] ?? '',
+            'has_nonce' => isset($_GET['nonce'])
+        ]);
 
         // Verify nonce
         $nonce = sanitize_text_field($_GET['nonce'] ?? '');
@@ -234,12 +247,20 @@ class GitHub_Deploy_App_Connector
         // Show success notice
         add_action('admin_notices', function () {
             $message = __('Successfully connected to GitHub!', 'github-auto-deploy');
-            $message .= ' ' . __('Please select a repository to bind from the settings page.', 'github-auto-deploy');
             echo '<div class="notice notice-success is-dismissible"><p>' . $message . '</p></div>';
         });
 
         // Redirect to remove query parameters
-        wp_safe_redirect(admin_url('admin.php?page=github-deploy-settings'));
+        // Backend already sent us to the correct return_url (wizard or settings)
+        // Just add connected=1 flag if we're on wizard page
+        $current_page = $_GET['page'] ?? '';
+        if ($current_page === 'github-deploy-wizard') {
+            $this->logger->log('GitHub_App_Connector', 'On wizard page after OAuth, adding connected flag');
+            wp_safe_redirect(admin_url('admin.php?page=github-deploy-wizard&step=2&connected=1'));
+        } else {
+            $this->logger->log('GitHub_App_Connector', 'On settings page after OAuth');
+            wp_safe_redirect(admin_url('admin.php?page=github-deploy-settings'));
+        }
         exit;
     }
 

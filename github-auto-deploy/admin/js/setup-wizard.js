@@ -9,13 +9,17 @@
   const GitHubDeployWizard = {
     currentStep: 1,
     totalSteps: 6,
-    wizardData: {},
+    wizardData: {
+      repo_owner: null,
+      repo_name: null,
+      branch: null,
+    },
 
     /**
      * Initialize wizard
      */
     init: function () {
-      this.currentStep = githubDeployWizard.currentStep || 1;
+      this.currentStep = parseInt(githubDeployWizard.currentStep, 10) || 1;
       this.bindEvents();
       this.initStep(this.currentStep);
     },
@@ -53,7 +57,7 @@
      * Initialize specific step
      */
     initStep: function (stepNumber) {
-      this.currentStep = stepNumber;
+      this.currentStep = parseInt(stepNumber, 10);
       this.updateProgress();
       this.updateNavigation();
 
@@ -170,12 +174,18 @@
     handleNext: function (e) {
       e.preventDefault();
 
+      console.log("Next clicked, current step:", this.currentStep);
+
       if (!this.validateCurrentStep()) {
+        console.log("Validation failed");
         return;
       }
 
+      console.log("Validation passed, saving step data...");
+
       // Save current step data
       this.saveStepData(() => {
+        console.log("Step data saved, navigating to step:", this.currentStep + 1);
         // Move to next step
         this.navigateToStep(this.currentStep + 1);
       });
@@ -257,17 +267,29 @@
      * Navigate to specific step
      */
     navigateToStep: function (stepNumber) {
+      stepNumber = parseInt(stepNumber, 10);
+      console.log(`Navigating from step ${this.currentStep} to step ${stepNumber}`);
+      console.log("Before navigation - Active steps:", $(`.wizard-step-content.active`).length);
+
       // Hide current step
-      $(`.wizard-step-content[data-step="${this.currentStep}"]`).removeClass("active");
+      const $currentStep = $(`.wizard-step-content[data-step="${this.currentStep}"]`);
+      console.log("Current step element found:", $currentStep.length);
+      $currentStep.removeClass("active");
 
       // Show new step
-      $(`.wizard-step-content[data-step="${stepNumber}"]`).addClass("active");
+      const $newStep = $(`.wizard-step-content[data-step="${stepNumber}"]`);
+      console.log("New step element found:", $newStep.length);
+      $newStep.addClass("active");
+
+      console.log("After navigation - Active steps:", $(`.wizard-step-content.active`).length);
 
       // Update current step
       this.initStep(stepNumber);
 
       // Scroll to top
       $(".wizard-content").scrollTop(0);
+
+      console.log("Navigation complete, now on step:", this.currentStep);
     },
 
     /**
@@ -275,11 +297,16 @@
      */
     saveStepData: function (callback) {
       const stepData = this.collectStepData();
+      console.log("Collecting step data for step", this.currentStep, ":", stepData);
 
+      // Steps 1 and 2 don't have data to save, just proceed
       if (!stepData || Object.keys(stepData).length === 0) {
+        console.log("No data to save, proceeding immediately");
         if (callback) callback();
         return;
       }
+
+      console.log("Saving step data via AJAX...");
 
       $.ajax({
         url: githubDeployWizard.ajaxUrl,
@@ -291,10 +318,13 @@
           data: stepData,
         },
         success: () => {
+          console.log("Step data saved successfully");
           if (callback) callback();
         },
-        error: () => {
+        error: (xhr, status, error) => {
+          console.error("Save step error:", error, xhr.responseText);
           alert(githubDeployWizard.strings.error);
+          // Don't call callback on error - stay on current step
         },
       });
     },
@@ -312,8 +342,14 @@
             const [owner, name] = repoFullName.split("/");
             data.repo_owner = owner;
             data.repo_name = name;
+            // Save to wizard object for later steps
+            this.wizardData.repo_owner = owner;
+            this.wizardData.repo_name = name;
           }
           data.branch = $("#branch-select").val();
+          if (data.branch) {
+            this.wizardData.branch = data.branch;
+          }
           break;
 
         case 4: // Method
@@ -328,7 +364,6 @@
           data.auto_deploy_enabled = $("#auto-deploy-toggle").is(":checked");
           data.require_manual_approval = $("#manual-approval-toggle").is(":checked");
           data.create_backups = $("#create-backups-toggle").is(":checked");
-          data.webhook_enabled = $("#webhook-toggle").is(":checked");
           break;
       }
 
@@ -348,10 +383,7 @@
      * Handle connect button click
      */
     handleConnectClick: function (e) {
-      // Add wizard mode parameter to OAuth flow
-      const $link = $(e.currentTarget);
-      const href = $link.attr("href");
-      $link.attr("href", href + "&wizard_mode=1");
+      // No special handling needed - OAuth callback will detect wizard in progress
     },
 
     /**
@@ -383,16 +415,15 @@
      * Initialize Repository step
      */
     initRepositoryStep: function () {
-      // Initialize Select2 for repository
-      if (!$("#repository-select").hasClass("select2-hidden-accessible")) {
-        $("#repository-select").select2({
-          placeholder: "Search repositories...",
-          width: "100%",
-          minimumInputLength: 0,
-        });
+      // Check if Select2 is loaded
+      if (typeof $.fn.select2 === 'undefined') {
+        console.error("Select2 is not loaded yet!");
+        // Retry after a short delay
+        setTimeout(() => this.initRepositoryStep(), 100);
+        return;
       }
 
-      // Load repositories
+      // Load repositories FIRST, then initialize Select2 after options are loaded
       this.loadRepositories();
     },
 
@@ -403,6 +434,7 @@
       const $select = $("#repository-select");
       const $loading = $(".repo-loading");
 
+      console.log("Loading repositories...");
       $loading.show();
       $select.prop("disabled", true);
 
@@ -414,7 +446,11 @@
           nonce: githubDeployWizard.nonce,
         },
         success: (response) => {
+          console.log("Repository AJAX response:", response);
+
           if (response.success && response.data.repositories) {
+            console.log("Found", response.data.repositories.length, "repositories");
+
             // Clear and populate select
             $select.empty().append('<option value="">Select a repository...</option>');
 
@@ -424,14 +460,26 @@
               $select.append(option);
             });
 
+            // NOW initialize Select2 with the populated options
+            if (!$select.hasClass("select2-hidden-accessible")) {
+              $select.select2({
+                placeholder: "Search repositories...",
+                width: "100%",
+                minimumInputLength: 0,
+                dropdownParent: $(".github-deploy-wizard"), // Keep dropdown inside wizard modal
+              });
+            }
+
             $select.prop("disabled", false);
             $loading.hide();
           } else {
+            console.error("Repository load failed:", response);
             alert(response.data?.message || "Failed to load repositories");
             $loading.hide();
           }
         },
-        error: () => {
+        error: (xhr, status, error) => {
+          console.error("Repository AJAX error:", status, error, xhr.responseText);
           alert(githubDeployWizard.strings.error);
           $loading.hide();
         },
@@ -459,8 +507,16 @@
         `/wp-content/themes/${name}/`
       );
 
-      // Load branches
-      this.loadBranches(repoFullName, repoData.default_branch);
+      // IMPORTANT: Bind repository to backend FIRST, then load branches
+      // This is required because the backend won't allow API requests without a bound repo
+      console.log("Repository selected, binding to backend first...");
+      const defaultBranch = repoData.default_branch || 'main';
+
+      this.bindRepository(owner, name, defaultBranch, () => {
+        // After binding succeeds, load branches
+        console.log("Repository bound, now loading branches...");
+        this.loadBranches(repoFullName, defaultBranch);
+      });
     },
 
     /**
@@ -473,11 +529,19 @@
       $loading.show();
       $select.prop("disabled", true).empty();
 
+      // Check if Select2 is loaded
+      if (typeof $.fn.select2 === 'undefined') {
+        console.error("Select2 is not loaded yet!");
+        $loading.hide();
+        return;
+      }
+
       // Initialize Select2 if not already
       if (!$select.hasClass("select2-hidden-accessible")) {
         $select.select2({
           placeholder: "Select a branch...",
           width: "100%",
+          dropdownParent: $(".github-deploy-wizard"),
         });
       }
 
@@ -525,9 +589,24 @@
      * Initialize Method step
      */
     initMethodStep: function () {
+      console.log("Initializing Method step (Step 4)");
+      console.log("Wizard data:", this.wizardData);
+
       // Ensure one method is selected
       if (!$(".wizard-option-card.selected").length) {
         $(".wizard-option-card[data-method='github_actions']").addClass("selected");
+      }
+
+      // If GitHub Actions is selected and workflows haven't been loaded, load them
+      const selectedMethod = $(".wizard-option-card.selected").data("method");
+      const workflowOptionsCount = $("#workflow-select option").length;
+
+      console.log("Selected method:", selectedMethod);
+      console.log("Workflow options count:", workflowOptionsCount);
+
+      if (selectedMethod === "github_actions" && workflowOptionsCount <= 1) {
+        console.log("Loading workflows...");
+        this.loadWorkflows();
       }
 
       this.validateCurrentStep();
@@ -556,21 +635,36 @@
      * Load workflows for selected repository
      */
     loadWorkflows: function () {
-      const repoFullName = $("#repository-select").val();
-      if (!repoFullName) return;
+      // Get repo from wizard data (saved from step 3)
+      const owner = this.wizardData.repo_owner;
+      const name = this.wizardData.repo_name;
 
-      const [owner, name] = repoFullName.split("/");
+      console.log("Loading workflows for repository:", owner, "/", name);
+
+      if (!owner || !name) {
+        console.error("No repository selected - wizard data:", this.wizardData);
+        return;
+      }
       const $select = $("#workflow-select");
       const $loading = $(".workflow-loading");
 
+      console.log("Workflow select element:", $select.length);
       $loading.show();
       $select.prop("disabled", true);
+
+      // Check if Select2 is loaded
+      if (typeof $.fn.select2 === 'undefined') {
+        console.error("Select2 is not loaded yet!");
+        $loading.hide();
+        return;
+      }
 
       // Initialize Select2
       if (!$select.hasClass("select2-hidden-accessible")) {
         $select.select2({
           placeholder: "Select a workflow...",
           width: "100%",
+          dropdownParent: $(".github-deploy-wizard"),
         });
       }
 
@@ -584,7 +678,10 @@
           repo_name: name,
         },
         success: (response) => {
+          console.log("Workflows AJAX response:", response);
+
           if (response.success && response.data.workflows) {
+            console.log("Found", response.data.workflows.length, "workflows");
             $select.empty();
 
             if (response.data.workflows.length === 0) {
@@ -594,7 +691,8 @@
               $select.append('<option value="">Select a workflow...</option>');
 
               response.data.workflows.forEach((workflow) => {
-                const option = new Option(workflow.name, workflow.name, false, false);
+                // Use filename as value (required by GitHub API), display name as label
+                const option = new Option(workflow.name, workflow.filename, false, false);
                 $select.append(option);
               });
 
@@ -605,6 +703,8 @@
             $loading.hide();
             this.validateCurrentStep();
           } else {
+            console.error("Workflows load failed:", response);
+            console.error("Error message:", response.data?.message || "Unknown error");
             $loading.hide();
             $(".wizard-no-workflow-message").show();
           }
@@ -621,6 +721,39 @@
      */
     handleWorkflowChange: function () {
       this.validateCurrentStep();
+    },
+
+    /**
+     * Bind repository to backend
+     */
+    bindRepository: function (owner, name, branch, callback) {
+      console.log("Binding repository:", owner, "/", name, "branch:", branch);
+
+      $.ajax({
+        url: githubDeployWizard.ajaxUrl,
+        type: "POST",
+        data: {
+          action: "github_deploy_wizard_bind_repo",
+          nonce: githubDeployWizard.nonce,
+          owner: owner,
+          name: name,
+          default_branch: branch,
+        },
+        success: (response) => {
+          console.log("Repository bind response:", response);
+          if (response.success) {
+            console.log("Repository bound successfully");
+            if (callback) callback();
+          } else {
+            console.error("Failed to bind repository:", response.data?.message);
+            alert("Failed to bind repository: " + (response.data?.message || "Unknown error"));
+          }
+        },
+        error: (xhr, status, error) => {
+          console.error("Bind repository error:", error, xhr.responseText);
+          alert("Failed to bind repository. Please try again.");
+        },
+      });
     },
 
     /**
@@ -771,8 +904,15 @@
 
   // Initialize when document ready
   $(document).ready(function () {
+    console.log("Document ready, checking for wizard element...");
+    console.log("Wizard elements found:", $(".github-deploy-wizard").length);
+
     if ($(".github-deploy-wizard").length) {
+      console.log("Initializing GitHubDeployWizard...");
       GitHubDeployWizard.init();
+      console.log("GitHubDeployWizard initialized, current step:", GitHubDeployWizard.currentStep);
+    } else {
+      console.log("No wizard element found, skipping initialization");
     }
   });
 })(jQuery);

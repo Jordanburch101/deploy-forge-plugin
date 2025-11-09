@@ -1,6 +1,6 @@
 # Changelog
 
-**Last Updated:** 2025-11-09
+**Last Updated:** 2025-01-27
 
 This file tracks all significant changes, features, and planned enhancements for the WordPress GitHub Auto-Deploy plugin.
 
@@ -320,6 +320,42 @@ Each entry should include:
   - Rate limiting preparation
   - Improved error messages
 - Related: `app-docs/BACKEND-SECURITY-TASKS.md`
+
+### Enhanced
+
+**Setup Wizard Improvements** (2025-01-27)
+- Type: Enhancement
+- Description: Enhanced setup wizard with repository binding, improved OAuth flow, and better UX
+- Changes:
+  - Added repository binding functionality during wizard (`ajax_bind_repo`)
+  - Improved OAuth callback handling to work seamlessly with wizard flow
+  - Context-aware return URLs (wizard vs settings page)
+  - Added wizard reset functionality via URL parameter for testing/troubleshooting
+  - Changed Select2 CDN from jsdelivr to unpkg for better reliability
+  - Improved settings merge logic to preserve webhook_secret during wizard completion
+  - Enhanced workflow fetching to return total_count for better UI feedback
+  - Removed webhook configuration from options step (simplified UI)
+  - Better welcome message on dashboard for unconfigured state with wizard link
+- Files Modified:
+  - `admin/class-setup-wizard.php` - Added repository binding, reset functionality, improved OAuth handling
+  - `admin/css/setup-wizard.css` - Refactored styles for better maintainability
+  - `admin/js/setup-wizard.js` - Enhanced JavaScript for new binding flow
+  - `includes/class-github-api.php` - Added `get_branches()` method
+  - `includes/class-github-app-connector.php` - Improved OAuth callback with wizard context awareness
+  - `templates/dashboard-page.php` - Better welcome message with wizard CTA
+  - `templates/setup-wizard/step-options.php` - Removed webhook configuration section
+- Impact: More robust wizard flow, better user experience, improved error handling
+
+**GitHub API Enhancements** (2025-01-27)
+- Type: Enhancement
+- Description: Added branch fetching capability to GitHub API class
+- Changes:
+  - New `get_branches()` method for fetching repository branches
+  - Includes caching (5-minute transient)
+  - Proper error handling and logging
+- Files Modified:
+  - `includes/class-github-api.php`
+- Use Case: Used by setup wizard and settings page for branch selection
 
 ### Fixed
 

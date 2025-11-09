@@ -13,13 +13,15 @@ if (!defined('ABSPATH')) {
     <h1><?php echo esc_html(get_admin_page_title()); ?></h1>
 
     <?php if (!$is_configured): ?>
-        <div class="notice notice-warning">
-            <p>
-                <?php esc_html_e('GitHub Deploy is not fully configured.', 'github-auto-deploy'); ?>
-                <a href="<?php echo esc_url(admin_url('admin.php?page=github-deploy-settings')); ?>">
-                    <?php esc_html_e('Complete setup', 'github-auto-deploy'); ?>
-                </a>
+        <div class="notice notice-info" style="padding: 20px; border-left: 4px solid #0073aa;">
+            <h2 style="margin-top: 0;"><?php esc_html_e('Welcome to GitHub Auto Deploy!', 'github-auto-deploy'); ?></h2>
+            <p style="font-size: 14px; margin-bottom: 15px;">
+                <?php esc_html_e('Get started by running the setup wizard to connect your GitHub repository and configure automatic deployments.', 'github-auto-deploy'); ?>
             </p>
+            <a href="<?php echo esc_url(admin_url('admin.php?page=github-deploy-wizard')); ?>" class="button button-primary button-hero">
+                <span class="dashicons dashicons-admin-settings" style="margin-top: 5px;"></span>
+                <?php esc_html_e('Start Setup Wizard', 'github-auto-deploy'); ?>
+            </a>
         </div>
     <?php endif; ?>
 
