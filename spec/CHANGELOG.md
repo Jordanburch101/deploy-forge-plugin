@@ -22,6 +22,52 @@ Each entry should include:
 
 ### High Priority
 
+**Setup Wizard** (2025-11-09)
+- Type: Feature
+- Description: Multi-step onboarding wizard for first-time setup with modern, sleek UI
+- Features:
+  - 6-step guided configuration process
+  - Horizontal progress stepper with visual feedback
+  - Select2-powered enhanced dropdowns for repositories, branches, workflows
+  - Real-time validation and AJAX loading
+  - Toggle switches for deployment options (iOS-style)
+  - Visual deployment method cards (GitHub Actions vs Direct Clone)
+  - Review screen with edit links
+  - Skip/resume functionality
+  - Auto-redirect on first activation
+- User Experience:
+  - Estimated 5-minute setup time
+  - Contextual help text throughout
+  - Success animations and feedback
+  - Copy-to-clipboard for webhook configuration
+  - Responsive design (mobile-friendly)
+- Technical Implementation:
+  - Full-screen modal overlay with smooth animations
+  - Progress saved to WordPress transients (1-hour expiration)
+  - 8 AJAX endpoints for repos, branches, workflows, validation
+  - Completes setup by saving all settings to wp_options
+- Files Added:
+  - `admin/class-setup-wizard.php` (580 lines)
+  - `admin/css/setup-wizard.css` (850+ lines)
+  - `admin/js/setup-wizard.js` (650+ lines)
+  - `templates/setup-wizard/wizard-container.php`
+  - `templates/setup-wizard/step-welcome.php`
+  - `templates/setup-wizard/step-connect.php`
+  - `templates/setup-wizard/step-repository.php`
+  - `templates/setup-wizard/step-method.php`
+  - `templates/setup-wizard/step-options.php`
+  - `templates/setup-wizard/step-review.php`
+- Integration:
+  - Added to main plugin initialization
+  - Activation hook sets redirect transient
+  - Hidden admin menu page (direct URL access only)
+- Dependencies:
+  - Select2 4.1.0 (CDN)
+  - jQuery (WordPress core)
+  - Existing GitHub API and settings infrastructure
+- Status: ✅ Implemented
+- Related: spec/setup-wizard.md
+
 **Multi-Environment Support** (Planned)
 - Date Planned: TBD
 - Type: Feature

@@ -34,6 +34,7 @@ require_once GITHUB_DEPLOY_PLUGIN_DIR . 'includes/class-github-app-connector.php
 require_once GITHUB_DEPLOY_PLUGIN_DIR . 'includes/class-webhook-handler.php';
 require_once GITHUB_DEPLOY_PLUGIN_DIR . 'includes/class-deployment-manager.php';
 require_once GITHUB_DEPLOY_PLUGIN_DIR . 'admin/class-admin-pages.php';
+require_once GITHUB_DEPLOY_PLUGIN_DIR . 'admin/class-setup-wizard.php';
 
 /**
  * Main plugin class
@@ -49,6 +50,7 @@ class GitHub_Auto_Deploy {
     private GitHub_Webhook_Handler $webhook_handler;
     private GitHub_Deployment_Manager $deployment_manager;
     private GitHub_Deploy_Admin_Pages $admin_pages;
+    private GitHub_Deploy_Setup_Wizard $setup_wizard;
 
     public static function get_instance(): self {
         if (null === self::$instance) {
@@ -73,6 +75,7 @@ class GitHub_Auto_Deploy {
 
         if (is_admin()) {
             $this->admin_pages = new GitHub_Deploy_Admin_Pages($this->settings, $this->github_api, $this->deployment_manager, $this->database, $this->logger, $this->app_connector);
+            $this->setup_wizard = new GitHub_Deploy_Setup_Wizard($this->settings, $this->github_api, $this->database, $this->logger, $this->app_connector);
         }
     }
 
@@ -99,6 +102,9 @@ class GitHub_Auto_Deploy {
         if (!wp_next_scheduled('github_deploy_check_builds')) {
             wp_schedule_event(time(), 'every_minute', 'github_deploy_check_builds');
         }
+
+        // Set transient to trigger wizard redirect on first activation
+        set_transient('github_deploy_activation_redirect', true, 30);
 
         // Flush rewrite rules for REST API
         flush_rewrite_rules();
