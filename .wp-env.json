@@ -2,13 +2,13 @@
   "core": "WordPress/WordPress#6.4",
   "phpVersion": "8.1",
   "plugins": [
-    "."
+    "./github-auto-deploy"
   ],
   "themes": [
     "https://downloads.wordpress.org/theme/twentytwentyfour.1.0.zip"
   ],
   "mappings": {
-    "wp-content/plugins/github-auto-deploy": "."
+    "wp-content/plugins/github-auto-deploy": "./github-auto-deploy"
   },
   "port": 8888,
   "testsPort": 8889,
