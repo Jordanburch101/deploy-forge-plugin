@@ -13,15 +13,17 @@ if (!defined('ABSPATH')) {
     <h1><?php echo esc_html(get_admin_page_title()); ?></h1>
 
     <?php if (!$is_configured): ?>
-        <div class="notice notice-info" style="padding: 20px; border-left: 4px solid #0073aa;">
-            <h2 style="margin-top: 0;"><?php esc_html_e('Welcome to GitHub Auto Deploy!', 'github-auto-deploy'); ?></h2>
-            <p style="font-size: 14px; margin-bottom: 15px;">
-                <?php esc_html_e('Get started by running the setup wizard to connect your GitHub repository and configure automatic deployments.', 'github-auto-deploy'); ?>
-            </p>
-            <a href="<?php echo esc_url(admin_url('admin.php?page=github-deploy-wizard')); ?>" class="button button-primary button-hero">
-                <span class="dashicons dashicons-admin-settings" style="margin-top: 5px;"></span>
-                <?php esc_html_e('Start Setup Wizard', 'github-auto-deploy'); ?>
-            </a>
+        <div class="github-deploy-welcome-banner">
+            <div class="github-deploy-welcome-content">
+                <h2 class="github-deploy-welcome-title"><?php esc_html_e('Welcome to GitHub Auto Deploy', 'github-auto-deploy'); ?></h2>
+                <p class="github-deploy-welcome-description">
+                    <?php esc_html_e('Get started by running the setup wizard to connect your GitHub repository and configure automatic deployments.', 'github-auto-deploy'); ?>
+                </p>
+                <a href="<?php echo esc_url(admin_url('admin.php?page=github-deploy-wizard')); ?>" class="github-deploy-welcome-button">
+                    <span class="dashicons dashicons-admin-settings"></span>
+                    <?php esc_html_e('Start Setup Wizard', 'github-auto-deploy'); ?>
+                </a>
+            </div>
         </div>
     <?php endif; ?>
 

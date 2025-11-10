@@ -38,7 +38,7 @@
   --wizard-accent-error: #ff0000;
   --wizard-accent-error-bg: rgba(255, 0, 0, 0.1);
   --wizard-accent-warning: #ffb900;
-  --wizard-accent-info: #0070f3;
+  --wizard-accent-info: #fff;
 
   /* Border Radius */
   --wizard-radius: 2px;
@@ -442,6 +442,7 @@
   gap: 12px;
   margin: 24px 0;
   animation: successSlideIn 0.3s ease-out;
+  color: var(--wizard-text-primary);
 }
 
 @keyframes successSlideIn {
@@ -924,13 +925,15 @@
 
 .select2-container--default
   .select2-selection--single
-  .select2-selection__arrow b {
+  .select2-selection__arrow
+  b {
   border-color: var(--wizard-text-secondary) transparent transparent transparent;
 }
 
 .select2-container--default.select2-container--open
   .select2-selection--single
-  .select2-selection__arrow b {
+  .select2-selection__arrow
+  b {
   border-color: transparent transparent var(--wizard-text-secondary) transparent;
 }
 

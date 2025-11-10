@@ -2,6 +2,77 @@
  * GitHub Auto-Deploy Admin Styles
  */
 
+/* ==========================================================================
+   Welcome Banner - Vercel-inspired Dark Theme
+   ========================================================================== */
+
+.github-deploy-welcome-banner {
+  background: linear-gradient(135deg, #000000 0%, #0a0a0a 100%);
+  border: 1px solid #333333;
+  border-radius: 2px;
+  padding: 0;
+  margin: 20px 0 30px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+  overflow: hidden;
+}
+
+.github-deploy-welcome-content {
+  padding: 32px 40px;
+  position: relative;
+}
+
+.github-deploy-welcome-title {
+  font-size: 28px;
+  font-weight: 600;
+  color: #ffffff;
+  margin: 0 0 12px;
+  line-height: 1.2;
+}
+
+.github-deploy-welcome-description {
+  font-size: 16px;
+  color: #a1a1a1;
+  line-height: 1.6;
+  margin: 0 0 24px;
+  max-width: 700px;
+}
+
+.github-deploy-welcome-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 24px;
+  background: #ffffff;
+  color: #000000;
+  font-size: 14px;
+  font-weight: 500;
+  border-radius: 2px;
+  border: 1px solid #ffffff;
+  text-decoration: none;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.github-deploy-welcome-button:hover {
+  background: #e6e6e6;
+  border-color: #e6e6e6;
+  color: #000000;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+}
+
+.github-deploy-welcome-button:focus {
+  outline: 2px solid #ffffff;
+  outline-offset: 2px;
+}
+
+.github-deploy-welcome-button .dashicons {
+  font-size: 20px;
+  width: 20px;
+  height: 20px;
+  margin: 0;
+}
+
 /* Dashboard Cards */
 .github-deploy-cards {
   display: grid;

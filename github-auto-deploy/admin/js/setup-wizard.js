@@ -395,20 +395,13 @@
           <span class="dashicons dashicons-yes-alt"></span>
           <div>
             <strong>Successfully connected to GitHub!</strong>
-            <p style="margin: 4px 0 0;">You can now proceed to the next step.</p>
+            <p style="margin: 4px 0 0;">Click "Next" to continue.</p>
           </div>
         </div>
       `);
 
       githubDeployWizard.isConnected = true;
       this.validateCurrentStep();
-
-      // Auto-advance after 1 second
-      setTimeout(() => {
-        if (this.currentStep === 2) {
-          this.handleNext({ preventDefault: () => {} });
-        }
-      }, 1000);
     },
 
     /**
@@ -776,12 +769,18 @@
      */
     handleToggleChange: function (e) {
       const $toggle = $(e.target);
-      const $group = $toggle.closest(".wizard-toggle-group");
+      // Only apply enabled class to top-level toggle groups (not substeps)
+      const $substep = $toggle.closest(".wizard-toggle-substep");
 
-      if ($toggle.is(":checked")) {
-        $group.addClass("enabled");
-      } else {
-        $group.removeClass("enabled");
+      if ($substep.length === 0) {
+        // This is a top-level toggle, handle the enabled class
+        const $group = $toggle.closest(".wizard-toggle-group");
+
+        if ($toggle.is(":checked")) {
+          $group.addClass("enabled");
+        } else {
+          $group.removeClass("enabled");
+        }
       }
 
       // Generate webhook secret if webhook enabled
