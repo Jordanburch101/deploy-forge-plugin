@@ -4,7 +4,42 @@
  */
 
 const { test: base, expect } = require('@playwright/test');
-const { Admin, RequestUtils } = require('@wordpress/e2e-test-utils-playwright');
+
+/**
+ * Simple admin helper for WordPress navigation
+ */
+class SimpleAdmin {
+  constructor(page) {
+    this.page = page;
+  }
+
+  async visitAdminPage(path) {
+    // Ensure we're logged in first
+    await this.ensureLoggedIn();
+
+    // Navigate to admin page
+    const url = path.startsWith('http') ? path : `http://localhost:8888/wp-admin/${path}`;
+    await this.page.goto(url);
+    await this.page.waitForLoadState('networkidle');
+  }
+
+  async ensureLoggedIn() {
+    // Check if already logged in by looking for admin bar
+    const adminBar = await this.page.locator('#wpadminbar').count();
+    if (adminBar === 0) {
+      await this.login();
+    }
+  }
+
+  async login() {
+    await this.page.goto('http://localhost:8888/wp-login.php');
+    await this.page.waitForSelector('#user_login', { timeout: 10000 });
+    await this.page.fill('#user_login', 'admin');
+    await this.page.fill('#user_pass', 'password');
+    await this.page.click('#wp-submit');
+    await this.page.waitForURL(/wp-admin/, { timeout: 10000 });
+  }
+}
 
 /**
  * Extended test with WordPress fixtures
@@ -12,36 +47,21 @@ const { Admin, RequestUtils } = require('@wordpress/e2e-test-utils-playwright');
 exports.test = base.extend({
   /**
    * Admin utilities for WordPress
-   * Provides helper methods for navigating WordPress admin
    */
-  admin: async ({ page, request }, use) => {
-    const admin = new Admin({ page, request });
+  admin: async ({ page }, use) => {
+    const admin = new SimpleAdmin(page);
+    // Login once at the start
+    await admin.login();
     await use(admin);
   },
 
   /**
-   * Request utilities for WordPress REST API
-   * Provides helper methods for making authenticated requests
-   */
-  requestUtils: async ({ request }, use) => {
-    const requestUtils = await RequestUtils.setup({
-      request,
-      baseURL: process.env.WP_BASE_URL || 'http://localhost:8888',
-      user: {
-        username: 'admin',
-        password: 'password',
-      },
-    });
-    await use(requestUtils);
-  },
-
-  /**
    * Authenticated page with admin user logged in
-   * Automatically logs in before each test
    */
-  authenticatedPage: async ({ page, admin }, use) => {
+  authenticatedPage: async ({ page }, use) => {
     // Navigate to login page
-    await page.goto('/wp-login.php');
+    await page.goto('http://localhost:8888/wp-login.php');
+    await page.waitForSelector('#user_login', { timeout: 10000 });
 
     // Fill in credentials
     await page.fill('#user_login', 'admin');
