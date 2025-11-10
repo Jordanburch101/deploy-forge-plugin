@@ -29,7 +29,8 @@ jobs:
           node-version: '20'
 
       - name: Install dependencies
-        run: npm install
+        run: npm install --legacy-peer-deps --loglevel=verbose
+        timeout-minutes: 5
 
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
