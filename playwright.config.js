@@ -22,7 +22,7 @@ module.exports = defineConfig({
 
   // Reporter configuration
   reporter: [
-    ['html', { outputFolder: 'test-results/html-report' }],
+    ['html', { outputFolder: 'playwright-report' }],
     ['junit', { outputFile: 'test-results/junit.xml' }],
     ['list'],
     // Add GitHub Actions reporter when running in CI
@@ -90,7 +90,7 @@ module.exports = defineConfig({
     command: 'npm run wp-env:start',
     url: 'http://localhost:8888/wp-admin',
     timeout: 120000,
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: true,
     stdout: 'ignore',
     stderr: 'pipe',
   },
