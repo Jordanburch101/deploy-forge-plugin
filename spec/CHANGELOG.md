@@ -23,6 +23,14 @@ Each entry should include:
 
 ### High Priority
 
+**Automated E2E Testing with Playwright** (2025-11-10)
+
+- Type: Enhancement
+- Description: Exploration of automated end-to-end testing using Playwright and GitHub Actions
+- Scope: Full plugin installation, setup wizard flow, repository connection, and deployment testing
+- Status: 🔍 Exploration phase
+- Related: See detailed exploration in comments below
+
 **Setup Wizard - Vercel-Inspired Dark Theme** (2025-11-09)
 
 - Type: Enhancement
