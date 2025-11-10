@@ -34,6 +34,7 @@ Each entry should include:
   - 2px border radius throughout (minimal aesthetic)
   - Mythic logo replacing WordPress dashicon
   - CSS variables for easy theme customization
+  - Fully styled Select2 dropdowns (dark background, no blue highlights)
 - Color System:
   - Background: #000000 (primary), #0a0a0a (secondary), #1a1a1a (tertiary)
   - Text: #ffffff (primary), #a1a1a1 (secondary), #666666 (tertiary)
@@ -42,13 +43,20 @@ Each entry should include:
   - Success accent: #00ff00 (green) - kept for important states
   - Error accent: #ff0000 (red) - kept for warnings
   - Warning accent: #ffb900 (amber)
+- Select2 Customization:
+  - Dark dropdown background matching wizard theme
+  - Dark search input with white border on focus
+  - Hover states using tertiary background color
+  - Selected options highlighted with green accent
+  - All states themed (disabled, loading, no-results, placeholder)
 - Technical Implementation:
   - 40+ CSS custom properties in :root for easy customization
   - All colors, borders, shadows defined as variables
   - No logic changes - purely visual enhancement
   - Maintained all existing functionality
+  - Comprehensive Select2 component styling (dropdown, search, options)
 - Files Modified:
-  - `admin/css/setup-wizard.css` (complete theme overhaul)
+  - `admin/css/setup-wizard.css` (complete theme overhaul + Select2 styling)
   - `templates/setup-wizard/step-welcome.php` (logo replacement)
 - Status: ✅ Implemented
 - Related: Original setup wizard implementation (2025-11-09)
