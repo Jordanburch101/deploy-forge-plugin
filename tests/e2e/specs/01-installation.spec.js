@@ -107,7 +107,7 @@ test.describe('Plugin Installation', () => {
     expect(hasSetupPrompt).toBe(true);
   });
 
-  test('should register REST API endpoints', async ({ page, requestUtils }) => {
+  test('should register REST API endpoints', async ({ page }) => {
     // Test REST API namespace exists
     const response = await page.request.get('/wp-json/github-deploy/v1');
 
