@@ -33,9 +33,10 @@ test.describe('WordPress Admin Access Test', () => {
     await page.click('#wp-submit');
     await page.waitForURL(/wp-admin/, { timeout: 10000 });
 
-    // Look for plugin menu
-    const menuExists = await page.locator('#toplevel_page_github-deploy-dashboard, text=GitHub Deploy').count() > 0;
+    // Look for plugin menu - correct slug is 'github-deploy'
+    const menuExists = await page.locator('#toplevel_page_github-deploy, a[href*="github-deploy"]').count() > 0;
 
     console.log('Plugin menu exists:', menuExists);
+    expect(menuExists).toBe(true);
   });
 });
