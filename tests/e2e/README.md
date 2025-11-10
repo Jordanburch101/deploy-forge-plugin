@@ -198,6 +198,100 @@ Tests mock GitHub API calls because:
 - ✅ File operations
 - ✅ UI rendering
 
+## Integration Testing (Real GitHub)
+
+For more realistic testing, you can configure tests to use a real GitHub account instead of mocks.
+
+### Setup Test GitHub Account
+
+See [`TEST-ACCOUNT-SETUP.md`](../../TEST-ACCOUNT-SETUP.md) for detailed instructions on creating a dedicated GitHub test account and repository.
+
+### Configure Integration Mode
+
+Set these environment variables to enable integration testing:
+
+```bash
+# Required environment variables
+export TEST_GITHUB_TOKEN="your_github_personal_access_token"
+export TEST_GITHUB_USERNAME="your-test-github-username"
+export TEST_GITHUB_REPO="test-theme-repo"
+
+# Run tests with real GitHub integration
+npm run test:e2e
+```
+
+### Integration vs Mock Mode
+
+The test framework automatically detects which mode to use:
+
+**Mock Mode** (Default):
+- No environment variables needed
+- GitHub API calls intercepted and mocked
+- Fast, predictable, no API limits
+- Console shows: `🎭 Using MOCKED GitHub responses`
+
+**Integration Mode** (When env vars set):
+- Real GitHub API calls
+- Real repository and workflows
+- Tests actual GitHub integration
+- Console shows: `🔗 Using REAL GitHub integration`
+
+### Running Integration Tests
+
+```bash
+# Option 1: Export environment variables
+export TEST_GITHUB_TOKEN="ghp_xxxxxxxxxxxx"
+export TEST_GITHUB_USERNAME="my-test-account"
+export TEST_GITHUB_REPO="wordpress-test-theme"
+npm run test:e2e
+
+# Option 2: Inline environment variables
+TEST_GITHUB_TOKEN="ghp_xxx" TEST_GITHUB_USERNAME="test-user" TEST_GITHUB_REPO="test-theme" npm run test:e2e
+```
+
+### GitHub Secrets for CI
+
+To run integration tests in GitHub Actions:
+
+1. Go to repository Settings → Secrets and variables → Actions
+2. Add these repository secrets:
+   - `TEST_GITHUB_TOKEN` - Personal access token from test account
+   - `TEST_GITHUB_USERNAME` - Test account username
+   - `TEST_GITHUB_REPO` - Test repository name
+
+3. Update workflow file to use secrets:
+
+```yaml
+- name: Run Playwright tests
+  run: npm run test:e2e
+  env:
+    CI: true
+    TEST_GITHUB_TOKEN: ${{ secrets.TEST_GITHUB_TOKEN }}
+    TEST_GITHUB_USERNAME: ${{ secrets.TEST_GITHUB_USERNAME }}
+    TEST_GITHUB_REPO: ${{ secrets.TEST_GITHUB_REPO }}
+```
+
+### Integration Test Considerations
+
+**Advantages:**
+- Tests real GitHub API behavior
+- Validates actual OAuth flow
+- Tests real workflow execution
+- Catches integration bugs
+
+**Limitations:**
+- Slower than mocked tests
+- Requires GitHub account setup
+- Subject to API rate limits
+- OAuth flow still requires manual setup in some tests
+- Tests may fail due to network issues
+
+**Best Practice:**
+- Use mocked tests for development (fast iteration)
+- Use integration tests for CI/CD (validation before release)
+- Keep test account credentials secure
+- Use dedicated test repository (don't test on production repos)
+
 ## WordPress Environment
 
 The tests run against a real WordPress installation:

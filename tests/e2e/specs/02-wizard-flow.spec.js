@@ -7,6 +7,7 @@ const { test, expect } = require('../config/wordpress-config');
 const { SetupWizardPage } = require('../page-objects/wizard-page');
 const { setupGitHubMocks, mockGitHubOAuthFlow } = require('../mocks/github-api-mock');
 const { resetPluginData, resetWizardState, getPluginSettings } = require('../helpers/plugin-helpers');
+const { getTestConfig } = require('../config/test-environment');
 
 test.describe('Setup Wizard Flow', () => {
   let wizardPage;
@@ -45,20 +46,31 @@ test.describe('Setup Wizard Flow', () => {
   });
 
   test('should simulate GitHub connection', async ({ page }) => {
+    const testConfig = getTestConfig();
+
     await wizardPage.navigate();
     await wizardPage.completeWelcomeStep();
-    await mockGitHubOAuthFlow(page);
 
-    // Reload to check connection status
-    await page.reload();
-    await page.waitForLoadState('networkidle');
+    if (testConfig.useRealGitHub) {
+      // In integration mode, skip OAuth mock - user would need to manually authenticate
+      // This test becomes a placeholder for manual OAuth flow
+      test.skip();
+    } else {
+      await mockGitHubOAuthFlow(page);
 
-    // Should show connected state
-    const connectionStatus = await page.textContent('.connection-status, .github-status');
-    expect(connectionStatus.toLowerCase()).toContain('connect');
+      // Reload to check connection status
+      await page.reload();
+      await page.waitForLoadState('networkidle');
+
+      // Should show connected state
+      const connectionStatus = await page.textContent('.connection-status, .github-status');
+      expect(connectionStatus.toLowerCase()).toContain('connect');
+    }
   });
 
   test('should complete repository selection step', async ({ page }) => {
+    const testConfig = getTestConfig();
+
     await wizardPage.navigate();
     await wizardPage.completeWelcomeStep();
     await wizardPage.completeConnectStep();
@@ -66,8 +78,9 @@ test.describe('Setup Wizard Flow', () => {
     // Wait for repository step
     await expect(page.locator(wizardPage.stepRepository)).toBeVisible({ timeout: 10000 });
 
-    // Complete repository selection
-    await wizardPage.completeRepositoryStep('test-theme-repo', 'main');
+    // Complete repository selection - use real test repo in integration mode
+    const repoName = testConfig.useRealGitHub ? testConfig.github.repository : 'test-theme-repo';
+    await wizardPage.completeRepositoryStep(repoName, 'main');
 
     // Should advance to method step
     const currentStep = await wizardPage.getCurrentStep();
@@ -109,16 +122,19 @@ test.describe('Setup Wizard Flow', () => {
   });
 
   test('should display review screen with correct data', async ({ page }) => {
+    const testConfig = getTestConfig();
+    const repoName = testConfig.useRealGitHub ? testConfig.github.repository : 'test-theme-repo';
+
     await wizardPage.navigate();
     await wizardPage.completeWelcomeStep();
     await wizardPage.completeConnectStep();
-    await wizardPage.completeRepositoryStep('test-theme-repo', 'main');
+    await wizardPage.completeRepositoryStep(repoName, 'main');
     await wizardPage.completeMethodStep('github_actions', 'Build Theme');
     await wizardPage.completeOptionsStep();
 
     // Verify review screen shows correct data
     await wizardPage.verifyReviewData({
-      repository: 'test-theme-repo',
+      repository: repoName,
       branch: 'main',
       method: 'GitHub Actions',
       workflow: 'Build Theme',
@@ -126,11 +142,14 @@ test.describe('Setup Wizard Flow', () => {
   });
 
   test('should complete wizard and redirect to dashboard', async ({ page }) => {
+    const testConfig = getTestConfig();
+    const repoName = testConfig.useRealGitHub ? testConfig.github.repository : 'test-theme-repo';
+
     await wizardPage.navigate();
 
     // Complete entire wizard
     await wizardPage.completeWizard({
-      repo: 'test-theme-repo',
+      repo: repoName,
       branch: 'main',
       method: 'github_actions',
       workflow: 'Build Theme',
@@ -151,11 +170,17 @@ test.describe('Setup Wizard Flow', () => {
   });
 
   test('should save settings after wizard completion', async ({ page }) => {
+    const testConfig = getTestConfig();
+    const repoName = testConfig.useRealGitHub ? testConfig.github.repository : 'test-theme-repo';
+    const expectedFullRepo = testConfig.useRealGitHub
+      ? testConfig.github.fullRepo
+      : 'testuser/test-theme-repo';
+
     await wizardPage.navigate();
 
     // Complete wizard
     await wizardPage.completeWizard({
-      repo: 'test-theme-repo',
+      repo: repoName,
       branch: 'main',
       method: 'github_actions',
       workflow: 'Build Theme',
@@ -164,7 +189,7 @@ test.describe('Setup Wizard Flow', () => {
     // Check if settings were saved
     const settings = await getPluginSettings();
     expect(settings).toBeTruthy();
-    expect(settings.repository).toBe('testuser/test-theme-repo');
+    expect(settings.repository).toBe(expectedFullRepo);
     expect(settings.branch).toBe('main');
     expect(settings.deployment_method).toBe('github_actions');
   });
@@ -208,10 +233,13 @@ test.describe('Setup Wizard Flow', () => {
   });
 
   test('should preserve step data on page reload', async ({ page }) => {
+    const testConfig = getTestConfig();
+    const repoName = testConfig.useRealGitHub ? testConfig.github.repository : 'test-theme-repo';
+
     await wizardPage.navigate();
     await wizardPage.completeWelcomeStep();
     await wizardPage.completeConnectStep();
-    await wizardPage.completeRepositoryStep('test-theme-repo', 'main');
+    await wizardPage.completeRepositoryStep(repoName, 'main');
 
     // Reload page
     await page.reload();

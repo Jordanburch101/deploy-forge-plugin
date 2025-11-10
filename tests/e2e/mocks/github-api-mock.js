@@ -4,12 +4,18 @@
  */
 
 const testData = require('../fixtures/test-data');
+const { shouldUseIntegration } = require('../config/test-environment');
 
 /**
  * Setup GitHub API mocks
  * @param {import('@playwright/test').Page} page - Playwright page object
  */
 async function setupGitHubMocks(page) {
+  // Skip mocking if using real GitHub integration
+  if (shouldUseIntegration()) {
+    console.log('🔗 Skipping mocks - using real GitHub integration');
+    return;
+  }
   // Mock get installation repositories
   await page.route('**/wp-json/github-deploy/v1/installation/repos', async (route) => {
     await route.fulfill({
@@ -238,6 +244,12 @@ async function setupGitHubMocks(page) {
  * @param {import('@playwright/test').Page} page - Playwright page object
  */
 async function mockGitHubOAuthFlow(page) {
+  // Skip mocking if using real GitHub integration
+  if (shouldUseIntegration()) {
+    console.log('🔗 Skipping OAuth mock - using real GitHub OAuth flow');
+    return;
+  }
+
   // Simulate successful GitHub App installation
   await page.evaluate((installation) => {
     localStorage.setItem('github_installation_id', String(installation.id));

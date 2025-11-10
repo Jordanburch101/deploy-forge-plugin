@@ -4,9 +4,14 @@
  */
 
 const { execSync } = require('child_process');
+const { logTestEnvironment } = require('./test-environment');
 
 async function globalSetup() {
   console.log('\n🚀 Starting global test setup...\n');
+
+  // Log test environment mode
+  logTestEnvironment();
+  console.log('');
 
   try {
     // Wait for WordPress to be ready
