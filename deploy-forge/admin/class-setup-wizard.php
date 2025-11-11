@@ -46,6 +46,7 @@ class Deploy_Forge_Setup_Wizard
         add_action('wp_ajax_deploy_forge_wizard_save_step', [$this, 'ajax_save_step']);
         add_action('wp_ajax_deploy_forge_wizard_complete', [$this, 'ajax_complete']);
         add_action('wp_ajax_deploy_forge_wizard_skip', [$this, 'ajax_skip']);
+        add_action('wp_ajax_deploy_forge_wizard_restart', [$this, 'ajax_restart']);
 
         // Redirect to wizard on activation if needed
         add_action('admin_init', [$this, 'maybe_redirect_to_wizard']);
@@ -524,6 +525,47 @@ class Deploy_Forge_Setup_Wizard
 
         wp_send_json_success([
             'redirect' => admin_url('admin.php?page=deploy-forge-settings&wizard_skipped=1')
+        ]);
+    }
+
+    /**
+     * AJAX: Restart wizard (disconnect and reset)
+     */
+    public function ajax_restart(): void
+    {
+        check_ajax_referer('deploy_forge_wizard', 'nonce');
+
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error(['message' => __('Unauthorized', 'deploy-forge')]);
+        }
+
+        $this->logger->log('Setup_Wizard', 'Restarting wizard - disconnecting and resetting state');
+
+        // Disconnect from GitHub (unbind repository)
+        $disconnect_result = $this->app_connector->disconnect();
+
+        if (!$disconnect_result['success']) {
+            $this->logger->error('Setup_Wizard', 'Failed to disconnect during wizard restart', $disconnect_result);
+            wp_send_json_error([
+                'message' => __('Failed to disconnect from GitHub. Please try again.', 'deploy-forge')
+            ]);
+            return;
+        }
+
+        // Reset wizard state
+        delete_option('deploy_forge_wizard_completed');
+        delete_option('deploy_forge_wizard_skipped');
+        delete_option('deploy_forge_wizard_completed_at');
+
+        // Clear all wizard step transients
+        for ($i = 1; $i <= 6; $i++) {
+            delete_transient('deploy_forge_wizard_step_' . $i);
+        }
+
+        $this->logger->log('Setup_Wizard', 'Wizard restarted successfully - state reset and disconnected');
+
+        wp_send_json_success([
+            'redirect' => admin_url('admin.php?page=deploy-forge-wizard')
         ]);
     }
 

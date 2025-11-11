@@ -39,6 +39,7 @@
       $(document).on("click", ".wizard-connect-button", this.handleConnectClick.bind(this));
       $(document).on("change", "#repository-select", this.handleRepoChange.bind(this));
       $(document).on("click", "#bind-repo-btn", this.handleBindClick.bind(this));
+      $(document).on("click", "#restart-wizard-btn", this.handleRestartWizard.bind(this));
       $(document).on("change", "#branch-select", this.handleBranchChange.bind(this));
       $(document).on("click", ".wizard-option-card", this.handleMethodSelect.bind(this));
       $(document).on("change", "#workflow-select", this.handleWorkflowChange.bind(this));
@@ -569,6 +570,54 @@
         // On error, re-enable button
         $button.prop("disabled", false);
         $loading.css("display", "none");
+      });
+    },
+
+    /**
+     * Handle restart wizard button click
+     */
+    handleRestartWizard: function (e) {
+      e.preventDefault();
+
+      if (!confirm("Are you sure you want to restart the setup wizard? This will disconnect from GitHub and reset all wizard progress.")) {
+        return;
+      }
+
+      const $button = $("#restart-wizard-btn");
+      const $loading = $("#restart-loading");
+
+      // Disable button and show loading
+      $button.prop("disabled", true);
+      $loading.css("display", "inline-block");
+
+      console.log("Restarting wizard...");
+
+      $.ajax({
+        url: deployForgeWizard.ajaxUrl,
+        type: "POST",
+        data: {
+          action: "deploy_forge_wizard_restart",
+          nonce: deployForgeWizard.nonce,
+        },
+        success: (response) => {
+          console.log("Wizard restart response:", response);
+          if (response.success && response.data.redirect) {
+            console.log("Wizard restarted successfully, reloading...");
+            // Reload the wizard from step 1
+            window.location.href = response.data.redirect;
+          } else {
+            console.error("Failed to restart wizard:", response.data?.message);
+            alert("Failed to restart wizard: " + (response.data?.message || "Unknown error"));
+            $button.prop("disabled", false);
+            $loading.css("display", "none");
+          }
+        },
+        error: (xhr, status, error) => {
+          console.error("Restart wizard error:", error, xhr.responseText);
+          alert("Failed to restart wizard. Please try again.");
+          $button.prop("disabled", false);
+          $loading.css("display", "none");
+        },
       });
     },
 

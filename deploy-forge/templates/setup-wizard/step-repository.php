@@ -47,11 +47,18 @@ if (!defined('ABSPATH')) {
 
     <!-- Amber Warning (shown after binding) -->
     <div id="repo-bound-warning" style="display: none; margin: 24px 0; padding: 16px 20px; background: rgba(255, 185, 0, 0.1); border: 1px solid var(--wizard-accent-warning, #ffb900); border-left: 4px solid var(--wizard-accent-warning, #ffb900); border-radius: 2px;">
-        <p style="margin: 0; font-size: 14px; color: var(--wizard-text-secondary, #a1a1a1); line-height: 1.5;">
-            <span class="dashicons dashicons-warning" style="color: var(--wizard-accent-warning, #ffb900); vertical-align: middle; font-size: 18px;"></span>
-            <strong style="color: var(--wizard-text-primary, #ffffff);"><?php esc_html_e('Repository Bound:', 'deploy-forge'); ?></strong>
-            <?php esc_html_e('You have bound a repository. If you wish to change it, you need to restart the setup wizard (this will disconnect and start over).', 'deploy-forge'); ?>
-        </p>
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px;">
+            <p style="margin: 0; font-size: 14px; color: var(--wizard-text-secondary, #a1a1a1); line-height: 1.5; flex: 1;">
+                <span class="dashicons dashicons-warning" style="color: var(--wizard-accent-warning, #ffb900); vertical-align: middle; font-size: 18px;"></span>
+                <strong style="color: var(--wizard-text-primary, #ffffff);"><?php esc_html_e('Repository Bound:', 'deploy-forge'); ?></strong>
+                <?php esc_html_e('You have bound a repository. To change it, restart the setup wizard (this will disconnect and start over).', 'deploy-forge'); ?>
+            </p>
+            <button type="button" id="restart-wizard-btn" class="wizard-button wizard-button-secondary" style="flex-shrink: 0;">
+                <span class="dashicons dashicons-update"></span>
+                <?php esc_html_e('Restart Wizard', 'deploy-forge'); ?>
+            </button>
+        </div>
+        <span id="restart-loading" class="wizard-loading" style="display: none; margin-top: 12px;"></span>
     </div>
 
     <!-- Branch Selector (shown only after binding) -->
