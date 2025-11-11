@@ -564,9 +564,11 @@ class Deploy_Forge_Setup_Wizard
                 break;
 
             case 5: // Deployment Options
-                $sanitized['auto_deploy_enabled'] = !empty($data['auto_deploy_enabled']);
-                $sanitized['require_manual_approval'] = !empty($data['require_manual_approval']);
-                $sanitized['create_backups'] = !empty($data['create_backups']);
+                // Convert string booleans from AJAX to actual booleans
+                // jQuery sends boolean false as string "false", which !empty() treats as true
+                $sanitized['auto_deploy_enabled'] = filter_var($data['auto_deploy_enabled'] ?? false, FILTER_VALIDATE_BOOLEAN);
+                $sanitized['require_manual_approval'] = filter_var($data['require_manual_approval'] ?? false, FILTER_VALIDATE_BOOLEAN);
+                $sanitized['create_backups'] = filter_var($data['create_backups'] ?? true, FILTER_VALIDATE_BOOLEAN);
 
                 if (!empty($data['webhook_enabled'])) {
                     // Generate webhook secret if not exists
