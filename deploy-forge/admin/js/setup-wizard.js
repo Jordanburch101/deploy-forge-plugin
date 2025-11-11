@@ -9,6 +9,7 @@
   const GitHubDeployWizard = {
     currentStep: 1,
     totalSteps: 6,
+    isRepoBound: false,
     wizardData: {
       repo_owner: null,
       repo_name: null,
@@ -37,6 +38,7 @@
       // Step-specific events
       $(document).on("click", ".wizard-connect-button", this.handleConnectClick.bind(this));
       $(document).on("change", "#repository-select", this.handleRepoChange.bind(this));
+      $(document).on("click", "#bind-repo-btn", this.handleBindClick.bind(this));
       $(document).on("change", "#branch-select", this.handleBranchChange.bind(this));
       $(document).on("click", ".wizard-option-card", this.handleMethodSelect.bind(this));
       $(document).on("change", "#workflow-select", this.handleWorkflowChange.bind(this));
@@ -143,7 +145,7 @@
           break;
 
         case 3: // Repository
-          isValid = $("#repository-select").val() && $("#branch-select").val();
+          isValid = this.isRepoBound && $("#branch-select").val();
           break;
 
         case 4: // Method
@@ -486,29 +488,87 @@
       const repoFullName = $(e.target).val();
 
       if (!repoFullName) {
-        $("#branch-select").prop("disabled", true).empty();
+        $("#bind-repo-section").hide();
+        $("#branch-section").hide();
         $(".wizard-deployment-preview").hide();
         this.validateCurrentStep();
         return;
       }
 
       const repoData = $(e.target).find(":selected").data("repo");
-
-      // Show deployment preview
       const [owner, name] = repoFullName.split("/");
-      $(".wizard-deployment-preview").show().find("code").text(
+
+      // Store selected repo data for later binding
+      this.selectedRepoData = {
+        owner: owner,
+        name: name,
+        full_name: repoFullName,
+        default_branch: repoData.default_branch || 'main'
+      };
+
+      // Update deployment preview text (but don't show yet - will show after binding)
+      $(".wizard-deployment-preview").find("code").text(
         `/wp-content/themes/${name}/`
       );
 
-      // IMPORTANT: Bind repository to backend FIRST, then load branches
-      // This is required because the backend won't allow API requests without a bound repo
-      console.log("Repository selected, binding to backend first...");
-      const defaultBranch = repoData.default_branch || 'main';
+      // Show bind button (only if repo not already bound)
+      if (!this.isRepoBound) {
+        $("#bind-repo-section").show();
+      }
 
-      this.bindRepository(owner, name, defaultBranch, () => {
-        // After binding succeeds, load branches
-        console.log("Repository bound, now loading branches...");
-        this.loadBranches(repoFullName, defaultBranch);
+      this.validateCurrentStep();
+    },
+
+    /**
+     * Handle bind repository button click
+     */
+    handleBindClick: function (e) {
+      e.preventDefault();
+
+      if (!this.selectedRepoData) {
+        alert("Please select a repository first.");
+        return;
+      }
+
+      const $button = $("#bind-repo-btn");
+      const $loading = $("#bind-loading");
+
+      // Disable button and show loading
+      $button.prop("disabled", true);
+      $loading.addClass("is-active");
+
+      const { owner, name, full_name, default_branch } = this.selectedRepoData;
+
+      console.log("Binding repository:", owner, "/", name);
+
+      // Bind repository to backend
+      this.bindRepository(owner, name, default_branch, () => {
+        // After binding succeeds
+        console.log("Repository bound successfully!");
+
+        // Update state
+        this.isRepoBound = true;
+
+        // Disable repository selector (can't change after binding)
+        $("#repository-select").prop("disabled", true);
+
+        // Hide bind button section
+        $("#bind-repo-section").hide();
+
+        // Show amber warning
+        $("#repo-bound-warning").show();
+
+        // Show branch section and load branches
+        $("#branch-section").show();
+        $(".wizard-deployment-preview").show();
+        this.loadBranches(full_name, default_branch);
+
+        // Hide loading
+        $loading.removeClass("is-active");
+      }, () => {
+        // On error, re-enable button
+        $button.prop("disabled", false);
+        $loading.removeClass("is-active");
       });
     },
 
@@ -719,7 +779,7 @@
     /**
      * Bind repository to backend
      */
-    bindRepository: function (owner, name, branch, callback) {
+    bindRepository: function (owner, name, branch, successCallback, errorCallback) {
       console.log("Binding repository:", owner, "/", name, "branch:", branch);
 
       $.ajax({
@@ -736,15 +796,17 @@
           console.log("Repository bind response:", response);
           if (response.success) {
             console.log("Repository bound successfully");
-            if (callback) callback();
+            if (successCallback) successCallback();
           } else {
             console.error("Failed to bind repository:", response.data?.message);
             alert("Failed to bind repository: " + (response.data?.message || "Unknown error"));
+            if (errorCallback) errorCallback();
           }
         },
         error: (xhr, status, error) => {
           console.error("Bind repository error:", error, xhr.responseText);
           alert("Failed to bind repository. Please try again.");
+          if (errorCallback) errorCallback();
         },
       });
     },
