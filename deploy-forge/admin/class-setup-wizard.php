@@ -193,6 +193,15 @@ class Deploy_Forge_Setup_Wizard
             'currentStep' => isset($_GET['step']) ? intval($_GET['step']) : 1,
             'isConnected' => $this->app_connector->is_connected(),
             'dashboardUrl' => admin_url('admin.php?page=deploy-forge'),
+            'boundRepo' => [
+                'isBound' => $this->settings->is_repo_bound(),
+                'owner' => $this->settings->get('github_repo_owner'),
+                'name' => $this->settings->get('github_repo_name'),
+                'branch' => $this->settings->get('github_branch'),
+                'full_name' => $this->settings->get('github_repo_owner') && $this->settings->get('github_repo_name')
+                    ? $this->settings->get('github_repo_owner') . '/' . $this->settings->get('github_repo_name')
+                    : '',
+            ],
             'strings' => [
                 'error' => __('An error occurred. Please try again.', 'deploy-forge'),
                 'loading' => __('Loading...', 'deploy-forge'),

@@ -419,8 +419,67 @@
         return;
       }
 
-      // Load repositories FIRST, then initialize Select2 after options are loaded
-      this.loadRepositories();
+      // Check if repository is already bound (from server state)
+      if (deployForgeWizard.boundRepo && deployForgeWizard.boundRepo.isBound) {
+        console.log("Repository already bound, restoring state:", deployForgeWizard.boundRepo);
+        this.restoreBoundRepoState(deployForgeWizard.boundRepo);
+      } else {
+        // Load repositories FIRST, then initialize Select2 after options are loaded
+        this.loadRepositories();
+      }
+    },
+
+    /**
+     * Restore bound repository state on page load
+     */
+    restoreBoundRepoState: function (boundRepo) {
+      console.log("Restoring bound repository state");
+
+      // Update internal state
+      this.isRepoBound = true;
+      this.wizardData.repo_owner = boundRepo.owner;
+      this.wizardData.repo_name = boundRepo.name;
+      this.wizardData.branch = boundRepo.branch;
+
+      // Store selected repo data
+      this.selectedRepoData = {
+        owner: boundRepo.owner,
+        name: boundRepo.name,
+        full_name: boundRepo.full_name,
+        default_branch: boundRepo.branch || 'main'
+      };
+
+      // Populate repository dropdown with the bound repo
+      const $repoSelect = $("#repository-select");
+      $repoSelect.empty().append(
+        new Option(boundRepo.full_name, boundRepo.full_name, true, true)
+      );
+
+      // Initialize Select2 and disable it
+      if (!$repoSelect.hasClass("select2-hidden-accessible")) {
+        $repoSelect.select2({
+          placeholder: "Search repositories...",
+          width: "100%",
+          minimumInputLength: 0,
+          dropdownParent: $(".deploy-forge-wizard"),
+        });
+      }
+      $repoSelect.prop("disabled", true);
+
+      // Show deployment preview
+      $(".wizard-deployment-preview").show().find("code").text(
+        `/wp-content/themes/${boundRepo.name}/`
+      );
+
+      // Show amber warning with restart button
+      $("#repo-bound-warning").show();
+
+      // Show branch section and load branches
+      $("#branch-section").show();
+      this.loadBranches(boundRepo.full_name, boundRepo.branch);
+
+      // Validate step
+      this.validateCurrentStep();
     },
 
     /**
