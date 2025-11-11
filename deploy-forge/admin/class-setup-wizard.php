@@ -538,7 +538,7 @@ class Deploy_Forge_Setup_Wizard
     }
 
     /**
-     * AJAX: Restart wizard (unbind repository and reset)
+     * AJAX: Restart wizard (full disconnect and reset)
      */
     public function ajax_restart(): void
     {
@@ -548,31 +548,19 @@ class Deploy_Forge_Setup_Wizard
             wp_send_json_error(['message' => __('Unauthorized', 'deploy-forge')]);
         }
 
-        $this->logger->log('Setup_Wizard', 'Restarting wizard - unbinding repository and resetting state');
+        $this->logger->log('Setup_Wizard', 'Restarting wizard - disconnecting from GitHub and resetting state');
 
-        // Unbind repository (lighter than full disconnect)
-        // We DON'T disconnect from GitHub - user is already connected (Step 2 complete)
-        // We just need to unbind the repository so they can select a different one
-        $github_data = $this->settings->get_github_data();
+        // Full disconnect from GitHub (not just unbind repo)
+        // This prevents client from changing repos - they must reconnect
+        $disconnect_result = $this->app_connector->disconnect();
 
-        if (!empty($github_data)) {
-            // Clear repo binding
-            $github_data['repo_bound'] = false;
-            unset($github_data['selected_repo_name']);
-            unset($github_data['selected_repo_full_name']);
-            unset($github_data['selected_repo_default_branch']);
-            unset($github_data['bound_at']);
-
-            $this->settings->set_github_data($github_data);
-            $this->logger->log('Setup_Wizard', 'Repository unbound successfully');
+        if (!$disconnect_result) {
+            $this->logger->error('Setup_Wizard', 'Failed to disconnect during wizard restart');
+            wp_send_json_error([
+                'message' => __('Failed to disconnect from GitHub. Please try again.', 'deploy-forge')
+            ]);
+            return;
         }
-
-        // Clear repo settings
-        $current_settings = $this->settings->get_all();
-        $current_settings['github_repo_owner'] = '';
-        $current_settings['github_repo_name'] = '';
-        $current_settings['github_branch'] = 'main';
-        $this->settings->save($current_settings);
 
         // Reset wizard state
         delete_option('deploy_forge_wizard_completed');
@@ -584,11 +572,11 @@ class Deploy_Forge_Setup_Wizard
             delete_transient('deploy_forge_wizard_step_' . $i);
         }
 
-        $this->logger->log('Setup_Wizard', 'Wizard restarted successfully - repository unbound and state reset');
+        $this->logger->log('Setup_Wizard', 'Wizard restarted successfully - disconnected from GitHub and state reset');
 
-        // Redirect to step 3 (repository selection) since user is already connected to GitHub
+        // Redirect to step 2 (Connect GitHub) - client must reconnect
         wp_send_json_success([
-            'redirect' => admin_url('admin.php?page=deploy-forge-wizard&step=3')
+            'redirect' => admin_url('admin.php?page=deploy-forge-wizard&step=2')
         ]);
     }
 
