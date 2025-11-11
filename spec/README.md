@@ -4,7 +4,7 @@
 
 ## Overview
 
-This directory contains comprehensive technical specifications for the WordPress GitHub Auto-Deploy plugin. These documents serve as the single source of truth for architecture, design decisions, and implementation details.
+This directory contains comprehensive technical specifications for the WordPress Deploy Forge plugin. These documents serve as the single source of truth for architecture, design decisions, and implementation details.
 
 ## Purpose
 
@@ -21,40 +21,43 @@ The `spec/` directory provides:
 
 ### Core Specifications
 
-| Document | Description | Audience |
-|----------|-------------|----------|
-| **[architecture.md](architecture.md)** | System architecture, components, data flow | Developers, Architects |
-| **[requirements.md](requirements.md)** | Functional and non-functional requirements | Product, QA, Developers |
-| **[database.md](database.md)** | Database schema, queries, migrations | Developers, DBAs |
-| **[api-integration.md](api-integration.md)** | GitHub API, webhooks, REST endpoints | Developers, DevOps |
-| **[security.md](security.md)** | Security requirements, threat model, best practices | Security, Developers |
-| **[deployment-workflow.md](deployment-workflow.md)** | Deployment lifecycle, states, error handling | Developers, Support |
-| **[testing.md](testing.md)** | Testing strategies, test cases, quality assurance | QA, Developers |
+| Document                                             | Description                                         | Audience                |
+| ---------------------------------------------------- | --------------------------------------------------- | ----------------------- |
+| **[architecture.md](architecture.md)**               | System architecture, components, data flow          | Developers, Architects  |
+| **[requirements.md](requirements.md)**               | Functional and non-functional requirements          | Product, QA, Developers |
+| **[database.md](database.md)**                       | Database schema, queries, migrations                | Developers, DBAs        |
+| **[api-integration.md](api-integration.md)**         | GitHub API, webhooks, REST endpoints                | Developers, DevOps      |
+| **[security.md](security.md)**                       | Security requirements, threat model, best practices | Security, Developers    |
+| **[deployment-workflow.md](deployment-workflow.md)** | Deployment lifecycle, states, error handling        | Developers, Support     |
+| **[testing.md](testing.md)**                         | Testing strategies, test cases, quality assurance   | QA, Developers          |
 
 ### Change Management
 
-| Document | Description | Audience |
-|----------|-------------|----------|
-| **[CHANGELOG.md](CHANGELOG.md)** | Feature history, version tracking, planned enhancements | All |
-| **[README.md](README.md)** | This file - spec directory overview | All |
+| Document                         | Description                                             | Audience |
+| -------------------------------- | ------------------------------------------------------- | -------- |
+| **[CHANGELOG.md](CHANGELOG.md)** | Feature history, version tracking, planned enhancements | All      |
+| **[README.md](README.md)**       | This file - spec directory overview                     | All      |
 
 ## How to Use These Specifications
 
 ### For Developers
 
 **Before implementing a feature:**
+
 1. Review [requirements.md](requirements.md) for functional requirements
 2. Check [architecture.md](architecture.md) for system design
 3. Review [security.md](security.md) for security considerations
 4. Update [CHANGELOG.md](CHANGELOG.md) with planned changes
 
 **During implementation:**
+
 1. Follow patterns documented in architecture
 2. Implement security requirements from security.md
 3. Write tests according to testing.md
 4. Update relevant specs if design changes
 
 **After implementation:**
+
 1. Update CHANGELOG.md with implementation details
 2. Add migration notes if schema changed
 3. Update specs to reflect any design changes
@@ -70,6 +73,7 @@ When working on this codebase, Claude should:
 5. **Keep specs in sync** with actual implementation
 
 **Documentation Policy (from CLAUDE.md):**
+
 - ✅ Update `spec/CHANGELOG.md` for feature changes
 - ✅ Update relevant spec files for design changes
 - ✅ Create new spec files for major new subsystems
@@ -94,6 +98,7 @@ When working on this codebase, Claude should:
 ### When to Update Specs
 
 **Update immediately when:**
+
 - Architecture changes (components, data flow)
 - Database schema changes
 - API contracts change
@@ -101,6 +106,7 @@ When working on this codebase, Claude should:
 - New features added
 
 **Update regularly:**
+
 - CHANGELOG.md (with every feature/fix)
 - Testing procedures (as tests evolve)
 - Requirements (as product evolves)
@@ -108,6 +114,7 @@ When working on this codebase, Claude should:
 ### Versioning
 
 Specifications are versioned with the plugin:
+
 - Specs track current implementation
 - Historical versions preserved in git history
 - Breaking changes noted in CHANGELOG.md
@@ -115,6 +122,7 @@ Specifications are versioned with the plugin:
 ### Style Guide
 
 **Markdown Formatting:**
+
 - Use `#` for main title (document name)
 - Use `##` for major sections
 - Use `###` for subsections
@@ -124,6 +132,7 @@ Specifications are versioned with the plugin:
 - Use emojis sparingly (checkmarks for status)
 
 **Code Examples:**
+
 ```php
 // Always include language identifier
 // Include context comments
@@ -131,6 +140,7 @@ Specifications are versioned with the plugin:
 ```
 
 **Cross-References:**
+
 - Link to other specs: `[architecture](architecture.md)`
 - Link to code: `includes/class-example.php:123`
 - Link to external docs: `[WordPress Codex](https://codex.wordpress.org/)`
@@ -195,6 +205,7 @@ When adding new content:
 ## Questions?
 
 If you're unsure:
+
 - Where to document something → Start with CHANGELOG.md
 - How much detail → Enough for someone to implement it
 - When to create new spec → When documenting a new major subsystem

@@ -4,7 +4,7 @@
 
 ## Overview
 
-WordPress GitHub Auto-Deploy Plugin - A WordPress plugin that automates theme deployment from GitHub repositories using GitHub Actions.
+WordPress Deploy Forge Plugin - A WordPress plugin that automates theme deployment from GitHub repositories using GitHub Actions.
 
 ## High-Level Architecture
 
@@ -25,7 +25,8 @@ WordPress GitHub Auto-Deploy Plugin - A WordPress plugin that automates theme de
 ## Core Components
 
 ### 1. Main Plugin File
-- **File:** `github-auto-deploy.php`
+
+- **File:** `deploy-forge.php`
 - **Purpose:** Plugin initialization, dependency injection
 - **Responsibilities:**
   - Register activation/deactivation hooks
@@ -33,6 +34,7 @@ WordPress GitHub Auto-Deploy Plugin - A WordPress plugin that automates theme de
   - Load dependencies
 
 ### 2. GitHub API Wrapper
+
 - **File:** `includes/class-github-api.php`
 - **Purpose:** All GitHub REST API v3 interactions
 - **Key Methods:**
@@ -44,6 +46,7 @@ WordPress GitHub Auto-Deploy Plugin - A WordPress plugin that automates theme de
   - `cancel_workflow_run()` - Cancel running workflow
 
 ### 3. Deployment Manager
+
 - **File:** `includes/class-deployment-manager.php`
 - **Purpose:** Orchestrates entire deployment workflow
 - **Key Methods:**
@@ -56,6 +59,7 @@ WordPress GitHub Auto-Deploy Plugin - A WordPress plugin that automates theme de
   - `cancel_deployment()` - Cancel in-progress deployment
 
 ### 4. Webhook Handler
+
 - **File:** `includes/class-webhook-handler.php`
 - **Purpose:** Handle GitHub webhooks
 - **Key Features:**
@@ -65,6 +69,7 @@ WordPress GitHub Auto-Deploy Plugin - A WordPress plugin that automates theme de
   - Ping event support
 
 ### 5. Settings Manager
+
 - **File:** `includes/class-settings.php`
 - **Purpose:** Configuration and encrypted storage
 - **Key Features:**
@@ -74,12 +79,14 @@ WordPress GitHub Auto-Deploy Plugin - A WordPress plugin that automates theme de
   - Backup settings
 
 ### 6. Database Layer
+
 - **File:** `includes/class-database.php`
 - **Purpose:** Custom tables for deployment history
 - **Tables:**
   - `{prefix}_github_deployments` - Deployment records
 
 ### 7. Admin Interface
+
 - **File:** `admin/class-admin-pages.php`
 - **Purpose:** WordPress admin UI
 - **Pages:**
@@ -89,6 +96,7 @@ WordPress GitHub Auto-Deploy Plugin - A WordPress plugin that automates theme de
   - Debug Logs - System diagnostics
 
 ### 8. Debug Logger
+
 - **File:** `includes/class-debug-logger.php`
 - **Purpose:** Detailed logging for troubleshooting
 - **Features:**
@@ -128,8 +136,8 @@ WordPress GitHub Auto-Deploy Plugin - A WordPress plugin that automates theme de
 ## File Structure
 
 ```
-github-auto-deploy/
-├── github-auto-deploy.php         # Main plugin file
+deploy-forge/
+├── deploy-forge.php         # Main plugin file
 ├── includes/
 │   ├── class-database.php         # Schema and queries
 │   ├── class-github-api.php       # GitHub API wrapper
@@ -232,6 +240,7 @@ github-auto-deploy/
 ### External Services
 
 - **GitHub:**
+
   - GitHub App (for authentication)
   - GitHub Actions (for builds)
   - GitHub REST API v3

@@ -3,7 +3,7 @@
 # Simple WordPress Plugin Build Script
 # Creates a clean ZIP for upload to WordPress
 
-PLUGIN_SLUG="github-auto-deploy"
+PLUGIN_SLUG="deploy-forge"
 VERSION=$(grep "Version:" ${PLUGIN_SLUG}/${PLUGIN_SLUG}.php | awk '{print $3}')
 ZIP_NAME="${PLUGIN_SLUG}-${VERSION}.zip"
 

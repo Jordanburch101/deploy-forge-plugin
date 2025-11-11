@@ -1,9 +1,11 @@
-# WordPress GitHub Auto-Deploy Plugin - Cursor Rules
+# WordPress Deploy Forge Plugin - Cursor Rules
 
 ## Project Context
+
 This is a WordPress plugin that automates theme deployment from GitHub repositories. It handles webhooks, triggers GitHub Actions, polls for build completion, and deploys compiled theme files to WordPress.
 
 ## Core Architecture
+
 - GitHub webhook → WordPress plugin → GitHub Actions → Build artifact → Deploy to theme directory
 - Custom database tables for deployment history (NOT post types)
 - REST API endpoints for webhooks with HMAC validation
@@ -12,6 +14,7 @@ This is a WordPress plugin that automates theme deployment from GitHub repositor
 ## Technology Stack Requirements
 
 ### PHP
+
 - PHP 7.4+ minimum
 - Use typed properties, arrow functions, null coalescing operator
 - Follow WordPress Coding Standards
@@ -20,6 +23,7 @@ This is a WordPress plugin that automates theme deployment from GitHub repositor
 - NO external libraries - WordPress core only
 
 ### JavaScript
+
 - Vanilla ES6+ only (Fetch API, async/await, Promises)
 - NO jQuery plugins
 - NO React, Vue, or any frameworks
@@ -27,28 +31,33 @@ This is a WordPress plugin that automates theme deployment from GitHub repositor
 - Modern async patterns only
 
 ### CSS
+
 - WordPress admin styles as base
 - Minimal custom CSS only
 - Follow WordPress admin design patterns
 
 ### HTTP & APIs
+
 - Use `wp_remote_request()` for all HTTP calls (NOT cURL, NOT file_get_contents)
 - Use WordPress REST API for custom endpoints
 - Use Transients API for caching (NOT wp_cache)
 - Use WP_Cron for background jobs
 
 ### Database
+
 - Use `wpdb` directly (NO ORMs, NO query builders)
 - Custom tables with proper prefixes
 - Prepared statements for all queries
 - Follow WordPress database naming conventions
 
 ### File Operations
+
 - Use `WP_Filesystem` API (NOT fopen, file_put_contents, etc.)
 - Validate paths to prevent directory traversal
 - Create backups before deployments
 
 ## Security Requirements (Critical)
+
 - Check `manage_options` capability on ALL admin operations
 - Use nonces on ALL forms and AJAX requests
 - Sanitize ALL inputs with WordPress `sanitize_*()` functions
@@ -59,6 +68,7 @@ This is a WordPress plugin that automates theme deployment from GitHub repositor
 - Never expose tokens in logs or error messages
 
 ## WordPress APIs to Use
+
 - Settings API for options pages
 - Transients API for caching GitHub responses
 - WP_Cron for polling (NOT system cron)
@@ -69,6 +79,7 @@ This is a WordPress plugin that automates theme deployment from GitHub repositor
 ## Project Scope
 
 ### IN SCOPE (v1.0)
+
 - Single repository/branch connection
 - Theme deployment only (NOT plugins)
 - GitHub Actions integration
@@ -77,6 +88,7 @@ This is a WordPress plugin that automates theme deployment from GitHub repositor
 - Rollback to previous version
 
 ### OUT OF SCOPE
+
 - Plugin deployments
 - Multiple repositories
 - Multi-environment (staging/prod)
@@ -85,9 +97,10 @@ This is a WordPress plugin that automates theme deployment from GitHub repositor
 - Deployment scheduling
 
 ## Code Organization
+
 ```
-github-auto-deploy/
-├── github-auto-deploy.php         # Main plugin file
+deploy-forge/
+├── deploy-forge.php         # Main plugin file
 ├── includes/                      # Core classes
 │   ├── class-database.php
 │   ├── class-github-api.php
@@ -105,22 +118,25 @@ github-auto-deploy/
 ```
 
 ## Class Structure
+
 - One class per file
-- Prefix: `GitHub_Auto_Deploy_`
+- Prefix: `deploy_forge_`
 - Use singleton pattern for managers
 - Static utility methods where appropriate
 - Proper constructor initialization
 
 ## Naming Conventions
-- Classes: `GitHub_Auto_Deploy_Class_Name`
-- Functions: `github_auto_deploy_function_name()`
-- Hooks: `github_auto_deploy/hook_name`
+
+- Classes: `deploy_forge_Class_Name`
+- Functions: `deploy_forge_function_name()`
+- Hooks: `deploy_forge/hook_name`
 - Database tables: `{prefix}_github_deployments`
-- Options: `github_auto_deploy_option_name`
-- Transients: `github_auto_deploy_transient_name`
-- Nonces: `github_auto_deploy_nonce_action`
+- Options: `deploy_forge_option_name`
+- Transients: `deploy_forge_transient_name`
+- Nonces: `deploy_forge_nonce_action`
 
 ## Error Handling
+
 - Use `WP_Error` for error returns
 - Log errors with `error_log()` for debugging
 - Store deployment errors in database
@@ -128,6 +144,7 @@ github-auto-deploy/
 - Graceful degradation for failed operations
 
 ## Development Principles
+
 1. **WordPress Native First**: Use built-in WordPress functions over external solutions
 2. **No Build Process**: Plugin itself requires no compilation (themes may require builds)
 3. **Maximum Compatibility**: Support WordPress 5.8+ and PHP 7.4+
@@ -137,23 +154,25 @@ github-auto-deploy/
 ## Common Patterns
 
 ### AJAX Handler Template
+
 ```php
 public function handle_ajax_request() {
-    check_ajax_referer('github_auto_deploy_nonce', 'nonce');
-    
+    check_ajax_referer('deploy_forge_nonce', 'nonce');
+
     if (!current_user_can('manage_options')) {
         wp_send_json_error('Insufficient permissions');
     }
-    
+
     $input = sanitize_text_field($_POST['input']);
-    
+
     // Process...
-    
+
     wp_send_json_success($data);
 }
 ```
 
 ### Database Query Template
+
 ```php
 global $wpdb;
 $table = $wpdb->prefix . 'github_deployments';
@@ -166,6 +185,7 @@ $results = $wpdb->get_results($wpdb->prepare(
 ```
 
 ### GitHub API Call Template
+
 ```php
 $response = wp_remote_request($url, [
     'method' => 'GET',
@@ -182,6 +202,7 @@ if (is_wp_error($response)) {
 ```
 
 ## Testing Requirements
+
 - Test with WordPress 5.8+
 - Test with PHP 7.4 and 8.x
 - Test nonce validation
@@ -191,10 +212,12 @@ if (is_wp_error($response)) {
 - Test error conditions and edge cases
 
 ## Package Manager
+
 - Use pnpm for any Node.js dependencies in example workflows
 - WordPress plugin itself has NO npm dependencies
 
 ## What NOT to Do
+
 - ❌ Don't use jQuery plugins
 - ❌ Don't use Composer or external PHP libraries
 - ❌ Don't use cURL directly (use wp_remote_request)
@@ -209,6 +232,7 @@ if (is_wp_error($response)) {
 - ❌ Don't create post types for deployments (use custom table)
 
 ## GitHub Integration
+
 - Use Personal Access Token with `repo` and `actions` scopes
 - Validate webhook signatures with HMAC SHA256
 - Poll GitHub Actions API for build status
@@ -216,6 +240,7 @@ if (is_wp_error($response)) {
 - Support GitHub Actions workflow dispatch
 
 ## Deployment Workflow
+
 1. Validate webhook/manual trigger
 2. Trigger GitHub Actions workflow
 3. Poll for build completion (WP_Cron every minute)
@@ -226,10 +251,10 @@ if (is_wp_error($response)) {
 8. Clean up temporary files
 
 ## When Generating Code
+
 - Always include security checks (capabilities, nonces)
 - Always sanitize inputs and escape outputs
 - Use WordPress coding standards
 - Add inline documentation for complex logic
 - Include error handling with WP_Error
 - Test with WordPress debug mode enabled
-

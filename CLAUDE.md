@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**WordPress GitHub Auto-Deploy Plugin** - A WordPress plugin that automates theme deployment from GitHub repositories. When a developer commits to GitHub, the plugin triggers GitHub Actions to build the theme and automatically deploys compiled files to the WordPress theme directory.
+**Deploy Forge** - A WordPress plugin by Jordan Burch that automates theme deployment from GitHub repositories. When a developer commits to GitHub, the plugin triggers GitHub Actions to build the theme and automatically deploys compiled files to the WordPress theme directory.
 
 ## Architecture
 
@@ -67,7 +67,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Database Schema
 
-Custom table `{prefix}_github_deployments`:
+Custom table `{prefix}_deploy_forge_deployments`:
 
 - `id` - Primary key
 - `commit_hash` - 40 char SHA
@@ -81,8 +81,8 @@ Custom table `{prefix}_github_deployments`:
 ## Project Structure
 
 ```
-github-auto-deploy/
-├── github-auto-deploy.php         # Main plugin file with header
+deploy-forge.php                   # Main plugin file with header
+deploy-forge/
 ├── includes/
 │   ├── class-database.php         # Schema and table creation
 │   ├── class-github-api.php       # GitHub API wrapper
@@ -91,12 +91,14 @@ github-auto-deploy/
 │   └── class-settings.php         # Options management
 ├── admin/
 │   ├── class-admin-pages.php      # Menu registration
+│   ├── class-setup-wizard.php     # Setup wizard
 │   ├── css/admin-styles.css       # Custom admin styles
 │   └── js/admin-scripts.js        # AJAX handlers, UI logic
 └── templates/
     ├── settings-page.php          # Configuration form
     ├── dashboard-page.php         # Status overview, deploy now
-    └── history-page.php           # Deployment log table
+    ├── history-page.php           # Deployment log table
+    └── setup-wizard/              # Setup wizard templates
 ```
 
 ## Security Requirements

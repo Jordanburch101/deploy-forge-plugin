@@ -4,7 +4,7 @@
 
 ## Overview
 
-This document defines all system requirements, both functional and non-functional, for the WordPress GitHub Auto-Deploy plugin.
+This document defines all system requirements, both functional and non-functional, for the WordPress Deploy Forge plugin.
 
 ## Functional Requirements
 
@@ -15,6 +15,7 @@ This document defines all system requirements, both functional and non-functiona
 **Description:** Users must be able to connect the plugin to a GitHub repository using GitHub App authentication.
 
 **Acceptance Criteria:**
+
 - User can initiate OAuth flow from settings page
 - API key is stored encrypted
 - Repository can be selected from user's accessible repositories
@@ -23,6 +24,7 @@ This document defines all system requirements, both functional and non-functiona
 - Connection can be disconnected/reset
 
 **Dependencies:**
+
 - GitHub App configured
 - Backend proxy service running
 - HTTPS enabled (for OAuth callback)
@@ -34,6 +36,7 @@ This document defines all system requirements, both functional and non-functiona
 **Description:** Users must be able to select which GitHub Actions workflow to trigger for deployments.
 
 **Acceptance Criteria:**
+
 - List all active workflows from repository
 - Filter workflows appropriately
 - Save selected workflow
@@ -41,6 +44,7 @@ This document defines all system requirements, both functional and non-functiona
 - Can change workflow at any time
 
 **Dependencies:**
+
 - FR001 (GitHub connection)
 - Repository has workflows configured
 
@@ -51,6 +55,7 @@ This document defines all system requirements, both functional and non-functiona
 **Description:** Administrators must be able to manually trigger deployments from the WordPress admin dashboard.
 
 **Acceptance Criteria:**
+
 - Can view list of recent commits
 - Can select specific commit to deploy
 - Deployment starts immediately when triggered
@@ -59,6 +64,7 @@ This document defines all system requirements, both functional and non-functiona
 - Link to GitHub Actions build logs
 
 **Dependencies:**
+
 - FR001, FR002
 - User has `manage_options` capability
 
@@ -69,7 +75,8 @@ This document defines all system requirements, both functional and non-functiona
 **Description:** Deployments should automatically trigger when code is pushed to the configured branch.
 
 **Acceptance Criteria:**
-- Webhook endpoint available at `/wp-json/github-deploy/v1/webhook`
+
+- Webhook endpoint available at `/wp-json/deploy-forge/v1/webhook`
 - HMAC SHA-256 signature verification required
 - Push events trigger deployment
 - workflow_run events update deployment status
@@ -77,6 +84,7 @@ This document defines all system requirements, both functional and non-functiona
 - Auto-deploy can be enabled/disabled in settings
 
 **Dependencies:**
+
 - FR001, FR002
 - Webhook configured on GitHub
 - Webhook secret configured
@@ -89,6 +97,7 @@ This document defines all system requirements, both functional and non-functiona
 **Description:** System must track and display deployment status throughout the lifecycle.
 
 **Acceptance Criteria:**
+
 - States: pending, building, success, failed, cancelled, rolled_back
 - Real-time status updates
 - Progress indicators where applicable
@@ -97,6 +106,7 @@ This document defines all system requirements, both functional and non-functiona
 - Error messages for failures
 
 **Dependencies:**
+
 - FR003 or FR004
 
 ### FR006: Automatic Backups
@@ -106,6 +116,7 @@ This document defines all system requirements, both functional and non-functiona
 **Description:** System should create backups of the current theme before deploying.
 
 **Acceptance Criteria:**
+
 - Backup created before each deployment
 - Backup stored as ZIP file
 - Backup location configurable
@@ -114,6 +125,7 @@ This document defines all system requirements, both functional and non-functiona
 - Option to disable backups
 
 **Dependencies:**
+
 - FR003 or FR004
 - Sufficient disk space
 
@@ -124,6 +136,7 @@ This document defines all system requirements, both functional and non-functiona
 **Description:** Users must be able to rollback to a previous deployment.
 
 **Acceptance Criteria:**
+
 - Rollback button available on successful deployments
 - Confirmation required before rollback
 - Previous theme restored from backup
@@ -131,6 +144,7 @@ This document defines all system requirements, both functional and non-functiona
 - Cannot rollback if no backup exists
 
 **Dependencies:**
+
 - FR005 (successful deployment)
 - FR006 (backup exists)
 
@@ -141,6 +155,7 @@ This document defines all system requirements, both functional and non-functiona
 **Description:** Users must be able to cancel in-progress deployments.
 
 **Acceptance Criteria:**
+
 - Cancel button available during building state
 - GitHub Actions workflow cancellation requested
 - Deployment marked as cancelled
@@ -148,6 +163,7 @@ This document defines all system requirements, both functional and non-functiona
 - New deployment can be started after cancellation
 
 **Dependencies:**
+
 - FR003 or FR004
 - Deployment in building state
 
@@ -158,6 +174,7 @@ This document defines all system requirements, both functional and non-functiona
 **Description:** When enabled, deployments should require manual approval before execution.
 
 **Acceptance Criteria:**
+
 - Setting to enable/disable manual approval
 - Webhook events create "pending" deployments (not auto-deployed)
 - Dashboard shows "Deploy" button for pending deployments
@@ -167,6 +184,7 @@ This document defines all system requirements, both functional and non-functiona
 - Manual deployments bypass approval requirement
 
 **Dependencies:**
+
 - FR004 (webhooks)
 - User has `manage_options` capability
 
@@ -179,6 +197,7 @@ This document defines all system requirements, both functional and non-functiona
 **Description:** Alternative deployment method that downloads repository directly without GitHub Actions build step, ideal for simple themes with no build process.
 
 **Acceptance Criteria:**
+
 - Setting to choose deployment method: GitHub Actions or Direct Clone
 - Direct Clone mode downloads repository ZIP at specific commit
 - Skips GitHub Actions workflow entirely
@@ -189,6 +208,7 @@ This document defines all system requirements, both functional and non-functiona
 - Backend provides pre-signed download URLs
 
 **Use Cases:**
+
 - Simple themes using plain CSS/JS
 - No webpack, npm, or build tools required
 - Faster deployments for static files
@@ -196,6 +216,7 @@ This document defines all system requirements, both functional and non-functiona
 - Development environments where builds aren't needed
 
 **Technical Implementation:**
+
 - WordPress calls backend: `POST /api/github/download-repo`
 - Backend authenticates with GitHub using installation token
 - Backend requests: `GET /repos/{owner}/{repo}/zipball/{ref}` (returns 302)
@@ -206,17 +227,20 @@ This document defines all system requirements, both functional and non-functiona
 - Workflow field becomes optional when Direct Clone selected
 
 **Backend Requirements:**
+
 - New endpoint: `/api/github/download-repo`
 - Request: `{ owner, repo, ref }` + `X-API-Key` header
 - Response: `{ download_url }` or `{ error, message }`
 - Uses same authentication pattern as `/api/github/proxy`
 
 **Security:**
+
 - Download URLs are pre-signed and time-limited by GitHub
 - No direct GitHub token exposure to WordPress
 - Same X-API-Key validation as other endpoints
 
 **Dependencies:**
+
 - FR001 (GitHub connectivity)
 - FR003 or FR004 (deployment methods)
 - Backend proxy service
@@ -230,6 +254,7 @@ This document defines all system requirements, both functional and non-functiona
 **Description:** System must maintain a history of all deployments.
 
 **Acceptance Criteria:**
+
 - All deployments recorded in database
 - Searchable and filterable history
 - Displays: commit info, status, timestamp, trigger type
@@ -238,6 +263,7 @@ This document defines all system requirements, both functional and non-functiona
 - Old deployments auto-deleted
 
 **Dependencies:**
+
 - FR003 or FR004
 
 ### FR012: Settings Management
@@ -247,6 +273,7 @@ This document defines all system requirements, both functional and non-functiona
 **Description:** Users must be able to configure all plugin settings.
 
 **Acceptance Criteria:**
+
 - Repository connection settings
 - Workflow selection
 - Branch selection
@@ -258,6 +285,7 @@ This document defines all system requirements, both functional and non-functiona
 - Settings can be reset
 
 **Dependencies:**
+
 - User has `manage_options` capability
 
 ### FR013: Debug Logging
@@ -267,6 +295,7 @@ This document defines all system requirements, both functional and non-functiona
 **Description:** System must provide detailed logging for troubleshooting.
 
 **Acceptance Criteria:**
+
 - All deployment steps logged
 - All API requests/responses logged
 - Error details captured
@@ -276,6 +305,7 @@ This document defines all system requirements, both functional and non-functiona
 - Log retention configurable
 
 **Dependencies:**
+
 - Any feature that performs operations
 
 ### FR014: Concurrent Deployment Prevention
@@ -285,6 +315,7 @@ This document defines all system requirements, both functional and non-functiona
 **Description:** System must prevent multiple simultaneous deployments.
 
 **Acceptance Criteria:**
+
 - Only one deployment can be in "building" state
 - Manual deployments blocked if one is building
 - Webhook deployments auto-cancel existing builds
@@ -292,6 +323,7 @@ This document defines all system requirements, both functional and non-functiona
 - Building deployment info displayed
 
 **Dependencies:**
+
 - FR003, FR004
 
 ## Non-Functional Requirements
@@ -301,6 +333,7 @@ This document defines all system requirements, both functional and non-functiona
 **Priority:** High
 
 **Requirements:**
+
 - Manual deployment initiated within 2 seconds
 - Webhook processing under 5 seconds
 - Admin pages load within 3 seconds
@@ -309,6 +342,7 @@ This document defines all system requirements, both functional and non-functiona
 - UI remains responsive during deployments
 
 **Metrics:**
+
 - Response time
 - Memory usage
 - CPU usage
@@ -319,6 +353,7 @@ This document defines all system requirements, both functional and non-functiona
 **Priority:** Critical
 
 **Requirements:**
+
 - All secrets encrypted at rest (Sodium)
 - All user inputs sanitized
 - All outputs escaped
@@ -330,6 +365,7 @@ This document defines all system requirements, both functional and non-functiona
 - No secrets in logs or error messages
 
 **Compliance:**
+
 - OWASP Top 10
 - WordPress Security Best Practices
 - PCI DSS (if handling payment data - N/A for this plugin)
@@ -339,6 +375,7 @@ This document defines all system requirements, both functional and non-functiona
 **Priority:** High
 
 **Requirements:**
+
 - 99% uptime for core functionality
 - Graceful error handling
 - Automatic retry for transient failures
@@ -347,6 +384,7 @@ This document defines all system requirements, both functional and non-functiona
 - No data loss on plugin failure
 
 **Metrics:**
+
 - Error rate
 - Failed deployment rate
 - Recovery time
@@ -356,6 +394,7 @@ This document defines all system requirements, both functional and non-functiona
 **Priority:** Medium
 
 **Requirements:**
+
 - Handle 100+ deployments per day
 - Support theme files up to 500MB
 - Maintain performance with 1000+ deployment records
@@ -363,6 +402,7 @@ This document defines all system requirements, both functional and non-functiona
 - Background processing via WP_Cron
 
 **Limits:**
+
 - Maximum concurrent deployments: 1
 - Maximum backup retention: 30 days (configurable)
 - Maximum log retention: 30 days (configurable)
@@ -372,6 +412,7 @@ This document defines all system requirements, both functional and non-functiona
 **Priority:** High
 
 **Requirements:**
+
 - Intuitive admin interface
 - Clear error messages
 - Helpful documentation
@@ -380,6 +421,7 @@ This document defines all system requirements, both functional and non-functiona
 - Accessible (WCAG 2.1 AA)
 
 **User Experience:**
+
 - First-time setup under 10 minutes
 - Deployment trigger under 3 clicks
 - Settings findable within 2 clicks
@@ -389,6 +431,7 @@ This document defines all system requirements, both functional and non-functiona
 **Priority:** Critical
 
 **Requirements:**
+
 - WordPress 5.8+ supported
 - PHP 7.4+ supported
 - PHP 8.0+ fully tested
@@ -398,6 +441,7 @@ This document defines all system requirements, both functional and non-functiona
 - Theme agnostic (works with any WordPress theme)
 
 **Testing Matrix:**
+
 - Latest 3 WordPress versions
 - PHP 7.4, 8.0, 8.1, 8.2, 8.3
 - MySQL 5.7, 8.0 / MariaDB 10.2, 10.6
@@ -407,6 +451,7 @@ This document defines all system requirements, both functional and non-functiona
 **Priority:** Medium
 
 **Requirements:**
+
 - Code follows WordPress Coding Standards
 - PHPDoc comments on all classes/methods
 - Clear separation of concerns
@@ -416,6 +461,7 @@ This document defines all system requirements, both functional and non-functiona
 - Semantic versioning
 
 **Code Quality:**
+
 - Pass phpcs with WordPress standards
 - Pass phpstan level 5+
 - No deprecated WordPress functions
@@ -426,6 +472,7 @@ This document defines all system requirements, both functional and non-functiona
 **Priority:** High
 
 **Requirements:**
+
 - Automatic backups before deployment
 - Manual rollback capability
 - Database export/import support
@@ -434,6 +481,7 @@ This document defines all system requirements, both functional and non-functiona
 - Settings preserved during plugin updates
 
 **Recovery Time Objectives:**
+
 - Rollback completion: Under 5 minutes
 - Failed deployment recovery: Immediate (no changes applied)
 
@@ -442,12 +490,14 @@ This document defines all system requirements, both functional and non-functiona
 **Priority:** Medium
 
 **Requirements:**
+
 - Plugin functions offline (manual deploy unavailable)
 - Graceful degradation when GitHub unavailable
 - Cached data used when API rate limited
 - Clear status indicators for service health
 
 **Dependencies:**
+
 - GitHub API availability
 - Backend proxy availability
 - WordPress cron functionality
@@ -458,6 +508,7 @@ This document defines all system requirements, both functional and non-functiona
 **Priority:** High
 
 **Requirements:**
+
 - User guide for setup and usage
 - Developer documentation for code
 - API documentation for integrations
@@ -468,6 +519,7 @@ This document defines all system requirements, both functional and non-functiona
 - Changelog maintained
 
 **Deliverables:**
+
 - `README.md`
 - `spec/` directory with all specifications
 - Inline PHPDoc comments
@@ -478,6 +530,7 @@ This document defines all system requirements, both functional and non-functiona
 ### WordPress Environment
 
 **Minimum:**
+
 - WordPress: 5.8+
 - PHP: 7.4+
 - MySQL: 5.7+ OR MariaDB: 10.2+
@@ -486,6 +539,7 @@ This document defines all system requirements, both functional and non-functiona
 - File permissions: Write access to `wp-content/themes/`
 
 **Recommended:**
+
 - WordPress: 6.4+
 - PHP: 8.2+
 - MySQL: 8.0+ OR MariaDB: 10.6+
@@ -496,24 +550,28 @@ This document defines all system requirements, both functional and non-functiona
 ### PHP Extensions
 
 **Required:**
+
 - `json` - API communication
 - `zip` - Artifact extraction
 - `sodium` - Encryption
 - `curl` or `allow_url_fopen` - HTTP requests
 
 **Optional:**
+
 - `mbstring` - Better string handling
 - `opcache` - Performance
 
 ### Server Configuration
 
 **Required:**
+
 - Outbound HTTPS connections allowed
 - Incoming HTTPS connections (for webhooks)
 - Sufficient disk space for backups
 - Write permissions to upload directory
 
 **Recommended:**
+
 - CDN or caching layer
 - Regular backups
 - Monitoring/alerting
@@ -522,18 +580,21 @@ This document defines all system requirements, both functional and non-functiona
 ### GitHub Requirements
 
 **Repository:**
+
 - GitHub repository access
 - GitHub Actions enabled
 - Workflow file configured (`.github/workflows/*.yml`)
 - Artifact upload in workflow
 
 **GitHub App:**
+
 - GitHub App installed
 - Repository permissions granted
 - Webhook configured (for auto-deploy)
 - Webhook secret configured
 
 **API:**
+
 - Rate limits: 5,000 requests/hour (authenticated)
 - Workflow trigger limits: 1,000/hour per repository
 

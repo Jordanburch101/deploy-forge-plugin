@@ -15,8 +15,9 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Configuration
-PLUGIN_SLUG="github-auto-deploy"
-VERSION=$(grep "Version:" ${PLUGIN_SLUG}/${PLUGIN_SLUG}.php | awk '{print $3}')
+PLUGIN_SLUG="deploy-forge"
+MAIN_FILE="deploy-forge.php"
+VERSION=$(grep "Version:" ${MAIN_FILE} | awk '{print $3}')
 BUILD_DIR="build"
 DIST_DIR="dist"
 PLUGIN_DIR="${PLUGIN_SLUG}"
@@ -58,7 +59,11 @@ echo ""
 
 # Step 3: Copy plugin files
 echo -e "${YELLOW}→${NC} Copying plugin files to build directory..."
-cp -r ${PLUGIN_DIR} ${BUILD_DIR}/
+mkdir -p ${BUILD_DIR}/${PLUGIN_SLUG}
+# Copy the main plugin file to the root of the plugin directory
+cp ${MAIN_FILE} ${BUILD_DIR}/${PLUGIN_SLUG}/
+# Copy all subdirectories (includes, admin, templates)
+cp -r ${PLUGIN_DIR}/* ${BUILD_DIR}/${PLUGIN_SLUG}/
 echo -e "${GREEN}✓${NC} Files copied"
 echo ""
 

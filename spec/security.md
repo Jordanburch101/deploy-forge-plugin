@@ -35,7 +35,7 @@ Security is a critical aspect of this plugin. This document outlines all securit
 ```php
 // All admin pages
 if (!current_user_can('manage_options')) {
-    wp_die(__('Unauthorized access', 'github-auto-deploy'));
+    wp_die(__('Unauthorized access', 'deploy-forge'));
 }
 
 // All REST endpoints (except webhook)
@@ -49,6 +49,7 @@ if (!current_user_can('manage_options')) {
 **Method:** GitHub App Installation Tokens (via proxy)
 
 **Benefits:**
+
 - ✅ Short-lived tokens (1 hour expiration)
 - ✅ Repository-scoped permissions
 - ✅ Revocable at any time
@@ -56,6 +57,7 @@ if (!current_user_can('manage_options')) {
 - ✅ No personal credentials exposed
 
 **Implementation:**
+
 ```php
 // Tokens generated via backend proxy
 $token_response = wp_remote_post($backend_url . '/api/github/token', [
@@ -99,6 +101,7 @@ $key = substr($key, 0, SODIUM_CRYPTO_SECRETBOX_KEYBYTES);
 ### User Inputs
 
 **Settings Form:**
+
 ```php
 // Repository owner/name
 $owner = sanitize_text_field($_POST['github_owner']);
@@ -117,6 +120,7 @@ $workflow = sanitize_file_name($_POST['workflow_name']);
 ```
 
 **AJAX Requests:**
+
 ```php
 // Nonce verification (REQUIRED)
 check_ajax_referer('github_deploy_nonce', 'nonce');
@@ -134,6 +138,7 @@ $commit_hash = sanitize_text_field($_POST['commit_hash']);
 ### Webhook Payloads
 
 **Always Required:**
+
 1. ✅ Signature verification (HMAC SHA-256)
 2. ✅ Non-empty webhook secret
 3. ✅ Valid JSON payload
@@ -158,6 +163,7 @@ if (!$this->verify_signature($payload, $signature)) {
 ```
 
 **No Exceptions:**
+
 - ❌ No bypassing signature verification
 - ❌ No default webhook secrets
 - ❌ No accepting unsigned webhooks
@@ -165,6 +171,7 @@ if (!$this->verify_signature($payload, $signature)) {
 ### File Operations
 
 **Path Validation:**
+
 ```php
 // Prevent directory traversal
 $theme_path = realpath($theme_path);
@@ -180,6 +187,7 @@ $filename = sanitize_file_name($filename);
 ```
 
 **Allowed Locations:**
+
 - ✅ `wp-content/themes/` - Theme deployment
 - ✅ `sys_get_temp_dir()` - Temporary extractions
 - ✅ Configured backup directory
@@ -190,6 +198,7 @@ $filename = sanitize_file_name($filename);
 ### Admin Templates
 
 **Always Escape:**
+
 ```php
 // Text content
 <h1><?php echo esc_html($title); ?></h1>
@@ -210,6 +219,7 @@ var data = <?php echo wp_json_encode($data); ?>;
 ```
 
 **Allowed HTML:**
+
 ```php
 // Only when necessary
 echo wp_kses($content, [
@@ -234,6 +244,7 @@ wp_send_json_success([
 ### Nonces
 
 **All Forms:**
+
 ```php
 // Generate
 wp_nonce_field('github_deploy_settings', 'github_deploy_nonce');
@@ -245,6 +256,7 @@ if (!wp_verify_nonce($_POST['github_deploy_nonce'], 'github_deploy_settings')) {
 ```
 
 **All AJAX Requests:**
+
 ```php
 // JavaScript
 $.ajax({
@@ -260,6 +272,7 @@ check_ajax_referer('github_deploy_nonce', 'nonce');
 ```
 
 **REST API:**
+
 ```php
 // WordPress REST API nonce (sent as header)
 wp_localize_script('admin-scripts', 'githubDeploy', [
@@ -274,10 +287,12 @@ wp_localize_script('admin-scripts', 'githubDeploy', [
 ### Storage
 
 **Encrypted in Database:**
+
 - GitHub API key
 - Webhook secret (stored in plaintext but never exposed)
 
 **Not Stored:**
+
 - Installation tokens (generated on-demand)
 - Temporary credentials
 
@@ -340,6 +355,7 @@ if (!hash_equals($expected, $provided)) {
 ### Additional Protections
 
 **Content-Type Handling:**
+
 ```php
 // Support both formats GitHub uses
 if (strpos($content_type, 'application/x-www-form-urlencoded') !== false) {
@@ -358,6 +374,7 @@ $signature_payload = (is_form_encoded) ? $raw_payload : $payload;
 ### ZIP Extraction
 
 **Validation:**
+
 ```php
 // Check ZIP is valid
 $zip = new ZipArchive();
@@ -373,9 +390,10 @@ if (filesize($artifact_zip) > $max_size) {
 ```
 
 **Safe Extraction:**
+
 ```php
 // Extract to temp directory first
-$temp_dir = sys_get_temp_dir() . '/github-deploy-' . uniqid();
+$temp_dir = sys_get_temp_dir() . '/deploy-forge-' . uniqid();
 mkdir($temp_dir, 0755, true);
 
 // Extract
@@ -403,6 +421,7 @@ chmod($file, 0644);
 ### SQL Injection Prevention
 
 **Always Use Prepared Statements:**
+
 ```php
 // Correct
 $wpdb->prepare(
@@ -432,6 +451,7 @@ $wpdb->insert($table, [
 **Current:** None implemented
 
 **Planned:**
+
 - IP-based rate limiting
 - Transient-based tracking
 - Configurable threshold
@@ -440,6 +460,7 @@ $wpdb->insert($table, [
 ### API Requests
 
 **GitHub Rate Limits:**
+
 - Monitor via headers
 - Cache aggressively
 - Exponential backoff
@@ -449,6 +470,7 @@ $wpdb->insert($table, [
 ### Security Events
 
 **Logged:**
+
 - ✅ Failed authentication attempts
 - ✅ Invalid webhook signatures
 - ✅ Permission denials
@@ -456,6 +478,7 @@ $wpdb->insert($table, [
 - ✅ Deployment triggers
 
 **Not Logged:**
+
 - ❌ Actual secrets/tokens
 - ❌ Personal data
 - ❌ Full request payloads
@@ -481,17 +504,17 @@ CREATE TABLE {prefix}_github_deploy_logs (
 
 ### OWASP Top 10
 
-| Vulnerability | Mitigation |
-|---------------|------------|
-| **A01:2021 – Broken Access Control** | Capability checks on all actions |
-| **A02:2021 – Cryptographic Failures** | Sodium encryption for secrets |
-| **A03:2021 – Injection** | Prepared statements, input sanitization |
-| **A04:2021 – Insecure Design** | Security-first architecture |
-| **A05:2021 – Security Misconfiguration** | Secure defaults, no debug in production |
-| **A06:2021 – Vulnerable Components** | Minimal dependencies, WordPress core only |
-| **A07:2021 – Identification Failures** | WordPress authentication |
-| **A08:2021 – Software and Data Integrity** | Webhook signature verification |
-| **A09:2021 – Security Logging Failures** | Comprehensive audit logging |
+| Vulnerability                              | Mitigation                                  |
+| ------------------------------------------ | ------------------------------------------- |
+| **A01:2021 – Broken Access Control**       | Capability checks on all actions            |
+| **A02:2021 – Cryptographic Failures**      | Sodium encryption for secrets               |
+| **A03:2021 – Injection**                   | Prepared statements, input sanitization     |
+| **A04:2021 – Insecure Design**             | Security-first architecture                 |
+| **A05:2021 – Security Misconfiguration**   | Secure defaults, no debug in production     |
+| **A06:2021 – Vulnerable Components**       | Minimal dependencies, WordPress core only   |
+| **A07:2021 – Identification Failures**     | WordPress authentication                    |
+| **A08:2021 – Software and Data Integrity** | Webhook signature verification              |
+| **A09:2021 – Security Logging Failures**   | Comprehensive audit logging                 |
 | **A10:2021 – Server-Side Request Forgery** | Validated URLs, no user-controlled requests |
 
 ### WordPress-Specific

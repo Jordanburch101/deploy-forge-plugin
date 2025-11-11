@@ -4,7 +4,7 @@
 
 ## Overview
 
-This document outlines testing strategies, methodologies, and procedures for ensuring the WordPress GitHub Auto-Deploy plugin functions correctly and securely.
+This document outlines testing strategies, methodologies, and procedures for ensuring the WordPress Deploy Forge plugin functions correctly and securely.
 
 ## Testing Levels
 
@@ -15,6 +15,7 @@ This document outlines testing strategies, methodologies, and procedures for ens
 **Not Currently Implemented** (Future Enhancement)
 
 **Planned Coverage:**
+
 - GitHub API wrapper methods
 - Encryption/decryption functions
 - Input sanitization functions
@@ -28,6 +29,7 @@ This document outlines testing strategies, methodologies, and procedures for ens
 **Scope:** Component interactions
 
 **Critical Integration Points:**
+
 - Plugin ↔ GitHub API
 - Plugin ↔ WordPress database
 - Plugin ↔ WordPress filesystem
@@ -35,6 +37,7 @@ This document outlines testing strategies, methodologies, and procedures for ens
 - GitHub API ↔ Deployment manager
 
 **Test Scenarios:**
+
 - End-to-end deployment flow
 - Webhook signature verification
 - Artifact download and extraction
@@ -46,6 +49,7 @@ This document outlines testing strategies, methodologies, and procedures for ens
 **Scope:** Full application testing in real environment
 
 **Required Before Release:**
+
 - All user workflows
 - Error scenarios
 - Edge cases
@@ -58,6 +62,7 @@ This document outlines testing strategies, methodologies, and procedures for ens
 **Scope:** Vulnerability assessment
 
 **Areas:**
+
 - Authentication bypass attempts
 - CSRF attacks
 - SQL injection
@@ -71,6 +76,7 @@ This document outlines testing strategies, methodologies, and procedures for ens
 ### Local Development
 
 **Setup:**
+
 ```bash
 # WordPress local installation
 - WordPress 5.8+
@@ -80,6 +86,7 @@ This document outlines testing strategies, methodologies, and procedures for ens
 ```
 
 **Tools:**
+
 - Local by Flywheel / XAMPP / MAMP
 - ngrok for webhook testing
 - GitHub test repository
@@ -87,6 +94,7 @@ This document outlines testing strategies, methodologies, and procedures for ens
 ### Staging Environment
 
 **Requirements:**
+
 - Production-like WordPress installation
 - HTTPS enabled (for webhooks)
 - Real GitHub repository
@@ -95,6 +103,7 @@ This document outlines testing strategies, methodologies, and procedures for ens
 ### Production Testing
 
 **Limited Scope:**
+
 - Smoke tests after deployment
 - Monitoring for errors
 - Real-world usage validation
@@ -106,11 +115,13 @@ This document outlines testing strategies, methodologies, and procedures for ens
 **Prerequisites:** Fresh WordPress installation
 
 **Steps:**
+
 1. Upload plugin to `/wp-content/plugins/`
 2. Navigate to Plugins page
 3. Click "Activate"
 
 **Expected Results:**
+
 - ✅ Plugin activates without errors
 - ✅ Database tables created
 - ✅ Admin menu appears
@@ -122,6 +133,7 @@ This document outlines testing strategies, methodologies, and procedures for ens
 **Prerequisites:** Plugin activated
 
 **Steps:**
+
 1. Navigate to Settings page
 2. Click "Connect with GitHub"
 3. Complete OAuth flow
@@ -129,6 +141,7 @@ This document outlines testing strategies, methodologies, and procedures for ens
 5. Click "Test Connection"
 
 **Expected Results:**
+
 - ✅ OAuth flow completes
 - ✅ API key stored encrypted
 - ✅ Connection test successful
@@ -139,6 +152,7 @@ This document outlines testing strategies, methodologies, and procedures for ens
 **Prerequisites:** Connected to GitHub
 
 **Steps:**
+
 1. Navigate to Settings page
 2. Repository and branch selected
 3. Click "Load Workflows" button
@@ -146,6 +160,7 @@ This document outlines testing strategies, methodologies, and procedures for ens
 5. Save settings
 
 **Expected Results:**
+
 - ✅ Workflows load successfully
 - ✅ Dropdown populated with active workflows
 - ✅ Selected workflow saved
@@ -156,6 +171,7 @@ This document outlines testing strategies, methodologies, and procedures for ens
 **Prerequisites:** Plugin fully configured
 
 **Steps:**
+
 1. Navigate to Dashboard page
 2. Select commit from list
 3. Click "Deploy Now"
@@ -163,6 +179,7 @@ This document outlines testing strategies, methodologies, and procedures for ens
 5. Wait for completion
 
 **Expected Results:**
+
 - ✅ Deployment starts immediately
 - ✅ Status updates in real-time
 - ✅ GitHub Actions workflow triggered
@@ -177,11 +194,13 @@ This document outlines testing strategies, methodologies, and procedures for ens
 **Prerequisites:** Webhook configured on GitHub
 
 **Steps:**
+
 1. Push commit to configured branch
 2. GitHub sends webhook
 3. Monitor deployment in WordPress
 
 **Expected Results:**
+
 - ✅ Webhook received and validated
 - ✅ Deployment starts automatically
 - ✅ Same as TC004 from step 4
@@ -191,11 +210,13 @@ This document outlines testing strategies, methodologies, and procedures for ens
 **Prerequisites:** Webhook secret configured
 
 **Steps:**
+
 1. Send webhook with invalid signature
 2. Send webhook with no signature
 3. Send webhook with valid signature
 
 **Expected Results:**
+
 - ❌ Invalid signature rejected (401)
 - ❌ Missing signature rejected (401)
 - ✅ Valid signature accepted (200)
@@ -205,12 +226,14 @@ This document outlines testing strategies, methodologies, and procedures for ens
 **Prerequisites:** Deployment in building state
 
 **Steps:**
+
 1. Start deployment
 2. Wait for building state
 3. Click "Cancel" button
 4. Confirm cancellation
 
 **Expected Results:**
+
 - ✅ Cancel request sent to GitHub
 - ✅ Deployment status changes to "Cancelled"
 - ✅ No files deployed
@@ -221,12 +244,14 @@ This document outlines testing strategies, methodologies, and procedures for ens
 **Prerequisites:** Successful deployment with backup
 
 **Steps:**
+
 1. Complete deployment
 2. Navigate to History page
 3. Click "Rollback" on deployment
 4. Confirm rollback
 
 **Expected Results:**
+
 - ✅ Backup extracted
 - ✅ Previous files restored
 - ✅ Status changes to "Rolled Back"
@@ -237,11 +262,13 @@ This document outlines testing strategies, methodologies, and procedures for ens
 **Prerequisites:** Repository with failing tests
 
 **Steps:**
+
 1. Push commit with failing code
 2. Wait for deployment to process
 3. Check deployment status
 
 **Expected Results:**
+
 - ✅ Build fails on GitHub
 - ✅ Deployment status changes to "Failed"
 - ✅ Error message displayed
@@ -254,11 +281,13 @@ This document outlines testing strategies, methodologies, and procedures for ens
 **Prerequisites:** GitHub Actions that uploads ZIP
 
 **Steps:**
+
 1. Trigger deployment
 2. Verify artifact is double-zipped
 3. Wait for completion
 
 **Expected Results:**
+
 - ✅ Outer ZIP extracted
 - ✅ Inner ZIP detected
 - ✅ Inner ZIP extracted
@@ -269,11 +298,13 @@ This document outlines testing strategies, methodologies, and procedures for ens
 **Prerequisites:** Plugin configured
 
 **Steps:**
+
 1. Start manual deployment
 2. While building, try to start another
 3. Check error message
 
 **Expected Results:**
+
 - ❌ Second deployment blocked
 - ✅ Error message: "Deployment in progress"
 - ✅ Building deployment info shown
@@ -284,11 +315,13 @@ This document outlines testing strategies, methodologies, and procedures for ens
 **Prerequisites:** Plugin configured
 
 **Steps:**
+
 1. Navigate to Settings
 2. Click "Reset All Data"
 3. Confirm reset
 
 **Expected Results:**
+
 - ✅ All settings cleared
 - ✅ Deployments deleted
 - ✅ Connection removed
@@ -351,6 +384,7 @@ This document outlines testing strategies, methodologies, and procedures for ens
 **Test:** Deploy 100MB+ theme
 
 **Expected:**
+
 - Completes without timeout
 - Memory usage acceptable
 - No PHP errors
@@ -360,6 +394,7 @@ This document outlines testing strategies, methodologies, and procedures for ens
 **Test:** Send multiple webhooks rapidly
 
 **Expected:**
+
 - All webhooks processed
 - Only one deployment active
 - No race conditions
@@ -369,6 +404,7 @@ This document outlines testing strategies, methodologies, and procedures for ens
 **Test:** Query performance with 1000+ deployments
 
 **Expected:**
+
 - List queries under 1 second
 - Indexes utilized
 - No N+1 queries
@@ -378,6 +414,7 @@ This document outlines testing strategies, methodologies, and procedures for ens
 ### WordPress Versions
 
 **Test Matrix:**
+
 - WordPress 5.8 (minimum)
 - WordPress 6.0
 - WordPress 6.1
@@ -388,6 +425,7 @@ This document outlines testing strategies, methodologies, and procedures for ens
 ### PHP Versions
 
 **Test Matrix:**
+
 - PHP 7.4 (minimum)
 - PHP 8.0
 - PHP 8.1
@@ -397,6 +435,7 @@ This document outlines testing strategies, methodologies, and procedures for ens
 ### Database
 
 **Test Matrix:**
+
 - MySQL 5.7
 - MySQL 8.0
 - MariaDB 10.2
@@ -405,6 +444,7 @@ This document outlines testing strategies, methodologies, and procedures for ens
 ### Hosting Providers
 
 **Test On:**
+
 - Shared hosting (GoDaddy, Bluehost)
 - Managed WordPress (WP Engine, Kinsta)
 - VPS (DigitalOcean, Linode)
@@ -415,12 +455,13 @@ This document outlines testing strategies, methodologies, and procedures for ens
 ### Manual Testing Tools
 
 **Webhook Testing:**
+
 ```bash
 # Test webhook locally with ngrok
 ngrok http 80
 
 # Send test webhook
-curl -X POST https://your-ngrok-url/wp-json/github-deploy/v1/webhook \
+curl -X POST https://your-ngrok-url/wp-json/deploy-forge/v1/webhook \
   -H "Content-Type: application/json" \
   -H "X-GitHub-Event: ping" \
   -H "X-Hub-Signature-256: sha256=..." \
@@ -428,11 +469,13 @@ curl -X POST https://your-ngrok-url/wp-json/github-deploy/v1/webhook \
 ```
 
 **GitHub Actions Testing:**
+
 - Manual workflow dispatch
 - Push to test branch
 - Mock workflow runs
 
 **Database Inspection:**
+
 ```sql
 -- Check deployment records
 SELECT * FROM wp_github_deployments ORDER BY created_at DESC LIMIT 10;
@@ -444,15 +487,17 @@ SELECT * FROM wp_github_deploy_logs WHERE level = 'ERROR' LIMIT 20;
 ### Automated Testing Tools
 
 **Linting:**
+
 ```bash
 # PHP_CodeSniffer with WordPress standards
-phpcs --standard=WordPress github-auto-deploy/
+phpcs --standard=WordPress deploy-forge/
 
 # PHPStan static analysis
-phpstan analyse github-auto-deploy/
+phpstan analyse deploy-forge/
 ```
 
 **Configuration:**
+
 - See `LINTER-CONFIGURATION.md` for setup details
 
 ## Test Data
@@ -460,6 +505,7 @@ phpstan analyse github-auto-deploy/
 ### Mock Webhook Payloads
 
 **Push Event:**
+
 ```json
 {
   "ref": "refs/heads/main",
@@ -475,6 +521,7 @@ phpstan analyse github-auto-deploy/
 ```
 
 **Workflow Run Event:**
+
 ```json
 {
   "action": "completed",
@@ -490,6 +537,7 @@ phpstan analyse github-auto-deploy/
 ### Test Repository
 
 **Requirements:**
+
 - Public or private test repository
 - GitHub Actions configured
 - Sample theme structure
@@ -498,6 +546,7 @@ phpstan analyse github-auto-deploy/
 ## Regression Testing
 
 **Before Each Release:**
+
 - [ ] Run all manual test cases
 - [ ] Verify security test cases
 - [ ] Test on multiple WordPress versions
@@ -509,11 +558,13 @@ phpstan analyse github-auto-deploy/
 ## Continuous Testing
 
 **On Every Commit:**
+
 - Linting (phpcs)
 - Static analysis (phpstan)
 - Code review
 
 **Weekly:**
+
 - Full regression suite
 - Security audit
 - Dependency updates
@@ -521,6 +572,7 @@ phpstan analyse github-auto-deploy/
 ## Bug Reporting
 
 **Required Information:**
+
 - WordPress version
 - PHP version
 - Plugin version
@@ -532,6 +584,7 @@ phpstan analyse github-auto-deploy/
 ## Quality Metrics
 
 **Target:**
+
 - 0 critical bugs before release
 - 0 security vulnerabilities
 - 100% of critical paths tested manually

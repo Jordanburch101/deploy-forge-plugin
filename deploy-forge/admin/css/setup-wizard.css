@@ -1,0 +1,1097 @@
+/**
+ * Setup Wizard Styles
+ * Vercel-inspired dark theme with clean, minimal aesthetic
+ */
+
+/* ==========================================================================
+   CSS Variables - Customize theme colors here
+   ========================================================================== */
+
+:root {
+  /* Background Colors */
+  --wizard-bg-primary: #000000;
+  --wizard-bg-secondary: #0a0a0a;
+  --wizard-bg-tertiary: #1a1a1a;
+  --wizard-bg-overlay: rgba(0, 0, 0, 0.9);
+
+  /* Text Colors */
+  --wizard-text-primary: #ffffff;
+  --wizard-text-secondary: #a1a1a1;
+  --wizard-text-tertiary: #666666;
+
+  /* Border Colors */
+  --wizard-border-primary: #333333;
+  --wizard-border-secondary: #222222;
+  --wizard-border-tertiary: #1a1a1a;
+
+  /* Button Colors */
+  --wizard-button-bg: #ffffff;
+  --wizard-button-text: #000000;
+  --wizard-button-hover-bg: #e6e6e6;
+  --wizard-button-secondary-bg: #1a1a1a;
+  --wizard-button-secondary-text: #ffffff;
+  --wizard-button-secondary-hover-bg: #2a2a2a;
+
+  /* Accent Colors */
+  --wizard-accent-success: #4cff4c;
+  --wizard-accent-success-bg: rgba(0, 255, 0, 0.1);
+  --wizard-accent-error: #ff0000;
+  --wizard-accent-error-bg: rgba(255, 0, 0, 0.1);
+  --wizard-accent-warning: #ffb900;
+  --wizard-accent-info: #fff;
+
+  /* Border Radius */
+  --wizard-radius: 2px;
+
+  /* Shadows */
+  --wizard-shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.5);
+  --wizard-shadow-md: 0 8px 24px rgba(0, 0, 0, 0.6);
+  --wizard-shadow-lg: 0 20px 60px rgba(0, 0, 0, 0.8);
+}
+
+/* ==========================================================================
+   Wizard Container
+   ========================================================================== */
+
+.deploy-forge-wizard-wrap {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--wizard-bg-overlay);
+  z-index: 999999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.deploy-forge-wizard {
+  background: var(--wizard-bg-primary);
+  border-radius: var(--wizard-radius);
+  box-shadow: var(--wizard-shadow-lg);
+  border: 1px solid var(--wizard-border-primary);
+  max-width: 900px;
+  width: 100%;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  animation: wizardFadeIn 0.3s ease-out;
+}
+
+@keyframes wizardFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ==========================================================================
+   Progress Stepper
+   ========================================================================== */
+
+.wizard-progress {
+  padding: 32px 40px 24px;
+  border-bottom: 1px solid var(--wizard-border-primary);
+  background: var(--wizard-bg-secondary);
+  border-radius: var(--wizard-radius) var(--wizard-radius) 0 0;
+}
+
+.wizard-steps {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  position: relative;
+}
+
+.wizard-steps::before {
+  content: "";
+  position: absolute;
+  top: 20px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--wizard-border-primary);
+  z-index: 0;
+}
+
+.wizard-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  position: relative;
+  z-index: 1;
+}
+
+.wizard-step-circle {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--wizard-bg-primary);
+  border: 2px solid var(--wizard-border-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--wizard-text-secondary);
+  transition: all 0.3s ease;
+}
+
+.wizard-step-label {
+  font-size: 12px;
+  color: var(--wizard-text-secondary);
+  font-weight: 500;
+  text-align: center;
+}
+
+/* Step States */
+.wizard-step.completed .wizard-step-circle {
+  background: var(--wizard-accent-success);
+  border-color: var(--wizard-accent-success);
+  color: var(--wizard-bg-primary);
+}
+
+/* .wizard-step.completed .wizard-step-circle::before {
+    content: '✓';
+    font-size: 18px;
+} */
+
+.wizard-step.active .wizard-step-circle {
+  background: var(--wizard-button-bg);
+  border-color: var(--wizard-button-bg);
+  color: var(--wizard-bg-primary);
+  box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.1);
+}
+
+.wizard-step.active .wizard-step-label {
+  color: var(--wizard-text-primary);
+  font-weight: 600;
+}
+
+/* ==========================================================================
+   Wizard Content
+   ========================================================================== */
+
+.wizard-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 40px;
+}
+
+.wizard-step-content {
+  display: none;
+  animation: stepFadeIn 0.3s ease-out;
+}
+
+.wizard-step-content.active {
+  display: block;
+}
+
+@keyframes stepFadeIn {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.wizard-step-title {
+  font-size: 28px;
+  font-weight: 600;
+  color: var(--wizard-text-primary);
+  margin: 0 0 12px;
+}
+
+.wizard-step-description {
+  font-size: 16px;
+  color: var(--wizard-text-secondary);
+  line-height: 1.6;
+  margin: 0 0 32px;
+}
+
+/* ==========================================================================
+   Wizard Footer
+   ========================================================================== */
+
+.wizard-footer {
+  padding: 24px 40px;
+  border-top: 1px solid var(--wizard-border-primary);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--wizard-bg-secondary);
+}
+
+.wizard-footer-left {
+  display: flex;
+  gap: 12px;
+}
+
+.wizard-footer-right {
+  display: flex;
+  gap: 12px;
+}
+
+/* Buttons */
+.wizard-button {
+  padding: 12px 24px;
+  border-radius: var(--wizard-radius);
+  font-size: 14px;
+  font-weight: 500;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.wizard-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.wizard-button-primary {
+  background: var(--wizard-button-bg);
+  color: var(--wizard-button-text);
+  border: 1px solid var(--wizard-button-bg);
+}
+
+.wizard-button-primary:not(:disabled):hover {
+  background: var(--wizard-button-hover-bg);
+  border-color: var(--wizard-button-hover-bg);
+  transform: translateY(-1px);
+  box-shadow: var(--wizard-shadow-sm);
+}
+
+.wizard-button-secondary {
+  background: var(--wizard-button-secondary-bg);
+  color: var(--wizard-button-secondary-text);
+  border: 1px solid var(--wizard-border-primary);
+}
+
+.wizard-button-secondary:not(:disabled):hover {
+  background: var(--wizard-button-secondary-hover-bg);
+}
+
+.wizard-button-link {
+  background: none;
+  color: var(--wizard-text-secondary);
+  padding: 12px 16px;
+  border: none;
+}
+
+.wizard-button-link:hover {
+  color: var(--wizard-text-primary);
+  text-decoration: underline;
+}
+
+/* ==========================================================================
+   Welcome Step
+   ========================================================================== */
+
+.wizard-welcome {
+  text-align: center;
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.wizard-welcome-icon {
+  width: 80px;
+  height: 80px;
+  margin: 0 auto 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.wizard-welcome-icon img {
+  width: 80px;
+  height: 80px;
+  object-fit: contain;
+}
+
+.wizard-welcome-title {
+  font-size: 32px;
+  font-weight: 600;
+  margin: 0 0 16px;
+  color: var(--wizard-text-primary);
+}
+
+.wizard-welcome-description {
+  font-size: 18px;
+  color: var(--wizard-text-secondary);
+  margin: 0 0 32px;
+  line-height: 1.6;
+}
+
+.wizard-features-list {
+  text-align: left;
+  background: var(--wizard-bg-tertiary);
+  padding: 24px 32px;
+  border-radius: var(--wizard-radius);
+  border: 1px solid var(--wizard-border-primary);
+  margin: 32px 0;
+}
+
+.wizard-features-list ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.wizard-features-list li {
+  padding: 12px 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 16px;
+  color: var(--wizard-text-primary);
+}
+
+.wizard-features-list li::before {
+  content: "✓";
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  background: var(--wizard-accent-success);
+  color: var(--wizard-bg-primary);
+  border-radius: 50%;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.wizard-time-estimate {
+  font-size: 14px;
+  color: var(--wizard-text-secondary);
+  margin: 24px 0 0;
+}
+
+/* ==========================================================================
+   Connect Step
+   ========================================================================== */
+
+.wizard-connect {
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.wizard-connect-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 32px;
+  background: var(--wizard-button-bg);
+  color: var(--wizard-button-text);
+  font-size: 16px;
+  font-weight: 600;
+  border-radius: var(--wizard-radius);
+  border: 1px solid var(--wizard-button-bg);
+  text-decoration: none;
+  transition: all 0.2s ease;
+  margin: 24px 0;
+}
+
+.wizard-connect-button:hover {
+  background: var(--wizard-button-hover-bg);
+  border-color: var(--wizard-button-hover-bg);
+  transform: translateY(-2px);
+  box-shadow: var(--wizard-shadow-sm);
+  color: var(--wizard-button-text);
+}
+
+.wizard-connect-button .dashicons {
+  font-size: 24px;
+  width: 24px;
+  height: 24px;
+}
+
+.wizard-help-text {
+  font-size: 14px;
+  color: var(--wizard-text-secondary);
+  margin: 16px 0;
+  padding: 12px 16px;
+  background: var(--wizard-bg-tertiary);
+  border-left: 4px solid var(--wizard-accent-info);
+  border-radius: var(--wizard-radius);
+  border: 1px solid var(--wizard-border-primary);
+  border-left: 4px solid var(--wizard-accent-info);
+}
+
+.wizard-success-message {
+  padding: 16px 20px;
+  background: var(--wizard-accent-success-bg);
+  border: 1px solid var(--wizard-accent-success);
+  border-left: 4px solid var(--wizard-accent-success);
+  border-radius: var(--wizard-radius);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 24px 0;
+  animation: successSlideIn 0.3s ease-out;
+  color: var(--wizard-text-primary);
+}
+
+@keyframes successSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.wizard-success-message .dashicons {
+  color: var(--wizard-accent-success);
+  font-size: 24px;
+  width: 24px;
+  height: 24px;
+}
+
+/* ==========================================================================
+   Repository Step
+   ========================================================================== */
+
+.wizard-form-group {
+  margin-bottom: 24px;
+}
+
+.wizard-form-label {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--wizard-text-primary);
+  margin-bottom: 8px;
+}
+
+.wizard-form-description {
+  font-size: 13px;
+  color: var(--wizard-text-secondary);
+  margin-top: 6px;
+}
+
+.wizard-deployment-preview {
+  margin-top: 24px;
+  padding: 16px;
+  background: var(--wizard-bg-tertiary);
+  border-radius: var(--wizard-radius);
+  border: 1px solid var(--wizard-border-primary);
+  border-left: 4px solid var(--wizard-button-bg);
+}
+
+.wizard-deployment-preview strong {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--wizard-text-primary);
+}
+
+.wizard-deployment-preview code {
+  background: var(--wizard-bg-secondary);
+  padding: 8px 12px;
+  display: block;
+  border-radius: var(--wizard-radius);
+  font-size: 13px;
+  color: var(--wizard-text-primary);
+  border: 1px solid var(--wizard-border-primary);
+}
+
+/* ==========================================================================
+   Deployment Method Step
+   ========================================================================== */
+
+.wizard-option-cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin: 32px 0;
+}
+
+.wizard-option-card {
+  border: 2px solid var(--wizard-border-primary);
+  border-radius: var(--wizard-radius);
+  padding: 24px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background: var(--wizard-bg-secondary);
+}
+
+.wizard-option-card:hover {
+  border-color: var(--wizard-button-bg);
+  box-shadow: var(--wizard-shadow-sm);
+}
+
+.wizard-option-card.selected {
+  border-color: var(--wizard-button-bg);
+  background: var(--wizard-bg-tertiary);
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.1);
+}
+
+.wizard-option-card-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.wizard-option-icon {
+  font-size: 32px;
+  line-height: 1;
+}
+
+.wizard-option-title {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0;
+  color: var(--wizard-text-primary);
+}
+
+.wizard-option-subtitle {
+  font-size: 12px;
+  color: var(--wizard-text-secondary);
+  margin: 0;
+}
+
+.wizard-option-description {
+  font-size: 14px;
+  color: var(--wizard-text-secondary);
+  line-height: 1.5;
+  margin: 12px 0 16px;
+}
+
+.wizard-option-badges {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.wizard-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  background: var(--wizard-bg-tertiary);
+  color: var(--wizard-text-primary);
+  border: 1px solid var(--wizard-border-primary);
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: var(--wizard-radius);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.wizard-badge-recommended {
+  background: var(--wizard-accent-success-bg);
+  border-color: var(--wizard-accent-success);
+  color: var(--wizard-accent-success);
+}
+
+.wizard-badge-fast {
+  background: rgba(255, 185, 0, 0.1);
+  border-color: var(--wizard-accent-warning);
+  color: var(--wizard-accent-warning);
+}
+
+.wizard-option-details {
+  display: none;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--wizard-border-primary);
+}
+
+.wizard-option-card.selected .wizard-option-details {
+  display: block;
+}
+
+/* ==========================================================================
+   Options Step
+   ========================================================================== */
+
+.wizard-toggle-group {
+  margin-bottom: 24px;
+  padding: 20px;
+  background: var(--wizard-bg-secondary);
+  border-radius: var(--wizard-radius);
+  border: 1px solid var(--wizard-border-primary);
+}
+
+.wizard-toggle-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.wizard-toggle-label {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--wizard-text-primary);
+}
+
+.wizard-toggle-description {
+  font-size: 14px;
+  color: var(--wizard-text-secondary);
+  line-height: 1.5;
+}
+
+/* Toggle Switch */
+.wizard-toggle-switch {
+  position: relative;
+  width: 52px;
+  height: 28px;
+  cursor: pointer;
+}
+
+.wizard-toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.wizard-toggle-slider {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: var(--wizard-border-primary);
+  border-radius: 28px;
+  transition: 0.3s;
+}
+
+.wizard-toggle-slider:before {
+  position: absolute;
+  content: "";
+  height: 20px;
+  width: 20px;
+  left: 4px;
+  bottom: 4px;
+  background-color: var(--wizard-bg-primary);
+  border-radius: 50%;
+  transition: 0.3s;
+}
+
+.wizard-toggle-switch input:checked + .wizard-toggle-slider {
+  background-color: var(--wizard-accent-success);
+}
+
+.wizard-toggle-switch input:checked + .wizard-toggle-slider:before {
+  transform: translateX(24px);
+}
+
+.wizard-toggle-substep {
+  display: none;
+  margin-top: 16px;
+  padding-left: 20px;
+  border-left: 3px solid var(--wizard-border-primary);
+}
+
+.wizard-toggle-group.enabled .wizard-toggle-substep {
+  display: block;
+}
+
+/* Webhook Details */
+.wizard-webhook-details {
+  margin-top: 16px;
+  padding: 16px;
+  background: var(--wizard-bg-tertiary);
+  border-radius: var(--wizard-radius);
+  border: 1px solid var(--wizard-border-primary);
+}
+
+.wizard-webhook-field {
+  margin-bottom: 16px;
+}
+
+.wizard-webhook-field:last-child {
+  margin-bottom: 0;
+}
+
+.wizard-webhook-value {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.wizard-webhook-value input {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid var(--wizard-border-primary);
+  border-radius: var(--wizard-radius);
+  font-family: monospace;
+  font-size: 13px;
+  background: var(--wizard-bg-secondary);
+  color: var(--wizard-text-primary);
+}
+
+.wizard-copy-button {
+  padding: 8px 16px;
+  background: var(--wizard-bg-secondary);
+  border: 1px solid var(--wizard-border-primary);
+  border-radius: var(--wizard-radius);
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--wizard-text-primary);
+  transition: all 0.2s ease;
+}
+
+.wizard-copy-button:hover {
+  background: var(--wizard-bg-tertiary);
+}
+
+.wizard-copy-button.copied {
+  background: var(--wizard-accent-success);
+  color: var(--wizard-bg-primary);
+  border-color: var(--wizard-accent-success);
+}
+
+/* ==========================================================================
+   Review Step
+   ========================================================================== */
+
+.wizard-review-cards {
+  display: grid;
+  gap: 16px;
+  margin: 24px 0;
+}
+
+.wizard-review-card {
+  background: var(--wizard-bg-secondary);
+  border: 1px solid var(--wizard-border-primary);
+  border-radius: var(--wizard-radius);
+  padding: 20px;
+}
+
+.wizard-review-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.wizard-review-card-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--wizard-text-primary);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.wizard-review-card-title .dashicons {
+  color: var(--wizard-accent-success);
+}
+
+.wizard-review-edit {
+  font-size: 13px;
+  color: var(--wizard-text-secondary);
+  text-decoration: none;
+}
+
+.wizard-review-edit:hover {
+  color: var(--wizard-text-primary);
+  text-decoration: underline;
+}
+
+.wizard-review-content {
+  font-size: 14px;
+  color: var(--wizard-text-secondary);
+}
+
+.wizard-review-content strong {
+  color: var(--wizard-text-primary);
+  font-weight: 600;
+}
+
+.wizard-review-list {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+}
+
+.wizard-review-list li {
+  padding: 6px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.wizard-review-list li::before {
+  content: "✓";
+  color: var(--wizard-accent-success);
+  font-weight: 600;
+}
+
+.wizard-next-steps {
+  background: rgba(255, 185, 0, 0.1);
+  border: 1px solid var(--wizard-accent-warning);
+  border-left: 4px solid var(--wizard-accent-warning);
+  padding: 16px 20px;
+  border-radius: var(--wizard-radius);
+  margin: 24px 0;
+}
+
+.wizard-next-steps-title {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0 0 12px;
+  color: var(--wizard-text-primary);
+}
+
+.wizard-next-steps ul {
+  margin: 0;
+  padding: 0 0 0 20px;
+}
+
+.wizard-next-steps li {
+  margin: 8px 0;
+  font-size: 14px;
+  color: var(--wizard-text-secondary);
+}
+
+.wizard-next-steps a {
+  color: var(--wizard-text-primary);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.wizard-next-steps a:hover {
+  text-decoration: underline;
+}
+
+/* ==========================================================================
+   Loading States
+   ========================================================================== */
+
+.wizard-loading {
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  border: 3px solid var(--wizard-border-primary);
+  border-radius: 50%;
+  border-top-color: var(--wizard-button-bg);
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.wizard-button .wizard-loading {
+  width: 16px;
+  height: 16px;
+  border-width: 2px;
+}
+
+/* ==========================================================================
+   Select2 Customization
+   ========================================================================== */
+
+.select2-container--default .select2-selection--single {
+  height: 40px;
+  border-color: var(--wizard-border-primary);
+  background-color: var(--wizard-bg-secondary);
+  color: var(--wizard-text-primary);
+}
+
+.select2-container--default
+  .select2-selection--single
+  .select2-selection__rendered {
+  line-height: 40px;
+  color: var(--wizard-text-primary);
+}
+
+.select2-container--default
+  .select2-selection--single
+  .select2-selection__arrow {
+  height: 38px;
+}
+
+.select2-container--default
+  .select2-selection--single
+  .select2-selection__arrow
+  b {
+  border-color: var(--wizard-text-secondary) transparent transparent transparent;
+}
+
+.select2-container--default.select2-container--open
+  .select2-selection--single
+  .select2-selection__arrow
+  b {
+  border-color: transparent transparent var(--wizard-text-secondary) transparent;
+}
+
+.wizard-form-group .select2-container {
+  width: 100% !important;
+}
+
+/* Dropdown Menu */
+.select2-dropdown {
+  background-color: var(--wizard-bg-secondary);
+  border: 1px solid var(--wizard-border-primary);
+  border-radius: var(--wizard-radius);
+  box-shadow: var(--wizard-shadow-md);
+}
+
+.select2-container--default .select2-dropdown {
+  background-color: var(--wizard-bg-secondary);
+  border-color: var(--wizard-border-primary);
+}
+
+/* Search Input */
+.select2-search--dropdown {
+  padding: 8px;
+  background-color: var(--wizard-bg-secondary);
+}
+
+.select2-search--dropdown .select2-search__field {
+  background-color: var(--wizard-bg-tertiary);
+  border: 1px solid var(--wizard-border-primary);
+  border-radius: var(--wizard-radius);
+  color: var(--wizard-text-primary);
+  padding: 8px 12px;
+}
+
+.select2-search--dropdown .select2-search__field:focus {
+  outline: none;
+  border-color: var(--wizard-button-bg);
+  background-color: var(--wizard-bg-secondary);
+}
+
+/* Results Container */
+.select2-results {
+  background-color: var(--wizard-bg-secondary);
+}
+
+.select2-results__options {
+  background-color: var(--wizard-bg-secondary);
+}
+
+/* Individual Options */
+.select2-container--default .select2-results__option {
+  background-color: var(--wizard-bg-secondary);
+  color: var(--wizard-text-primary);
+  padding: 10px 12px;
+}
+
+/* Highlighted (Hover) State */
+.select2-container--default .select2-results__option--highlighted {
+  background-color: var(--wizard-bg-tertiary) !important;
+  color: var(--wizard-text-primary) !important;
+}
+
+/* Selected State */
+.select2-container--default .select2-results__option--selected {
+  background-color: var(--wizard-bg-tertiary);
+  color: var(--wizard-text-primary);
+}
+
+.select2-container--default .select2-results__option[aria-selected="true"] {
+  background-color: var(--wizard-bg-tertiary);
+  color: var(--wizard-accent-success);
+}
+
+/* Disabled State */
+.select2-container--default .select2-results__option--disabled {
+  color: var(--wizard-text-tertiary);
+}
+
+/* Loading Message */
+.select2-container--default .select2-results__option.loading-results {
+  color: var(--wizard-text-secondary);
+}
+
+/* No Results Message */
+.select2-container--default .select2-results__message {
+  color: var(--wizard-text-secondary);
+}
+
+/* Placeholder */
+.select2-container--default .select2-selection__placeholder {
+  color: var(--wizard-text-tertiary);
+}
+
+/* ==========================================================================
+   Responsive Design
+   ========================================================================== */
+
+@media (max-width: 768px) {
+  .deploy-forge-wizard {
+    max-width: 100%;
+    margin: 10px;
+  }
+
+  .wizard-content {
+    padding: 24px;
+  }
+
+  .wizard-progress {
+    padding: 20px 24px 16px;
+  }
+
+  .wizard-footer {
+    padding: 16px 24px;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .wizard-footer-left,
+  .wizard-footer-right {
+    width: 100%;
+  }
+
+  .wizard-button {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .wizard-option-cards {
+    grid-template-columns: 1fr;
+  }
+
+  .wizard-step-label {
+    display: none;
+  }
+
+  .wizard-steps::before {
+    top: 20px;
+  }
+}
+
+/* ==========================================================================
+   Accessibility
+   ========================================================================== */
+
+.wizard-button:focus,
+.wizard-toggle-switch:focus-within .wizard-toggle-slider {
+  outline: 2px solid var(--wizard-button-bg);
+  outline-offset: 2px;
+}
+
+.wizard-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
