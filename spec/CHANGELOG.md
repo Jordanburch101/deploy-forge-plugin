@@ -1,8 +1,8 @@
 # Changelog
 
-**Last Updated:** 2025-01-27
+**Last Updated:** 2025-11-11
 
-This file tracks all significant changes, features, and planned enhancements for the WordPress GitHub Auto-Deploy plugin.
+This file tracks all significant changes, features, and planned enhancements for Deploy Forge by Jordan Burch.
 
 ## Purpose
 
@@ -22,6 +22,33 @@ Each entry should include:
 ## [Unreleased] - Planned Features
 
 ### High Priority
+
+**Plugin Renamed to Deploy Forge** (2025-11-11)
+
+- Type: Enhancement
+- Description: Complete plugin rebrand from "Deploy Forge" to "Deploy Forge" by Jordan Burch
+- Changes:
+  - Renamed plugin directory from `deploy-forge/` to `deploy-forge/`
+  - Renamed main plugin file from `deploy-forge.php` to `deploy-forge.php`
+  - Updated all class name prefixes: `GitHub_Deploy_*` → `Deploy_Forge_*`
+  - Updated all constant prefixes: `GITHUB_DEPLOY_*` → `DEPLOY_FORGE_*`
+  - Updated all function prefixes: `github_deploy_*` → `deploy_forge_*`
+  - Updated text domain: `deploy-forge` → `deploy-forge`
+  - Updated CSS class prefixes: `deploy-forge` → `deploy-forge`
+  - Updated JavaScript object names: `githubDeploy` → `deployForge`
+  - Updated plugin header with author info (Jordan Burch)
+  - Updated all documentation references
+- Files Modified:
+  - All PHP, JavaScript, and CSS files in plugin
+  - `CLAUDE.md` - Updated project overview and structure
+  - `deploy-forge/README.md` - Updated branding throughout
+  - `spec/CHANGELOG.md` - Updated title and branding
+- Files Removed:
+  - `security-audit/` directory
+  - `deploy-forge.zip`
+  - `LINTER-CONFIGURATION.md`
+  - Duplicate plugin files
+- Status: ✅ Implemented
 
 **Dashboard Redesign - Wireframe-Based Layout** (2025-11-11)
 
@@ -57,6 +84,23 @@ Each entry should include:
   - `admin/js/admin-scripts.js` (added initTableFilters, filterTable methods)
 - Status: ✅ Implemented
 - Related: Dashboard page (original implementation)
+
+**Setup Wizard - Custom Icon Support** (2025-11-11)
+
+- Type: Enhancement
+- Description: Replaced emoji icons with custom image icons in setup wizard deployment method step
+- Changes:
+  - Created `deploy-forge/admin/images/` directory for custom icons
+  - Replaced ⚙️ emoji with `power-icon.png` for GitHub Actions option
+  - Replaced ⚡ emoji with `flash-icon.png` for Direct Clone option
+  - Images use `max-width: 32px; max-height: 32px;` for consistent sizing
+  - Updated path references to use `DEPLOY_FORGE_PLUGIN_URL . 'deploy-forge/admin/images/'`
+- Files Modified:
+  - `deploy-forge/templates/setup-wizard/step-method.php` - Updated icon markup
+- Files Added:
+  - `deploy-forge/admin/images/` directory (icons to be added by user)
+- Status: ✅ Implemented
+- Related: Setup wizard implementation
 
 **Setup Wizard - Vercel-Inspired Dark Theme** (2025-11-09)
 
@@ -231,7 +275,7 @@ Each entry should include:
 - Date Planned: TBD
 - Type: Feature
 - Description: Command-line interface for deployments
-- Example: `wp github-deploy deploy --commit=abc123`
+- Example: `wp deploy-forge deploy --commit=abc123`
 
 **Deployment Health Checks** (Planned)
 
