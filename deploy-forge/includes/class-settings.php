@@ -289,6 +289,27 @@ class Deploy_Forge_Settings
         $current_settings['github_branch'] = 'main';
         $this->save($current_settings);
 
+        // CRITICAL: Clear all GitHub-related transients
+        // These cache repositories, branches, workflows, etc. from the previous connection
+        // If not cleared, reconnecting with a different account will show old cached data
+        delete_transient('deploy_forge_installation_repos'); // Installation repositories
+        delete_transient('deploy_forge_user_repos');         // User repositories
+
+        // Clear all pattern-based transients (workflows, branches, commits, runs)
+        // These use MD5 hashes in the key, so we need to clear all matching patterns
+        global $wpdb;
+        $wpdb->query(
+            "DELETE FROM {$wpdb->options}
+             WHERE option_name LIKE '_transient_deploy_forge_workflows_%'
+             OR option_name LIKE '_transient_timeout_deploy_forge_workflows_%'
+             OR option_name LIKE '_transient_deploy_forge_branches_%'
+             OR option_name LIKE '_transient_timeout_deploy_forge_branches_%'
+             OR option_name LIKE '_transient_deploy_forge_commits_%'
+             OR option_name LIKE '_transient_timeout_deploy_forge_commits_%'
+             OR option_name LIKE '_transient_deploy_forge_runs_%'
+             OR option_name LIKE '_transient_timeout_deploy_forge_runs_%'"
+        );
+
         return true;
     }
 
