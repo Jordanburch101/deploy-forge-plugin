@@ -638,7 +638,7 @@
     handleRestartWizard: function (e) {
       e.preventDefault();
 
-      if (!confirm("Are you sure you want to restart the setup wizard? This will disconnect from GitHub and reset all wizard progress.")) {
+      if (!confirm("Are you sure you want to restart repository selection? This will unbind the current repository so you can select a different one.")) {
         return;
       }
 

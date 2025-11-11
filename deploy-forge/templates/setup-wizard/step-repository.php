@@ -40,7 +40,7 @@ if (!defined('ABSPATH')) {
         <div style="margin-top: 16px; padding: 12px 16px; background: rgba(255, 0, 0, 0.1); border-left: 4px solid var(--wizard-accent-error, #ff0000); border-radius: 2px; border: 1px solid rgba(255, 0, 0, 0.3); border-left: 4px solid var(--wizard-accent-error, #ff0000);">
             <p style="margin: 0; font-size: 13px; color: var(--wizard-text-secondary, #a1a1a1);">
                 <strong style="color: var(--wizard-accent-error, #ff0000);"><?php esc_html_e('Warning:', 'deploy-forge'); ?></strong>
-                <?php esc_html_e('Once you bind a repository, you cannot change it without restarting the setup wizard.', 'deploy-forge'); ?>
+                <?php esc_html_e('Once you bind a repository, you can only change it by restarting repository selection.', 'deploy-forge'); ?>
             </p>
         </div>
     </div>
@@ -51,7 +51,7 @@ if (!defined('ABSPATH')) {
             <p style="margin: 0; font-size: 14px; color: var(--wizard-text-secondary, #a1a1a1); line-height: 1.5; flex: 1;">
                 <span class="dashicons dashicons-warning" style="color: var(--wizard-accent-warning, #ffb900); vertical-align: middle; font-size: 18px;"></span>
                 <strong style="color: var(--wizard-text-primary, #ffffff);"><?php esc_html_e('Repository Bound:', 'deploy-forge'); ?></strong>
-                <?php esc_html_e('You have bound a repository. To change it, restart the setup wizard (this will disconnect and start over).', 'deploy-forge'); ?>
+                <?php esc_html_e('You have bound a repository. To change it, click "Restart Wizard" to unbind and select a different repository.', 'deploy-forge'); ?>
             </p>
             <button type="button" id="restart-wizard-btn" class="wizard-button wizard-button-secondary" style="flex-shrink: 0;">
                 <span class="dashicons dashicons-update"></span>
