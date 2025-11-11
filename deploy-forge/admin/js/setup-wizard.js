@@ -535,7 +535,7 @@
 
       // Disable button and show loading
       $button.prop("disabled", true);
-      $loading.addClass("is-active");
+      $loading.css("display", "inline-block");
 
       const { owner, name, full_name, default_branch } = this.selectedRepoData;
 
@@ -564,11 +564,11 @@
         this.loadBranches(full_name, default_branch);
 
         // Hide loading
-        $loading.removeClass("is-active");
+        $loading.css("display", "none");
       }, () => {
         // On error, re-enable button
         $button.prop("disabled", false);
-        $loading.removeClass("is-active");
+        $loading.css("display", "none");
       });
     },
 
