@@ -23,6 +23,41 @@ Each entry should include:
 
 ### High Priority
 
+**Dashboard Redesign - Wireframe-Based Layout** (2025-11-11)
+
+- Type: Enhancement
+- Description: Complete redesign of dashboard page based on new wireframe specifications
+- Layout Changes:
+  - Replaced 3-column card grid with streamlined single-column sections
+  - Connection & Controls: Combined status and quick actions into single header with Deploy Now button right-aligned
+  - Stats: 4 clickable stat cards in a row with hover effects and direct links to filtered history
+  - Latest Deployment Summary: New dedicated section showing full deployment metadata before recent deployments table
+  - Recent Deployments: Added search input and status filter dropdown for table
+- Design Improvements:
+  - Consistent card-based design with white backgrounds and subtle shadows
+  - Clickable stat cards with hover effects (transform, shadow, border color change)
+  - Improved spacing and visual hierarchy
+  - Better mobile responsiveness with flexible layouts
+  - Table controls (search + filter) in horizontal layout
+- User Experience:
+  - Click stat cards to view filtered deployment history
+  - Search deployments by commit hash, message, or any table text
+  - Filter deployments by status (success, failed, pending, building, etc.)
+  - Quick access to Deploy Now button in header
+  - Latest deployment details prominently displayed
+- Technical Implementation:
+  - JavaScript table filtering (client-side for performance)
+  - Flexbox layouts for responsive design
+  - CSS Grid for stat cards
+  - Status-based URL parameters for history page linking
+  - Real-time search/filter without page reload
+- Files Modified:
+  - `templates/dashboard-page.php` (complete structure redesign)
+  - `admin/css/admin-styles.css` (new sections: header, stats-section, latest-summary, table-controls)
+  - `admin/js/admin-scripts.js` (added initTableFilters, filterTable methods)
+- Status: ✅ Implemented
+- Related: Dashboard page (original implementation)
+
 **Setup Wizard - Vercel-Inspired Dark Theme** (2025-11-09)
 
 - Type: Enhancement

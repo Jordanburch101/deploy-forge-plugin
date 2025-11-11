@@ -8,6 +8,7 @@
   const GitHubDeployAdmin = {
     init: function () {
       this.bindEvents();
+      this.initTableFilters();
       this.autoRefresh();
     },
 
@@ -70,6 +71,58 @@
       // Handle deployment method change
       $("#deployment_method").on("change", this.onDeploymentMethodChange.bind(this));
       this.onDeploymentMethodChange(); // Run on page load
+    },
+
+    /**
+     * Initialize table search and filter functionality
+     */
+    initTableFilters: function () {
+      const self = this;
+      const $searchInput = $("#deployment-search");
+      const $statusFilter = $("#deployment-status-filter");
+      const $table = $("#deployments-table");
+
+      if (!$table.length) {
+        return; // No table on this page
+      }
+
+      // Search functionality
+      $searchInput.on("keyup", function () {
+        self.filterTable();
+      });
+
+      // Status filter functionality
+      $statusFilter.on("change", function () {
+        self.filterTable();
+      });
+    },
+
+    /**
+     * Filter deployments table based on search and status
+     */
+    filterTable: function () {
+      const searchTerm = $("#deployment-search").val().toLowerCase();
+      const statusFilter = $("#deployment-status-filter").val().toLowerCase();
+      const $rows = $("#deployments-table tbody tr");
+
+      $rows.each(function () {
+        const $row = $(this);
+        const rowText = $row.text().toLowerCase();
+        const rowStatus = $row.data("status");
+
+        // Check search match
+        const searchMatch = !searchTerm || rowText.includes(searchTerm);
+
+        // Check status match
+        const statusMatch = !statusFilter || rowStatus === statusFilter;
+
+        // Show/hide row
+        if (searchMatch && statusMatch) {
+          $row.show();
+        } else {
+          $row.hide();
+        }
+      });
     },
 
     connectGitHub: function (e) {
