@@ -23,6 +23,39 @@ Each entry should include:
 
 ### High Priority
 
+**PHP & JavaScript Consolidation - Phase 2** (2025-11-15)
+
+- Type: Refactoring / Code Quality
+- Description: Major PHP and JavaScript consolidation to eliminate duplicate AJAX logic and data formatting
+- Changes:
+  - Created `class-ajax-handler-base.php` - Base class for AJAX handlers with shared security/validation methods
+  - Created `class-data-formatter.php` - Utility class for formatting repositories, workflows, deployments
+  - Created `ajax-utilities.js` - Shared JavaScript utilities for AJAX requests and Select2 initialization
+  - Updated main plugin file to require new utility classes
+  - Updated both admin and wizard enqueue functions to load AJAX utilities JavaScript
+- Technical Details:
+  - **Base AJAX Handler**: Provides `verify_ajax_request()`, `send_success()`, `send_error()`, `get_post_param()`, `validate_required_params()`, `handle_api_response()`
+  - **Data Formatter**: Static methods for formatting repositories, workflows, branches, deployments for Select2/JSON responses
+  - **AJAX Utilities JS**: `DeployForgeAjax.request()`, `loadRepositories()`, `loadWorkflows()`, `loadBranches()`, `initSelect2()`, `showError()`, `showSuccess()`
+- Benefits:
+  - Eliminates foundation for ~200+ lines of duplicate AJAX security checks (ready for Phase 3 refactoring)
+  - Provides reusable data formatting (ready for Phase 3 refactoring)
+  - Provides reusable JavaScript AJAX patterns (ready for future use)
+  - Single source of truth for AJAX request handling
+  - Consistent error handling and validation
+  - Improved code organization and maintainability
+- Files Created:
+  - `deploy-forge/includes/class-ajax-handler-base.php` (AJAX base class)
+  - `deploy-forge/includes/class-data-formatter.php` (data formatting utilities)
+  - `deploy-forge/admin/js/ajax-utilities.js` (shared JavaScript utilities)
+- Files Modified:
+  - `deploy-forge.php` (added utility class includes)
+  - `deploy-forge/admin/class-admin-pages.php` (enqueue AJAX utilities)
+  - `deploy-forge/admin/class-setup-wizard.php` (enqueue AJAX utilities)
+- Status: ✅ Implemented (Phase 2 Complete - Foundation Laid)
+- Next Steps: Phase 3 - Refactor existing AJAX handlers to use base class and formatter (actual consolidation)
+- Related: Code consolidation plan - Phase 2 of 10 total opportunities
+
 **CSS Consolidation - Phase 1** (2025-11-15)
 
 - Type: Refactoring / Code Quality

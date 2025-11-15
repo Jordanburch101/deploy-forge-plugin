@@ -132,10 +132,20 @@ class Deploy_Forge_Admin_Pages
             DEPLOY_FORGE_VERSION
         );
 
+        // Enqueue shared AJAX utilities
+        wp_enqueue_script(
+            'deploy-forge-ajax-utils',
+            DEPLOY_FORGE_PLUGIN_URL . 'admin/js/ajax-utilities.js',
+            ['jquery'],
+            DEPLOY_FORGE_VERSION,
+            true
+        );
+
+        // Enqueue admin-specific scripts (depends on AJAX utilities)
         wp_enqueue_script(
             'deploy-forge-admin',
             DEPLOY_FORGE_PLUGIN_URL . 'admin/js/admin-scripts.js',
-            ['jquery'],
+            ['jquery', 'deploy-forge-ajax-utils'],
             DEPLOY_FORGE_VERSION,
             true
         );

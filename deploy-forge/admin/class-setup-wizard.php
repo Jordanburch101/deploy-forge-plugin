@@ -184,11 +184,20 @@ class Deploy_Forge_Setup_Wizard
             DEPLOY_FORGE_VERSION
         );
 
-        // Wizard JS
+        // Enqueue shared AJAX utilities
+        wp_enqueue_script(
+            'deploy-forge-ajax-utils',
+            DEPLOY_FORGE_PLUGIN_URL . 'admin/js/ajax-utilities.js',
+            ['jquery'],
+            DEPLOY_FORGE_VERSION,
+            true
+        );
+
+        // Wizard JS (depends on AJAX utilities and Select2)
         wp_enqueue_script(
             'deploy-forge-wizard',
             DEPLOY_FORGE_PLUGIN_URL . 'admin/js/setup-wizard.js',
-            ['jquery', 'select2'],
+            ['jquery', 'select2', 'deploy-forge-ajax-utils'],
             DEPLOY_FORGE_VERSION,
             true
         );

@@ -101,6 +101,10 @@ class Deploy_Forge {
         require_once DEPLOY_FORGE_PLUGIN_DIR . 'includes/class-webhook-handler.php';
         require_once DEPLOY_FORGE_PLUGIN_DIR . 'includes/class-github-app-connector.php';
 
+        // Utility classes
+        require_once DEPLOY_FORGE_PLUGIN_DIR . 'includes/class-ajax-handler-base.php';
+        require_once DEPLOY_FORGE_PLUGIN_DIR . 'includes/class-data-formatter.php';
+
         // Admin classes
         if (is_admin()) {
             require_once DEPLOY_FORGE_PLUGIN_DIR . 'admin/class-admin-pages.php';
