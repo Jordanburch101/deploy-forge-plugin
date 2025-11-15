@@ -257,19 +257,8 @@ class Deploy_Forge_Setup_Wizard extends Deploy_Forge_Ajax_Handler_Base
             return;
         }
 
-        // Format for Select2
-        $formatted = array_map(function ($repo) {
-            return [
-                'id' => $repo['full_name'],
-                'text' => $repo['full_name'],
-                'full_name' => $repo['full_name'],
-                'name' => $repo['name'],
-                'owner' => $repo['owner']['login'] ?? '',
-                'description' => $repo['description'] ?? '',
-                'private' => $repo['private'] ?? false,
-                'default_branch' => $repo['default_branch'] ?? 'main'
-            ];
-        }, $repos['data']);
+        // Format for Select2 using Data_Formatter
+        $formatted = Deploy_Forge_Data_Formatter::format_repositories($repos['data']);
 
         $this->log('Setup_Wizard', 'Successfully fetched ' . count($formatted) . ' repositories');
 

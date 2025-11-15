@@ -24,15 +24,16 @@ class Deploy_Forge_Data_Formatter
         // Handle both object and array
         $repo_data = is_object($repo) ? (array) $repo : $repo;
         $owner = is_object($repo->owner ?? null) ? (array) $repo->owner : ($repo_data['owner'] ?? []);
+        $full_name = $repo_data['full_name'] ?? '';
 
         return [
-            'id' => $repo_data['id'] ?? 0,
-            'full_name' => $repo_data['full_name'] ?? '',
+            'id' => $full_name,  // Select2 uses full_name as ID
+            'text' => $full_name,  // Select2 display text
+            'full_name' => $full_name,
             'name' => $repo_data['name'] ?? '',
             'owner' => is_array($owner) ? ($owner['login'] ?? '') : ($owner->login ?? ''),
             'private' => $repo_data['private'] ?? false,
             'default_branch' => $repo_data['default_branch'] ?? 'main',
-            'updated_at' => $repo_data['updated_at'] ?? '',
             'description' => $repo_data['description'] ?? '',
         ];
     }

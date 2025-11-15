@@ -23,6 +23,26 @@ Each entry should include:
 
 ### High Priority
 
+**Data Formatter Usage** (2025-11-15)
+
+- Type: Enhancement / Code Quality
+- Description: Applied the Data_Formatter utility class created in Phase 2 to eliminate manual formatting logic
+- Changes:
+  - Updated `Deploy_Forge_Data_Formatter::format_repository_for_select()` to include Select2-compatible `id` and `text` fields
+  - Replaced manual `array_map()` formatting in `ajax_get_repos()` with `Deploy_Forge_Data_Formatter::format_repositories()`
+- Benefits:
+  - Eliminated 12 lines of duplicate formatting logic
+  - Single source of truth for repository formatting
+  - Consistent formatting across wizard and admin areas
+  - More maintainable and easier to update
+- Code Reduction:
+  - Manual array_map with inline function (13 lines) → Single formatter call (1 line)
+- Files Modified:
+  - `deploy-forge/includes/class-data-formatter.php` (added Select2 fields)
+  - `deploy-forge/admin/class-setup-wizard.php` (uses formatter)
+- Status: ✅ Implemented
+- Related: Completes the Data_Formatter utility created in Phase 2
+
 **AJAX Handler Consolidation - Phase 3** (2025-11-15)
 
 - Type: Refactoring / Code Quality
