@@ -168,11 +168,19 @@ class Deploy_Forge_Setup_Wizard
             false  // Load in header, not footer
         );
 
-        // Wizard CSS
+        // Enqueue shared styles first
+        wp_enqueue_style(
+            'deploy-forge-shared',
+            DEPLOY_FORGE_PLUGIN_URL . 'admin/css/shared-styles.css',
+            [],
+            DEPLOY_FORGE_VERSION
+        );
+
+        // Wizard CSS (depends on shared styles)
         wp_enqueue_style(
             'deploy-forge-wizard',
             DEPLOY_FORGE_PLUGIN_URL . 'admin/css/setup-wizard.css',
-            [],
+            ['deploy-forge-shared', 'select2'],
             DEPLOY_FORGE_VERSION
         );
 

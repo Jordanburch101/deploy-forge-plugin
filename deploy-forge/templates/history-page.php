@@ -100,7 +100,7 @@ if (!defined('ABSPATH')) {
     <?php endif; ?>
 </div>
 
-<!-- Deployment Details Modal -->
+<!-- Deployment Details Modal (styles in shared-styles.css) -->
 <div id="deployment-details-modal" class="deploy-forge-modal" style="display: none;">
     <div class="deploy-forge-modal-content">
         <span class="deploy-forge-modal-close">&times;</span>
@@ -110,50 +110,6 @@ if (!defined('ABSPATH')) {
         </div>
     </div>
 </div>
-
-<style>
-    .deploy-forge-modal {
-        position: fixed;
-        z-index: 100000;
-        left: 0;
-        top: 0;
-        width: 100%;
-        height: 100%;
-        overflow: auto;
-        background-color: rgba(0, 0, 0, 0.4);
-    }
-
-    .deploy-forge-modal-content {
-        background-color: #fefefe;
-        margin: 5% auto;
-        padding: 20px;
-        border: 1px solid #888;
-        width: 80%;
-        max-width: 800px;
-        border-radius: 4px;
-    }
-
-    .deploy-forge-modal-close {
-        color: #aaa;
-        float: right;
-        font-size: 28px;
-        font-weight: bold;
-        cursor: pointer;
-    }
-
-    .deploy-forge-modal-close:hover,
-    .deploy-forge-modal-close:focus {
-        color: #000;
-    }
-
-    #deployment-details-content pre {
-        background: #f5f5f5;
-        padding: 15px;
-        border-radius: 4px;
-        overflow-x: auto;
-        max-height: 400px;
-    }
-</style>
 
 <script>
     jQuery(document).ready(function($) {

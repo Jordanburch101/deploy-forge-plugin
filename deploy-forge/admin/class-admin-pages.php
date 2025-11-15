@@ -116,10 +116,19 @@ class Deploy_Forge_Admin_Pages
             return;
         }
 
+        // Enqueue shared styles first
+        wp_enqueue_style(
+            'deploy-forge-shared',
+            DEPLOY_FORGE_PLUGIN_URL . 'admin/css/shared-styles.css',
+            [],
+            DEPLOY_FORGE_VERSION
+        );
+
+        // Enqueue admin-specific styles
         wp_enqueue_style(
             'deploy-forge-admin',
             DEPLOY_FORGE_PLUGIN_URL . 'admin/css/admin-styles.css',
-            [],
+            ['deploy-forge-shared'],
             DEPLOY_FORGE_VERSION
         );
 
