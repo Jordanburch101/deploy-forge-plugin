@@ -9,7 +9,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-class Deploy_Forge_Setup_Wizard
+class Deploy_Forge_Setup_Wizard extends Deploy_Forge_Ajax_Handler_Base
 {
 
     private Deploy_Forge_Settings $settings;
@@ -49,6 +49,14 @@ class Deploy_Forge_Setup_Wizard
 
         // Redirect to wizard on activation if needed
         add_action('admin_init', [$this, 'maybe_redirect_to_wizard']);
+    }
+
+    /**
+     * Override base class log method to use logger instance
+     */
+    protected function log(string $context, string $message, array $data = []): void
+    {
+        $this->logger->log($context, $message, $data);
     }
 
     /**
@@ -237,19 +245,16 @@ class Deploy_Forge_Setup_Wizard
      */
     public function ajax_get_repos(): void
     {
-        check_ajax_referer('deploy_forge_wizard', 'nonce');
+        $this->verify_ajax_request('deploy_forge_wizard');
 
-        if (!current_user_can('manage_options')) {
-            wp_send_json_error(['message' => __('Unauthorized', 'deploy-forge')]);
-        }
-
-        $this->logger->log('Setup_Wizard', 'Fetching repositories for wizard');
+        $this->log('Setup_Wizard', 'Fetching repositories for wizard');
 
         $repos = $this->github_api->get_installation_repositories();
 
         if (!$repos['success']) {
             $this->logger->error('Setup_Wizard', 'Failed to fetch repositories', $repos);
-            wp_send_json_error(['message' => $repos['message'] ?? __('Failed to fetch repositories', 'deploy-forge')]);
+            $this->send_error($repos['message'] ?? __('Failed to fetch repositories', 'deploy-forge'));
+            return;
         }
 
         // Format for Select2
@@ -266,9 +271,9 @@ class Deploy_Forge_Setup_Wizard
             ];
         }, $repos['data']);
 
-        $this->logger->log('Setup_Wizard', 'Successfully fetched ' . count($formatted) . ' repositories');
+        $this->log('Setup_Wizard', 'Successfully fetched ' . count($formatted) . ' repositories');
 
-        wp_send_json_success(['repositories' => $formatted]);
+        $this->send_success(['repositories' => $formatted]);
     }
 
     /**
@@ -276,19 +281,16 @@ class Deploy_Forge_Setup_Wizard
      */
     public function ajax_get_branches(): void
     {
-        check_ajax_referer('deploy_forge_wizard', 'nonce');
+        $this->verify_ajax_request('deploy_forge_wizard');
 
-        if (!current_user_can('manage_options')) {
-            wp_send_json_error(['message' => __('Unauthorized', 'deploy-forge')]);
-        }
-
-        $repo_full_name = sanitize_text_field($_POST['repo_full_name'] ?? '');
+        $repo_full_name = $this->get_post_param('repo_full_name');
 
         if (empty($repo_full_name)) {
-            wp_send_json_error(['message' => __('Repository name required', 'deploy-forge')]);
+            $this->send_error(__('Repository name required', 'deploy-forge'));
+            return;
         }
 
-        $this->logger->log('Setup_Wizard', 'Fetching branches for ' . $repo_full_name);
+        $this->log('Setup_Wizard', 'Fetching branches for ' . $repo_full_name);
 
         // Temporarily set repo to fetch branches
         list($owner, $name) = explode('/', $repo_full_name);
@@ -306,10 +308,11 @@ class Deploy_Forge_Setup_Wizard
 
         if (!$branches['success']) {
             $this->logger->error('Setup_Wizard', 'Failed to fetch branches', $branches);
-            wp_send_json_error(['message' => $branches['message'] ?? __('Failed to fetch branches', 'deploy-forge')]);
+            $this->send_error($branches['message'] ?? __('Failed to fetch branches', 'deploy-forge'));
+            return;
         }
 
-        wp_send_json_success(['branches' => $branches['data']]);
+        $this->send_success(['branches' => $branches['data']]);
     }
 
     /**
@@ -317,29 +320,27 @@ class Deploy_Forge_Setup_Wizard
      */
     public function ajax_get_workflows(): void
     {
-        check_ajax_referer('deploy_forge_wizard', 'nonce');
+        $this->verify_ajax_request('deploy_forge_wizard');
 
-        if (!current_user_can('manage_options')) {
-            wp_send_json_error(['message' => __('Unauthorized', 'deploy-forge')]);
-        }
-
-        $repo_owner = sanitize_text_field($_POST['repo_owner'] ?? '');
-        $repo_name = sanitize_text_field($_POST['repo_name'] ?? '');
+        $repo_owner = $this->get_post_param('repo_owner');
+        $repo_name = $this->get_post_param('repo_name');
 
         if (empty($repo_owner) || empty($repo_name)) {
-            wp_send_json_error(['message' => __('Repository information required', 'deploy-forge')]);
+            $this->send_error(__('Repository information required', 'deploy-forge'));
+            return;
         }
 
-        $this->logger->log('Setup_Wizard', 'Fetching workflows for ' . $repo_owner . '/' . $repo_name);
+        $this->log('Setup_Wizard', 'Fetching workflows for ' . $repo_owner . '/' . $repo_name);
 
         $result = $this->github_api->get_workflows($repo_owner, $repo_name);
 
         if (!$result['success']) {
             $this->logger->error('Setup_Wizard', 'Failed to fetch workflows', $result);
-            wp_send_json_error(['message' => $result['message'] ?? __('Failed to fetch workflows', 'deploy-forge')]);
+            $this->send_error($result['message'] ?? __('Failed to fetch workflows', 'deploy-forge'));
+            return;
         }
 
-        wp_send_json_success([
+        $this->send_success([
             'workflows' => $result['workflows'],
             'total_count' => $result['total_count']
         ]);
@@ -350,16 +351,13 @@ class Deploy_Forge_Setup_Wizard
      */
     public function ajax_validate_repo(): void
     {
-        check_ajax_referer('deploy_forge_wizard', 'nonce');
+        $this->verify_ajax_request('deploy_forge_wizard');
 
-        if (!current_user_can('manage_options')) {
-            wp_send_json_error(['message' => __('Unauthorized', 'deploy-forge')]);
-        }
-
-        $repo_full_name = sanitize_text_field($_POST['repo_full_name'] ?? '');
+        $repo_full_name = $this->get_post_param('repo_full_name');
 
         if (empty($repo_full_name)) {
-            wp_send_json_error(['message' => __('Repository name required', 'deploy-forge')]);
+            $this->send_error(__('Repository name required', 'deploy-forge'));
+            return;
         }
 
         // Try to fetch repo details
@@ -378,10 +376,11 @@ class Deploy_Forge_Setup_Wizard
         $this->settings->update('github_repo_name', $current_name);
 
         if (!$result['success']) {
-            wp_send_json_error(['message' => __('Cannot access repository', 'deploy-forge')]);
+            $this->send_error(__('Cannot access repository', 'deploy-forge'));
+            return;
         }
 
-        wp_send_json_success(['message' => __('Repository accessible', 'deploy-forge')]);
+        $this->send_success(null, __('Repository accessible', 'deploy-forge'));
     }
 
     /**
@@ -389,29 +388,25 @@ class Deploy_Forge_Setup_Wizard
      */
     public function ajax_bind_repo(): void
     {
-        check_ajax_referer('deploy_forge_wizard', 'nonce');
+        $this->verify_ajax_request('deploy_forge_wizard');
 
-        if (!current_user_can('manage_options')) {
-            wp_send_json_error(['message' => __('Unauthorized', 'deploy-forge')]);
-        }
-
-        $owner = sanitize_text_field($_POST['owner'] ?? '');
-        $name = sanitize_text_field($_POST['name'] ?? '');
-        $default_branch = sanitize_text_field($_POST['default_branch'] ?? 'main');
+        $owner = $this->get_post_param('owner');
+        $name = $this->get_post_param('name');
+        $default_branch = $this->get_post_param('default_branch', 'main');
 
         if (empty($owner) || empty($name)) {
-            wp_send_json_error(['message' => __('Invalid repository data', 'deploy-forge')]);
+            $this->send_error(__('Invalid repository data', 'deploy-forge'));
             return;
         }
 
-        $this->logger->log('Setup_Wizard', 'Binding repository', [
+        $this->log('Setup_Wizard', 'Binding repository', [
             'repo' => $owner . '/' . $name,
             'branch' => $default_branch,
         ]);
 
         // During wizard, allow re-binding by unbinding first if needed
         if ($this->settings->is_repo_bound()) {
-            $this->logger->log('Setup_Wizard', 'Repository already bound, unbinding first to allow wizard re-selection');
+            $this->log('Setup_Wizard', 'Repository already bound, unbinding first to allow wizard re-selection');
 
             // Get GitHub data and clear bind status
             $github_data = $this->settings->get_github_data();
@@ -426,23 +421,25 @@ class Deploy_Forge_Setup_Wizard
         $result = $this->settings->bind_repository($owner, $name, $default_branch);
 
         if ($result) {
-            $this->logger->log('Setup_Wizard', 'Repository bound successfully');
+            $this->log('Setup_Wizard', 'Repository bound successfully');
 
-            wp_send_json_success([
-                'message' => sprintf(
+            $this->send_success(
+                [
+                    'repo' => [
+                        'owner' => $owner,
+                        'name' => $name,
+                        'full_name' => $owner . '/' . $name,
+                        'default_branch' => $default_branch,
+                    ],
+                ],
+                sprintf(
                     __('Repository %s bound successfully', 'deploy-forge'),
                     $owner . '/' . $name
-                ),
-                'repo' => [
-                    'owner' => $owner,
-                    'name' => $name,
-                    'full_name' => $owner . '/' . $name,
-                    'default_branch' => $default_branch,
-                ],
-            ]);
+                )
+            );
         } else {
             $this->logger->error('Setup_Wizard', 'Failed to bind repository');
-            wp_send_json_error(['message' => __('Failed to bind repository', 'deploy-forge')]);
+            $this->send_error(__('Failed to bind repository', 'deploy-forge'));
         }
     }
 
@@ -451,17 +448,14 @@ class Deploy_Forge_Setup_Wizard
      */
     public function ajax_save_step(): void
     {
-        check_ajax_referer('deploy_forge_wizard', 'nonce');
+        $this->verify_ajax_request('deploy_forge_wizard');
 
-        if (!current_user_can('manage_options')) {
-            wp_send_json_error(['message' => __('Unauthorized', 'deploy-forge')]);
-        }
-
-        $step = intval($_POST['step'] ?? 0);
+        $step = $this->get_post_int('step');
         $data = $_POST['data'] ?? [];
 
         if ($step < 1 || $step > 6) {
-            wp_send_json_error(['message' => __('Invalid step', 'deploy-forge')]);
+            $this->send_error(__('Invalid step', 'deploy-forge'));
+            return;
         }
 
         // Sanitize step data
@@ -470,9 +464,9 @@ class Deploy_Forge_Setup_Wizard
         // Save to transient
         set_transient('deploy_forge_wizard_step_' . $step, $sanitized, HOUR_IN_SECONDS);
 
-        $this->logger->log('Setup_Wizard', 'Saved step ' . $step . ' data', $sanitized);
+        $this->log('Setup_Wizard', 'Saved step ' . $step . ' data', $sanitized);
 
-        wp_send_json_success();
+        $this->send_success();
     }
 
     /**
@@ -480,13 +474,9 @@ class Deploy_Forge_Setup_Wizard
      */
     public function ajax_complete(): void
     {
-        check_ajax_referer('deploy_forge_wizard', 'nonce');
+        $this->verify_ajax_request('deploy_forge_wizard');
 
-        if (!current_user_can('manage_options')) {
-            wp_send_json_error(['message' => __('Unauthorized', 'deploy-forge')]);
-        }
-
-        $this->logger->log('Setup_Wizard', 'Completing wizard');
+        $this->log('Setup_Wizard', 'Completing wizard');
 
         // Gather all step data
         $wizard_data = [];
@@ -505,7 +495,7 @@ class Deploy_Forge_Setup_Wizard
             $final_settings = array_merge($current_settings, $wizard_data);
 
             $this->settings->save($final_settings);
-            $this->logger->log('Setup_Wizard', 'Saved wizard configuration', $final_settings);
+            $this->log('Setup_Wizard', 'Saved wizard configuration', $final_settings);
         }
 
         // Mark wizard as completed
@@ -517,9 +507,9 @@ class Deploy_Forge_Setup_Wizard
             delete_transient('deploy_forge_wizard_step_' . $i);
         }
 
-        $this->logger->log('Setup_Wizard', 'Wizard completed successfully');
+        $this->log('Setup_Wizard', 'Wizard completed successfully');
 
-        wp_send_json_success([
+        $this->send_success([
             'redirect' => admin_url('admin.php?page=deploy-forge&wizard_completed=1')
         ]);
     }
@@ -529,17 +519,13 @@ class Deploy_Forge_Setup_Wizard
      */
     public function ajax_skip(): void
     {
-        check_ajax_referer('deploy_forge_wizard', 'nonce');
-
-        if (!current_user_can('manage_options')) {
-            wp_send_json_error(['message' => __('Unauthorized', 'deploy-forge')]);
-        }
+        $this->verify_ajax_request('deploy_forge_wizard');
 
         update_option('deploy_forge_wizard_skipped', true);
 
-        $this->logger->log('Setup_Wizard', 'Wizard skipped by user');
+        $this->log('Setup_Wizard', 'Wizard skipped by user');
 
-        wp_send_json_success([
+        $this->send_success([
             'redirect' => admin_url('admin.php?page=deploy-forge-settings&wizard_skipped=1')
         ]);
     }

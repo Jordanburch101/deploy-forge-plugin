@@ -23,6 +23,53 @@ Each entry should include:
 
 ### High Priority
 
+**AJAX Handler Consolidation - Phase 3** (2025-11-15)
+
+- Type: Refactoring / Code Quality
+- Description: Refactored all existing AJAX handlers to use the base class and utility methods created in Phase 2
+- Changes:
+  - Extended `Deploy_Forge_Admin_Pages` from `Deploy_Forge_Ajax_Handler_Base`
+  - Extended `Deploy_Forge_Setup_Wizard` from `Deploy_Forge_Ajax_Handler_Base`
+  - Refactored all 16 AJAX methods in `class-admin-pages.php` to use base class methods
+  - Refactored all 8 AJAX methods in `class-setup-wizard.php` to use base class methods
+  - Added `log()` method overrides in both classes to use logger instances
+  - Replaced direct `check_ajax_referer()` + `current_user_can()` with `$this->verify_ajax_request()`
+  - Replaced `wp_send_json_success()` with `$this->send_success()`
+  - Replaced `wp_send_json_error()` with `$this->send_error()`
+  - Replaced `wp_send_json()` with `$this->handle_api_response()` where appropriate
+  - Replaced `sanitize_text_field($_POST['x'])` with `$this->get_post_param('x')`
+  - Replaced `intval($_POST['x'])` with `$this->get_post_int('x')`
+- Technical Details:
+  - **Admin AJAX Methods Refactored** (16 total):
+    - `ajax_test_connection()`, `ajax_manual_deploy()`, `ajax_get_status()`, `ajax_rollback()`
+    - `ajax_approve_deployment()`, `ajax_cancel_deployment()`, `ajax_get_commits()`, `ajax_get_repos()`
+    - `ajax_get_workflows()`, `ajax_generate_secret()`, `ajax_get_logs()`, `ajax_clear_logs()`
+    - `ajax_get_connect_url()`, `ajax_disconnect_github()`, `ajax_get_installation_repos()`, `ajax_bind_repo()`
+    - `ajax_reset_all_data()`
+  - **Wizard AJAX Methods Refactored** (8 total):
+    - `ajax_get_repos()`, `ajax_get_branches()`, `ajax_get_workflows()`, `ajax_validate_repo()`
+    - `ajax_bind_repo()`, `ajax_save_step()`, `ajax_complete()`, `ajax_skip()`
+- Benefits:
+  - **Eliminated ~250-300 lines of duplicate code** across both classes
+  - Consistent security checks across all AJAX endpoints
+  - Consistent error handling and response formatting
+  - Improved code readability with cleaner, more concise methods
+  - Easier to add new AJAX handlers (just extend base class)
+  - Single source of truth for security, validation, and response patterns
+  - Reduced potential for security vulnerabilities through standardization
+- Code Reduction:
+  - Each AJAX method reduced by ~10-15 lines on average
+  - Security checks: 2-4 lines → 1 line per method
+  - Response calls: 1-2 lines → 1 line per method
+  - Parameter sanitization: 1-2 lines → 1 line per parameter
+  - Total: ~250-300 lines eliminated across 24 AJAX methods
+- Files Modified:
+  - `deploy-forge/admin/class-admin-pages.php` (extended base, refactored all AJAX methods)
+  - `deploy-forge/admin/class-setup-wizard.php` (extended base, refactored all AJAX methods)
+- Status: ✅ Implemented (Phase 3 Complete - Actual Consolidation Applied)
+- Next Steps: Phase 4+ - Additional consolidation opportunities (templates, Select2 helpers, form field renderers, etc.)
+- Related: Code consolidation plan - Phase 3 of 10 total opportunities
+
 **PHP & JavaScript Consolidation - Phase 2** (2025-11-15)
 
 - Type: Refactoring / Code Quality
