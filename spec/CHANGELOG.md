@@ -1,6 +1,6 @@
 # Changelog
 
-**Last Updated:** 2025-11-15
+**Last Updated:** 2025-11-18
 
 This file tracks all significant changes, features, and planned enhancements for Deploy Forge by Jordan Burch.
 
@@ -22,6 +22,78 @@ Each entry should include:
 ## [Unreleased] - Planned Features
 
 ### High Priority
+
+**Plugin Update Checker** (2025-11-18)
+
+- Type: Feature
+- Description: Implement automatic plugin updates from private GitHub releases via custom update server
+- Purpose: Enable WordPress sites to receive automatic plugin updates without relying on WordPress.org repository
+- Architecture: Two-part system with WordPress plugin integration and Express/Vercel proxy server
+- Components:
+  - **WordPress Plugin Side** (`includes/class-update-checker.php`):
+    - Integrates with WordPress update API via hooks (`pre_set_site_transient_update_plugins`, `plugins_api`, `upgrader_source_selection`)
+    - Queries custom update server for latest version information
+    - Handles version comparison using semantic versioning
+    - Provides plugin information for WordPress update modal
+    - Renames downloaded plugin folder to match WordPress expectations
+    - Implements caching strategy (6-hour transient for release info)
+    - Supports manual update checks and one-click updates
+  - **Update Server** (Express/Vercel):
+    - Serverless Express.js application deployed on Vercel
+    - Acts as authenticated proxy to private GitHub repository releases
+    - Endpoints: `/api/update-check` (POST), `/api/download/:plugin/:version` (GET), `/api/health` (GET)
+    - Transforms GitHub release data to WordPress update format
+    - Streams release ZIP files without local storage
+    - Implements edge caching (1 hour for checks, 24 hours for downloads)
+    - Rate limiting (100 requests per 15 minutes per site)
+    - Plugin whitelist validation for security
+    - GitHub API authentication via Personal Access Token (environment variable)
+- Features:
+  - Dashboard update notifications (same UX as WordPress.org plugins)
+  - One-click updates from WordPress admin
+  - Automatic update checks (twice daily via wp-cron)
+  - Plugin details modal with changelog, requirements, screenshots
+  - Support for semantic versioning (MAJOR.MINOR.PATCH)
+  - Secure HTTPS-only communication
+  - Optional package integrity verification (SHA-256 hash)
+  - Comprehensive error handling and logging
+  - Settings page section for manual update checks
+- Technical Details:
+  - WordPress hooks: `pre_set_site_transient_update_plugins`, `plugins_api`, `upgrader_source_selection`, `load-update-core.php`, `load-plugins.php`
+  - Update server stack: Node.js 18.x, Express 4.x, Axios, Winston logging
+  - GitHub API endpoints used: `/repos/{owner}/{repo}/releases`, `/repos/{owner}/{repo}/releases/assets/{id}`
+  - Caching: WordPress transients (6 hours), Vercel edge cache (1-24 hours), in-memory cache (1 hour)
+  - Security: HTTPS enforcement, rate limiting, plugin whitelist, request validation, CORS configuration
+  - Performance: Streaming downloads, parallel requests, aggressive caching, minimal data transfer
+- Benefits:
+  - Automatic updates for private/proprietary plugins
+  - Familiar WordPress update experience for users
+  - No manual ZIP uploads required
+  - Secure access to private GitHub releases
+  - Scalable serverless architecture
+  - Minimal maintenance overhead
+- Configuration:
+  - WordPress constants: `DEPLOY_FORGE_UPDATE_SERVER`, `DEPLOY_FORGE_UPDATE_INTERVAL`, `DEPLOY_FORGE_DISABLE_UPDATES`
+  - Vercel environment variables: `GITHUB_TOKEN`, `GITHUB_OWNER`, `GITHUB_REPO`, `NODE_ENV`, `RATE_LIMIT_WINDOW`, `RATE_LIMIT_MAX_REQUESTS`
+  - Plugin whitelist in `config/plugins.js`
+- Monitoring:
+  - Health check endpoint for uptime monitoring
+  - GitHub API rate limit tracking (5,000/hour limit)
+  - Error logging via Winston (Vercel logs)
+  - Update check and download metrics
+- Status: 📋 Planned - Specification Complete
+- Related Specs:
+  - `spec/plugin-update-checker.md` - WordPress plugin side (60+ KB detailed spec)
+  - `spec/update-server.md` - Express/Vercel update server (50+ KB detailed spec)
+- Next Steps:
+  1. Create Express/Vercel update server repository
+  2. Implement server endpoints and GitHub API integration
+  3. Deploy to Vercel with environment variables
+  4. Create `class-update-checker.php` in WordPress plugin
+  5. Integrate update checker into main plugin initialization
+  6. Test update flow end-to-end
+  7. Create first GitHub release with proper format (tag, changelog, ZIP asset)
+  8. Monitor update checks and downloads in production
 
 **Data Formatter Usage** (2025-11-15)
 
