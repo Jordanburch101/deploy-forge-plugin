@@ -3,28 +3,31 @@
  * Vercel-inspired dark theme with clean, minimal aesthetic
  */
 
+/* Import shared styles */
+@import url('shared-styles.css');
+
 /* ==========================================================================
-   CSS Variables - Customize theme colors here
+   Wizard-Specific CSS Variables
    ========================================================================== */
 
 :root {
-  /* Background Colors */
+  /* Background Colors (Dark Theme) */
   --wizard-bg-primary: #000000;
   --wizard-bg-secondary: #0a0a0a;
   --wizard-bg-tertiary: #1a1a1a;
   --wizard-bg-overlay: rgba(0, 0, 0, 0.9);
 
-  /* Text Colors */
+  /* Text Colors (Dark Theme) */
   --wizard-text-primary: #ffffff;
   --wizard-text-secondary: #a1a1a1;
   --wizard-text-tertiary: #666666;
 
-  /* Border Colors */
+  /* Border Colors (Dark Theme) */
   --wizard-border-primary: #333333;
   --wizard-border-secondary: #222222;
   --wizard-border-tertiary: #1a1a1a;
 
-  /* Button Colors */
+  /* Button Colors (Dark Theme) */
   --wizard-button-bg: #ffffff;
   --wizard-button-text: #000000;
   --wizard-button-hover-bg: #e6e6e6;
@@ -32,7 +35,7 @@
   --wizard-button-secondary-text: #ffffff;
   --wizard-button-secondary-hover-bg: #2a2a2a;
 
-  /* Accent Colors */
+  /* Accent Colors (Dark Theme) */
   --wizard-accent-success: #4cff4c;
   --wizard-accent-success-bg: rgba(0, 255, 0, 0.1);
   --wizard-accent-error: #ff0000;
@@ -40,10 +43,8 @@
   --wizard-accent-warning: #ffb900;
   --wizard-accent-info: #fff;
 
-  /* Border Radius */
-  --wizard-radius: 2px;
-
-  /* Shadows */
+  /* Use shared radius/shadows or override */
+  --wizard-radius: var(--df-radius-sm);
   --wizard-shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.5);
   --wizard-shadow-md: 0 8px 24px rgba(0, 0, 0, 0.6);
   --wizard-shadow-lg: 0 20px 60px rgba(0, 0, 0, 0.8);
@@ -874,25 +875,16 @@
 }
 
 /* ==========================================================================
-   Loading States
+   Loading States - Wizard-specific overrides
    ========================================================================== */
 
+/* Loading spinner inherits from shared-styles.css but with dark theme colors */
 .wizard-loading {
-  display: inline-block;
-  width: 20px;
-  height: 20px;
-  border: 3px solid var(--wizard-border-primary);
-  border-radius: 50%;
+  border-color: var(--wizard-border-primary);
   border-top-color: var(--wizard-button-bg);
-  animation: spin 0.8s linear infinite;
 }
 
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
+/* Wizard button loading spinner size override */
 .wizard-button .wizard-loading {
   width: 16px;
   height: 16px;

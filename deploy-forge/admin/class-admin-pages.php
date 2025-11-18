@@ -9,7 +9,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-class Deploy_Forge_Admin_Pages
+class Deploy_Forge_Admin_Pages extends Deploy_Forge_Ajax_Handler_Base
 {
 
     private Deploy_Forge_Settings $settings;
@@ -52,6 +52,14 @@ class Deploy_Forge_Admin_Pages
         add_action('wp_ajax_deploy_forge_get_installation_repos', [$this, 'ajax_get_installation_repos']);
         add_action('wp_ajax_deploy_forge_bind_repo', [$this, 'ajax_bind_repo']);
         add_action('wp_ajax_deploy_forge_reset_all_data', [$this, 'ajax_reset_all_data']);
+    }
+
+    /**
+     * Override base class log method to use logger instance
+     */
+    protected function log(string $context, string $message, array $data = []): void
+    {
+        $this->logger->log($context, $message, $data);
     }
 
     /**
@@ -116,17 +124,36 @@ class Deploy_Forge_Admin_Pages
             return;
         }
 
+        // Enqueue shared styles first
         wp_enqueue_style(
-            'deploy-forge-admin',
-            DEPLOY_FORGE_PLUGIN_URL . 'admin/css/admin-styles.css',
+            'deploy-forge-shared',
+            DEPLOY_FORGE_PLUGIN_URL . 'admin/css/shared-styles.css',
             [],
             DEPLOY_FORGE_VERSION
         );
 
+        // Enqueue admin-specific styles
+        wp_enqueue_style(
+            'deploy-forge-admin',
+            DEPLOY_FORGE_PLUGIN_URL . 'admin/css/admin-styles.css',
+            ['deploy-forge-shared'],
+            DEPLOY_FORGE_VERSION
+        );
+
+        // Enqueue shared AJAX utilities
+        wp_enqueue_script(
+            'deploy-forge-ajax-utils',
+            DEPLOY_FORGE_PLUGIN_URL . 'admin/js/ajax-utilities.js',
+            ['jquery'],
+            DEPLOY_FORGE_VERSION,
+            true
+        );
+
+        // Enqueue admin-specific scripts (depends on AJAX utilities)
         wp_enqueue_script(
             'deploy-forge-admin',
             DEPLOY_FORGE_PLUGIN_URL . 'admin/js/admin-scripts.js',
-            ['jquery'],
+            ['jquery', 'deploy-forge-ajax-utils'],
             DEPLOY_FORGE_VERSION,
             true
         );
@@ -230,14 +257,10 @@ class Deploy_Forge_Admin_Pages
      */
     public function ajax_test_connection(): void
     {
-        check_ajax_referer('deploy_forge_admin', 'nonce');
-
-        if (!current_user_can('manage_options')) {
-            wp_send_json_error(['message' => __('Unauthorized', 'deploy-forge')]);
-        }
+        $this->verify_ajax_request('deploy_forge_admin');
 
         $result = $this->github_api->test_connection();
-        wp_send_json($result);
+        $this->handle_api_response($result);
     }
 
     /**
@@ -245,20 +268,17 @@ class Deploy_Forge_Admin_Pages
      */
     public function ajax_manual_deploy(): void
     {
-        check_ajax_referer('deploy_forge_admin', 'nonce');
-
-        if (!current_user_can('manage_options')) {
-            wp_send_json_error(['message' => __('Unauthorized', 'deploy-forge')]);
-        }
+        $this->verify_ajax_request('deploy_forge_admin');
 
         try {
-            $commit_hash = sanitize_text_field($_POST['commit_hash'] ?? '');
+            $commit_hash = $this->get_post_param('commit_hash');
 
             if (empty($commit_hash)) {
                 // Get latest commit
                 $commits = $this->github_api->get_recent_commits(1);
                 if (!$commits['success'] || empty($commits['data'])) {
-                    wp_send_json_error(['message' => __('Failed to get latest commit', 'deploy-forge')]);
+                    $this->send_error(__('Failed to get latest commit', 'deploy-forge'));
+                    return;
                 }
 
                 // Handle both array and object responses
@@ -269,7 +289,8 @@ class Deploy_Forge_Admin_Pages
             // Get commit details
             $commit_result = $this->github_api->get_commit_details($commit_hash);
             if (!$commit_result['success']) {
-                wp_send_json_error(['message' => __('Failed to get commit details', 'deploy-forge')]);
+                $this->send_error(__('Failed to get commit details', 'deploy-forge'));
+                return;
             }
 
             $commit_data = $commit_result['data'];
@@ -294,37 +315,40 @@ class Deploy_Forge_Admin_Pages
             // Check if result is an array (error) or int (success)
             if (is_array($deployment_result) && isset($deployment_result['error'])) {
                 // Deployment blocked due to existing build
-                wp_send_json_error([
-                    'message' => $deployment_result['message'],
-                    'error_code' => $deployment_result['error'],
-                    'building_deployment' => [
-                        'id' => $deployment_result['building_deployment']->id ?? 0,
-                        'commit_hash' => $deployment_result['building_deployment']->commit_hash ?? '',
-                        'status' => $deployment_result['building_deployment']->status ?? '',
-                        'created_at' => $deployment_result['building_deployment']->created_at ?? '',
-                    ],
-                ]);
+                $this->send_error(
+                    $deployment_result['message'],
+                    $deployment_result['error'],
+                    [
+                        'building_deployment' => [
+                            'id' => $deployment_result['building_deployment']->id ?? 0,
+                            'commit_hash' => $deployment_result['building_deployment']->commit_hash ?? '',
+                            'status' => $deployment_result['building_deployment']->status ?? '',
+                            'created_at' => $deployment_result['building_deployment']->created_at ?? '',
+                        ],
+                    ]
+                );
+                return;
             }
 
-            $this->logger->log('Admin', 'Deployment result received', [
+            $this->log('Admin', 'Deployment result received', [
                 'deployment_result' => $deployment_result,
                 'type' => gettype($deployment_result),
                 'is_truthy' => (bool)$deployment_result,
             ]);
 
             if ($deployment_result) {
-                $this->logger->log('Admin', 'Sending success response', ['deployment_id' => $deployment_result]);
-                wp_send_json_success([
-                    'message' => __('Deployment started successfully!', 'deploy-forge'),
-                    'deployment_id' => $deployment_result,
-                ]);
+                $this->log('Admin', 'Sending success response', ['deployment_id' => $deployment_result]);
+                $this->send_success(
+                    ['deployment_id' => $deployment_result],
+                    __('Deployment started successfully!', 'deploy-forge')
+                );
             } else {
-                $this->logger->log('Admin', 'Sending error response - deployment result was falsy');
-                wp_send_json_error(['message' => __('Failed to start deployment', 'deploy-forge')]);
+                $this->log('Admin', 'Sending error response - deployment result was falsy');
+                $this->send_error(__('Failed to start deployment', 'deploy-forge'));
             }
         } catch (Exception $e) {
             $this->logger->error('Admin', 'Manual deploy exception', ['error' => $e->getMessage()]);
-            wp_send_json_error(['message' => sprintf(__('Deployment error: %s', 'deploy-forge'), $e->getMessage())]);
+            $this->send_error(sprintf(__('Deployment error: %s', 'deploy-forge'), $e->getMessage()));
         }
     }
 
@@ -333,21 +357,17 @@ class Deploy_Forge_Admin_Pages
      */
     public function ajax_get_status(): void
     {
-        check_ajax_referer('deploy_forge_admin', 'nonce');
+        $this->verify_ajax_request('deploy_forge_admin');
 
-        if (!current_user_can('manage_options')) {
-            wp_send_json_error(['message' => __('Unauthorized', 'deploy-forge')]);
-        }
-
-        $deployment_id = intval($_POST['deployment_id'] ?? 0);
+        $deployment_id = $this->get_post_int('deployment_id');
 
         if ($deployment_id) {
             $deployment = $this->database->get_deployment($deployment_id);
-            wp_send_json_success(['deployment' => $deployment]);
+            $this->send_success(['deployment' => $deployment]);
         } else {
             $stats = $this->database->get_statistics();
             $recent = $this->database->get_recent_deployments(5);
-            wp_send_json_success(['stats' => $stats, 'recent' => $recent]);
+            $this->send_success(['stats' => $stats, 'recent' => $recent]);
         }
     }
 
@@ -356,24 +376,21 @@ class Deploy_Forge_Admin_Pages
      */
     public function ajax_rollback(): void
     {
-        check_ajax_referer('deploy_forge_admin', 'nonce');
+        $this->verify_ajax_request('deploy_forge_admin');
 
-        if (!current_user_can('manage_options')) {
-            wp_send_json_error(['message' => __('Unauthorized', 'deploy-forge')]);
-        }
-
-        $deployment_id = intval($_POST['deployment_id'] ?? 0);
+        $deployment_id = $this->get_post_int('deployment_id');
 
         if (!$deployment_id) {
-            wp_send_json_error(['message' => __('Invalid deployment ID', 'deploy-forge')]);
+            $this->send_error(__('Invalid deployment ID', 'deploy-forge'));
+            return;
         }
 
         $result = $this->deployment_manager->rollback_deployment($deployment_id);
 
         if ($result) {
-            wp_send_json_success(['message' => __('Rollback completed successfully!', 'deploy-forge')]);
+            $this->send_success(null, __('Rollback completed successfully!', 'deploy-forge'));
         } else {
-            wp_send_json_error(['message' => __('Rollback failed', 'deploy-forge')]);
+            $this->send_error(__('Rollback failed', 'deploy-forge'));
         }
     }
 
@@ -382,36 +399,35 @@ class Deploy_Forge_Admin_Pages
      */
     public function ajax_approve_deployment(): void
     {
-        check_ajax_referer('deploy_forge_admin', 'nonce');
+        $this->verify_ajax_request('deploy_forge_admin');
 
-        if (!current_user_can('manage_options')) {
-            wp_send_json_error(['message' => __('Unauthorized', 'deploy-forge')]);
-        }
-
-        $deployment_id = intval($_POST['deployment_id'] ?? 0);
+        $deployment_id = $this->get_post_int('deployment_id');
 
         if (!$deployment_id) {
-            wp_send_json_error(['message' => __('Invalid deployment ID', 'deploy-forge')]);
+            $this->send_error(__('Invalid deployment ID', 'deploy-forge'));
+            return;
         }
 
         // Get deployment details
         $deployment = $this->database->get_deployment($deployment_id);
 
         if (!$deployment) {
-            wp_send_json_error(['message' => __('Deployment not found', 'deploy-forge')]);
+            $this->send_error(__('Deployment not found', 'deploy-forge'));
+            return;
         }
 
         if ($deployment->status !== 'pending') {
-            wp_send_json_error(['message' => __('Only pending deployments can be approved', 'deploy-forge')]);
+            $this->send_error(__('Only pending deployments can be approved', 'deploy-forge'));
+            return;
         }
 
         // Approve the deployment by triggering the workflow
         $result = $this->deployment_manager->approve_pending_deployment($deployment_id, get_current_user_id());
 
         if ($result) {
-            wp_send_json_success(['message' => __('Deployment approved and started successfully!', 'deploy-forge')]);
+            $this->send_success(null, __('Deployment approved and started successfully!', 'deploy-forge'));
         } else {
-            wp_send_json_error(['message' => __('Failed to start deployment', 'deploy-forge')]);
+            $this->send_error(__('Failed to start deployment', 'deploy-forge'));
         }
     }
 
@@ -420,24 +436,21 @@ class Deploy_Forge_Admin_Pages
      */
     public function ajax_cancel_deployment(): void
     {
-        check_ajax_referer('deploy_forge_admin', 'nonce');
+        $this->verify_ajax_request('deploy_forge_admin');
 
-        if (!current_user_can('manage_options')) {
-            wp_send_json_error(['message' => __('Unauthorized', 'deploy-forge')]);
-        }
-
-        $deployment_id = intval($_POST['deployment_id'] ?? 0);
+        $deployment_id = $this->get_post_int('deployment_id');
 
         if (!$deployment_id) {
-            wp_send_json_error(['message' => __('Invalid deployment ID', 'deploy-forge')]);
+            $this->send_error(__('Invalid deployment ID', 'deploy-forge'));
+            return;
         }
 
         $result = $this->deployment_manager->cancel_deployment($deployment_id);
 
         if ($result) {
-            wp_send_json_success(['message' => __('Deployment cancelled successfully!', 'deploy-forge')]);
+            $this->send_success(null, __('Deployment cancelled successfully!', 'deploy-forge'));
         } else {
-            wp_send_json_error(['message' => __('Failed to cancel deployment. It may have already completed or been cancelled.', 'deploy-forge')]);
+            $this->send_error(__('Failed to cancel deployment. It may have already completed or been cancelled.', 'deploy-forge'));
         }
     }
 
@@ -446,14 +459,10 @@ class Deploy_Forge_Admin_Pages
      */
     public function ajax_get_commits(): void
     {
-        check_ajax_referer('deploy_forge_admin', 'nonce');
-
-        if (!current_user_can('manage_options')) {
-            wp_send_json_error(['message' => __('Unauthorized', 'deploy-forge')]);
-        }
+        $this->verify_ajax_request('deploy_forge_admin');
 
         $result = $this->github_api->get_recent_commits(10);
-        wp_send_json($result);
+        $this->handle_api_response($result);
     }
 
     /**
@@ -461,18 +470,14 @@ class Deploy_Forge_Admin_Pages
      */
     public function ajax_get_repos(): void
     {
-        check_ajax_referer('deploy_forge_admin', 'nonce');
-
-        if (!current_user_can('manage_options')) {
-            wp_send_json_error(['message' => __('Unauthorized', 'deploy-forge')]);
-        }
+        $this->verify_ajax_request('deploy_forge_admin');
 
         $result = $this->github_api->get_user_repositories();
 
         if ($result['success']) {
-            wp_send_json_success(['repos' => $result['data']]);
+            $this->send_success(['repos' => $result['data']]);
         } else {
-            wp_send_json_error(['message' => $result['message']]);
+            $this->send_error($result['message']);
         }
     }
 
@@ -482,37 +487,32 @@ class Deploy_Forge_Admin_Pages
      */
     public function ajax_get_workflows(): void
     {
-        check_ajax_referer('deploy_forge_admin', 'nonce');
-
-        if (!current_user_can('manage_options')) {
-            wp_send_json_error(['message' => __('Unauthorized', 'deploy-forge')]);
-            return;
-        }
+        $this->verify_ajax_request('deploy_forge_admin');
 
         // SECURITY: Sanitize and validate input parameters
-        $owner = sanitize_text_field($_POST['owner'] ?? '');
-        $repo = sanitize_text_field($_POST['repo'] ?? '');
+        $owner = $this->get_post_param('owner');
+        $repo = $this->get_post_param('repo');
 
         if (empty($owner) || empty($repo)) {
-            wp_send_json_error(['message' => __('Missing owner or repo parameter', 'deploy-forge')]);
+            $this->send_error(__('Missing owner or repo parameter', 'deploy-forge'));
             return;
         }
 
         // Additional validation: Check for valid characters
         if (!preg_match('/^[a-zA-Z0-9_-]+$/', $owner) || !preg_match('/^[a-zA-Z0-9_.-]+$/', $repo)) {
-            wp_send_json_error(['message' => __('Invalid repository format', 'deploy-forge')]);
+            $this->send_error(__('Invalid repository format', 'deploy-forge'));
             return;
         }
 
         $result = $this->github_api->get_workflows($owner, $repo);
 
         if ($result['success']) {
-            wp_send_json_success([
+            $this->send_success([
                 'workflows' => $result['workflows'],
                 'total_count' => $result['total_count']
             ]);
         } else {
-            wp_send_json_error(['message' => $result['message']]);
+            $this->send_error($result['message']);
         }
     }
 
@@ -521,18 +521,14 @@ class Deploy_Forge_Admin_Pages
      */
     public function ajax_generate_secret(): void
     {
-        check_ajax_referer('deploy_forge_admin', 'nonce');
-
-        if (!current_user_can('manage_options')) {
-            wp_send_json_error(['message' => __('Unauthorized', 'deploy-forge')]);
-        }
+        $this->verify_ajax_request('deploy_forge_admin');
 
         $secret = $this->settings->generate_webhook_secret();
 
         if ($secret) {
-            wp_send_json_success(['secret' => $secret]);
+            $this->send_success(['secret' => $secret]);
         } else {
-            wp_send_json_error(['message' => __('Failed to generate secret', 'deploy-forge')]);
+            $this->send_error(__('Failed to generate secret', 'deploy-forge'));
         }
     }
 
@@ -562,17 +558,13 @@ class Deploy_Forge_Admin_Pages
      */
     public function ajax_get_logs(): void
     {
-        check_ajax_referer('deploy_forge_admin', 'nonce');
+        $this->verify_ajax_request('deploy_forge_admin');
 
-        if (!current_user_can('manage_options')) {
-            wp_send_json_error(['message' => __('Unauthorized', 'deploy-forge')]);
-        }
-
-        $lines = intval($_POST['lines'] ?? 100);
+        $lines = $this->get_post_int('lines', 100);
         $logs = $this->logger->get_recent_logs($lines);
         $size = $this->logger->get_log_size();
 
-        wp_send_json_success([
+        $this->send_success([
             'logs' => $logs,
             'size' => $size,
         ]);
@@ -583,18 +575,14 @@ class Deploy_Forge_Admin_Pages
      */
     public function ajax_clear_logs(): void
     {
-        check_ajax_referer('deploy_forge_admin', 'nonce');
-
-        if (!current_user_can('manage_options')) {
-            wp_send_json_error(['message' => __('Unauthorized', 'deploy-forge')]);
-        }
+        $this->verify_ajax_request('deploy_forge_admin');
 
         $result = $this->logger->clear_logs();
 
         if ($result) {
-            wp_send_json_success(['message' => __('Logs cleared successfully', 'deploy-forge')]);
+            $this->send_success(null, __('Logs cleared successfully', 'deploy-forge'));
         } else {
-            wp_send_json_error(['message' => __('Failed to clear logs', 'deploy-forge')]);
+            $this->send_error(__('Failed to clear logs', 'deploy-forge'));
         }
     }
 
@@ -603,19 +591,16 @@ class Deploy_Forge_Admin_Pages
      */
     public function ajax_get_connect_url(): void
     {
-        check_ajax_referer('deploy_forge_admin', 'nonce');
-
-        if (!current_user_can('manage_options')) {
-            wp_send_json_error(['message' => __('Unauthorized', 'deploy-forge')]);
-        }
+        $this->verify_ajax_request('deploy_forge_admin');
 
         $connect_url = $this->app_connector->get_connect_url();
 
         if (is_wp_error($connect_url)) {
-            wp_send_json_error(['message' => $connect_url->get_error_message()]);
+            $this->send_error($connect_url->get_error_message());
+            return;
         }
 
-        wp_send_json_success(['connect_url' => $connect_url]);
+        $this->send_success(['connect_url' => $connect_url]);
     }
 
     /**
@@ -623,18 +608,14 @@ class Deploy_Forge_Admin_Pages
      */
     public function ajax_disconnect_github(): void
     {
-        check_ajax_referer('deploy_forge_admin', 'nonce');
-
-        if (!current_user_can('manage_options')) {
-            wp_send_json_error(['message' => __('Unauthorized', 'deploy-forge')]);
-        }
+        $this->verify_ajax_request('deploy_forge_admin');
 
         $result = $this->app_connector->disconnect();
 
         if ($result) {
-            wp_send_json_success(['message' => __('Disconnected from GitHub successfully', 'deploy-forge')]);
+            $this->send_success(null, __('Disconnected from GitHub successfully', 'deploy-forge'));
         } else {
-            wp_send_json_error(['message' => __('Failed to disconnect', 'deploy-forge')]);
+            $this->send_error(__('Failed to disconnect', 'deploy-forge'));
         }
     }
 
@@ -643,32 +624,28 @@ class Deploy_Forge_Admin_Pages
      */
     public function ajax_get_installation_repos(): void
     {
-        check_ajax_referer('deploy_forge_admin', 'nonce');
-
-        if (!current_user_can('manage_options')) {
-            wp_send_json_error(['message' => __('Unauthorized', 'deploy-forge')]);
-        }
+        $this->verify_ajax_request('deploy_forge_admin');
 
         // Check if already bound
         if ($this->settings->is_repo_bound()) {
-            wp_send_json_error(['message' => __('Repository is already bound. Disconnect to change repository.', 'deploy-forge')]);
+            $this->send_error(__('Repository is already bound. Disconnect to change repository.', 'deploy-forge'));
             return;
         }
 
-        $this->logger->log('Admin', 'Fetching installation repositories');
+        $this->log('Admin', 'Fetching installation repositories');
 
         $result = $this->github_api->get_installation_repositories();
 
-        $this->logger->log('Admin', 'Installation repositories result', [
+        $this->log('Admin', 'Installation repositories result', [
             'success' => $result['success'],
             'repo_count' => isset($result['data']) ? count($result['data']) : 0,
             'message' => $result['message'] ?? 'N/A'
         ]);
 
         if ($result['success']) {
-            wp_send_json_success(['repos' => $result['data']]);
+            $this->send_success(['repos' => $result['data']]);
         } else {
-            wp_send_json_error(['message' => $result['message']]);
+            $this->send_error($result['message']);
         }
     }
 
@@ -677,49 +654,47 @@ class Deploy_Forge_Admin_Pages
      */
     public function ajax_bind_repo(): void
     {
-        check_ajax_referer('deploy_forge_admin', 'nonce');
-
-        if (!current_user_can('manage_options')) {
-            wp_send_json_error(['message' => __('Unauthorized', 'deploy-forge')]);
-        }
+        $this->verify_ajax_request('deploy_forge_admin');
 
         // Check if already bound
         if ($this->settings->is_repo_bound()) {
-            wp_send_json_error(['message' => __('Repository is already bound. Disconnect from GitHub to change repository.', 'deploy-forge')]);
+            $this->send_error(__('Repository is already bound. Disconnect from GitHub to change repository.', 'deploy-forge'));
             return;
         }
 
-        $owner = sanitize_text_field($_POST['owner'] ?? '');
-        $name = sanitize_text_field($_POST['name'] ?? '');
-        $default_branch = sanitize_text_field($_POST['default_branch'] ?? 'main');
+        $owner = $this->get_post_param('owner');
+        $name = $this->get_post_param('name');
+        $default_branch = $this->get_post_param('default_branch', 'main');
 
         if (empty($owner) || empty($name)) {
-            wp_send_json_error(['message' => __('Invalid repository data', 'deploy-forge')]);
+            $this->send_error(__('Invalid repository data', 'deploy-forge'));
             return;
         }
 
         $result = $this->settings->bind_repository($owner, $name, $default_branch);
 
         if ($result) {
-            $this->logger->log('Admin', 'Repository bound', [
+            $this->log('Admin', 'Repository bound', [
                 'repo' => $owner . '/' . $name,
                 'branch' => $default_branch,
             ]);
 
-            wp_send_json_success([
-                'message' => sprintf(
+            $this->send_success(
+                [
+                    'repo' => [
+                        'owner' => $owner,
+                        'name' => $name,
+                        'full_name' => $owner . '/' . $name,
+                        'default_branch' => $default_branch,
+                    ],
+                ],
+                sprintf(
                     __('Repository %s successfully bound. This cannot be changed without disconnecting from GitHub.', 'deploy-forge'),
                     $owner . '/' . $name
-                ),
-                'repo' => [
-                    'owner' => $owner,
-                    'name' => $name,
-                    'full_name' => $owner . '/' . $name,
-                    'default_branch' => $default_branch,
-                ],
-            ]);
+                )
+            );
         } else {
-            wp_send_json_error(['message' => __('Failed to bind repository', 'deploy-forge')]);
+            $this->send_error(__('Failed to bind repository', 'deploy-forge'));
         }
     }
 
@@ -728,23 +703,14 @@ class Deploy_Forge_Admin_Pages
      */
     public function ajax_reset_all_data(): void
     {
-        check_ajax_referer('deploy_forge_admin', 'nonce');
-
-        if (!current_user_can('manage_options')) {
-            wp_send_json_error(['message' => __('Unauthorized', 'deploy-forge')]);
-            return;
-        }
+        $this->verify_ajax_request('deploy_forge_admin');
 
         $result = $this->app_connector->reset_all_data();
 
         if (is_wp_error($result)) {
-            wp_send_json_error([
-                'message' => $result->get_error_message()
-            ]);
+            $this->send_error($result->get_error_message());
         } else {
-            wp_send_json_success([
-                'message' => __('All plugin data has been reset. The page will reload.', 'deploy-forge')
-            ]);
+            $this->send_success(null, __('All plugin data has been reset. The page will reload.', 'deploy-forge'));
         }
     }
 }

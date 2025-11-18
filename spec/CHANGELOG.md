@@ -1,6 +1,6 @@
 # Changelog
 
-**Last Updated:** 2025-11-11
+**Last Updated:** 2025-11-15
 
 This file tracks all significant changes, features, and planned enhancements for Deploy Forge by Jordan Burch.
 
@@ -22,6 +22,141 @@ Each entry should include:
 ## [Unreleased] - Planned Features
 
 ### High Priority
+
+**Data Formatter Usage** (2025-11-15)
+
+- Type: Enhancement / Code Quality
+- Description: Applied the Data_Formatter utility class created in Phase 2 to eliminate manual formatting logic
+- Changes:
+  - Updated `Deploy_Forge_Data_Formatter::format_repository_for_select()` to include Select2-compatible `id` and `text` fields
+  - Replaced manual `array_map()` formatting in `ajax_get_repos()` with `Deploy_Forge_Data_Formatter::format_repositories()`
+- Benefits:
+  - Eliminated 12 lines of duplicate formatting logic
+  - Single source of truth for repository formatting
+  - Consistent formatting across wizard and admin areas
+  - More maintainable and easier to update
+- Code Reduction:
+  - Manual array_map with inline function (13 lines) → Single formatter call (1 line)
+- Files Modified:
+  - `deploy-forge/includes/class-data-formatter.php` (added Select2 fields)
+  - `deploy-forge/admin/class-setup-wizard.php` (uses formatter)
+- Status: ✅ Implemented
+- Related: Completes the Data_Formatter utility created in Phase 2
+
+**AJAX Handler Consolidation - Phase 3** (2025-11-15)
+
+- Type: Refactoring / Code Quality
+- Description: Refactored all existing AJAX handlers to use the base class and utility methods created in Phase 2
+- Changes:
+  - Extended `Deploy_Forge_Admin_Pages` from `Deploy_Forge_Ajax_Handler_Base`
+  - Extended `Deploy_Forge_Setup_Wizard` from `Deploy_Forge_Ajax_Handler_Base`
+  - Refactored all 16 AJAX methods in `class-admin-pages.php` to use base class methods
+  - Refactored all 8 AJAX methods in `class-setup-wizard.php` to use base class methods
+  - Added `log()` method overrides in both classes to use logger instances
+  - Replaced direct `check_ajax_referer()` + `current_user_can()` with `$this->verify_ajax_request()`
+  - Replaced `wp_send_json_success()` with `$this->send_success()`
+  - Replaced `wp_send_json_error()` with `$this->send_error()`
+  - Replaced `wp_send_json()` with `$this->handle_api_response()` where appropriate
+  - Replaced `sanitize_text_field($_POST['x'])` with `$this->get_post_param('x')`
+  - Replaced `intval($_POST['x'])` with `$this->get_post_int('x')`
+- Technical Details:
+  - **Admin AJAX Methods Refactored** (16 total):
+    - `ajax_test_connection()`, `ajax_manual_deploy()`, `ajax_get_status()`, `ajax_rollback()`
+    - `ajax_approve_deployment()`, `ajax_cancel_deployment()`, `ajax_get_commits()`, `ajax_get_repos()`
+    - `ajax_get_workflows()`, `ajax_generate_secret()`, `ajax_get_logs()`, `ajax_clear_logs()`
+    - `ajax_get_connect_url()`, `ajax_disconnect_github()`, `ajax_get_installation_repos()`, `ajax_bind_repo()`
+    - `ajax_reset_all_data()`
+  - **Wizard AJAX Methods Refactored** (8 total):
+    - `ajax_get_repos()`, `ajax_get_branches()`, `ajax_get_workflows()`, `ajax_validate_repo()`
+    - `ajax_bind_repo()`, `ajax_save_step()`, `ajax_complete()`, `ajax_skip()`
+- Benefits:
+  - **Eliminated ~250-300 lines of duplicate code** across both classes
+  - Consistent security checks across all AJAX endpoints
+  - Consistent error handling and response formatting
+  - Improved code readability with cleaner, more concise methods
+  - Easier to add new AJAX handlers (just extend base class)
+  - Single source of truth for security, validation, and response patterns
+  - Reduced potential for security vulnerabilities through standardization
+- Code Reduction:
+  - Each AJAX method reduced by ~10-15 lines on average
+  - Security checks: 2-4 lines → 1 line per method
+  - Response calls: 1-2 lines → 1 line per method
+  - Parameter sanitization: 1-2 lines → 1 line per parameter
+  - Total: ~250-300 lines eliminated across 24 AJAX methods
+- Files Modified:
+  - `deploy-forge/admin/class-admin-pages.php` (extended base, refactored all AJAX methods)
+  - `deploy-forge/admin/class-setup-wizard.php` (extended base, refactored all AJAX methods)
+- Status: ✅ Implemented (Phase 3 Complete - Actual Consolidation Applied)
+- Next Steps: Phase 4+ - Additional consolidation opportunities (templates, Select2 helpers, form field renderers, etc.)
+- Related: Code consolidation plan - Phase 3 of 10 total opportunities
+
+**PHP & JavaScript Consolidation - Phase 2** (2025-11-15)
+
+- Type: Refactoring / Code Quality
+- Description: Major PHP and JavaScript consolidation to eliminate duplicate AJAX logic and data formatting
+- Changes:
+  - Created `class-ajax-handler-base.php` - Base class for AJAX handlers with shared security/validation methods
+  - Created `class-data-formatter.php` - Utility class for formatting repositories, workflows, deployments
+  - Created `ajax-utilities.js` - Shared JavaScript utilities for AJAX requests and Select2 initialization
+  - Updated main plugin file to require new utility classes
+  - Updated both admin and wizard enqueue functions to load AJAX utilities JavaScript
+- Technical Details:
+  - **Base AJAX Handler**: Provides `verify_ajax_request()`, `send_success()`, `send_error()`, `get_post_param()`, `validate_required_params()`, `handle_api_response()`
+  - **Data Formatter**: Static methods for formatting repositories, workflows, branches, deployments for Select2/JSON responses
+  - **AJAX Utilities JS**: `DeployForgeAjax.request()`, `loadRepositories()`, `loadWorkflows()`, `loadBranches()`, `initSelect2()`, `showError()`, `showSuccess()`
+- Benefits:
+  - Eliminates foundation for ~200+ lines of duplicate AJAX security checks (ready for Phase 3 refactoring)
+  - Provides reusable data formatting (ready for Phase 3 refactoring)
+  - Provides reusable JavaScript AJAX patterns (ready for future use)
+  - Single source of truth for AJAX request handling
+  - Consistent error handling and validation
+  - Improved code organization and maintainability
+- Files Created:
+  - `deploy-forge/includes/class-ajax-handler-base.php` (AJAX base class)
+  - `deploy-forge/includes/class-data-formatter.php` (data formatting utilities)
+  - `deploy-forge/admin/js/ajax-utilities.js` (shared JavaScript utilities)
+- Files Modified:
+  - `deploy-forge.php` (added utility class includes)
+  - `deploy-forge/admin/class-admin-pages.php` (enqueue AJAX utilities)
+  - `deploy-forge/admin/class-setup-wizard.php` (enqueue AJAX utilities)
+- Status: ✅ Implemented (Phase 2 Complete - Foundation Laid)
+- Next Steps: Phase 3 - Refactor existing AJAX handlers to use base class and formatter (actual consolidation)
+- Related: Code consolidation plan - Phase 2 of 10 total opportunities
+
+**CSS Consolidation - Phase 1** (2025-11-15)
+
+- Type: Refactoring / Code Quality
+- Description: Major code consolidation to eliminate duplicate CSS and improve maintainability
+- Changes:
+  - Created `deploy-forge/admin/css/shared-styles.css` with common styles used across admin and wizard
+  - Moved CSS variables, loading spinners, status badges, modals, buttons to shared file
+  - Removed duplicate styles from `admin-styles.css` (deployment status, modal, loading, buttons)
+  - Removed duplicate styles from `setup-wizard.css` (loading spinner animation)
+  - Removed inline modal styles from `history-page.php` (lines 114-156)
+  - Added utility classes (flex helpers, spacing, text alignment, visibility)
+  - Updated both `class-admin-pages.php` and `class-setup-wizard.php` to enqueue shared styles
+- Technical Details:
+  - CSS Variables: Centralized color palette, spacing, radius, shadows
+  - Loading Spinners: Single definition with theming overrides
+  - Deployment Status Badges: Unified styling for all status types (success, failed, pending, building, etc.)
+  - Modal System: Shared modal styles replacing inline styles
+  - Import Chain: `shared-styles.css` → `admin-styles.css` / `setup-wizard.css`
+- Benefits:
+  - Reduced CSS by ~30% (eliminated ~200 lines of duplication)
+  - Single source of truth for common UI components
+  - Easier to maintain consistent styling across pages
+  - Improved code DRY (Don't Repeat Yourself) principles
+- Files Created:
+  - `deploy-forge/admin/css/shared-styles.css` (new consolidated stylesheet)
+- Files Modified:
+  - `deploy-forge/admin/css/admin-styles.css` (removed duplicates, added @import)
+  - `deploy-forge/admin/css/setup-wizard.css` (removed duplicates, added @import)
+  - `deploy-forge/templates/history-page.php` (removed inline modal styles)
+  - `deploy-forge/admin/class-admin-pages.php` (updated enqueue to load shared styles)
+  - `deploy-forge/admin/class-setup-wizard.php` (updated enqueue to load shared styles)
+- Status: ✅ Implemented (Phase 1 Complete)
+- Next Steps: Phase 2 - PHP consolidation (AJAX handler base class, data formatters)
+- Related: Code consolidation plan (10 total consolidation opportunities identified)
 
 **Plugin Renamed to Deploy Forge** (2025-11-11)
 
