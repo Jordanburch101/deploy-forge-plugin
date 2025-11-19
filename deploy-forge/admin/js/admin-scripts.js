@@ -986,11 +986,11 @@
       // Auto-refresh status every 30 seconds if on dashboard
       if ($(".deploy-forge-dashboard").length > 0) {
         setInterval(function () {
-          // Check for pending deployments
-          const pendingCount = $(
-            ".deployment-status.status-pending, .deployment-status.status-building"
+          // Check for pending, building, queued, or deploying deployments
+          const activeCount = $(
+            ".deployment-status.status-pending, .deployment-status.status-building, .deployment-status.status-queued, .deployment-status.status-deploying"
           ).length;
-          if (pendingCount > 0) {
+          if (activeCount > 0) {
             // Silently refresh status
             $.ajax({
               url: deployForgeAdmin.ajaxUrl,
@@ -1002,7 +1002,7 @@
               success: function (response) {
                 if (response.success) {
                   // Only reload if status changed
-                  const oldPending = pendingCount;
+                  const oldActive = activeCount;
                   // This is a simplified check - in production, you'd compare actual statuses
                   location.reload();
                 }

@@ -197,8 +197,43 @@ class Deploy_Forge_Database {
         global $wpdb;
 
         return $wpdb->get_results(
-            "SELECT * FROM {$this->table_name} WHERE status IN ('pending', 'building') ORDER BY created_at ASC"
+            "SELECT * FROM {$this->table_name} WHERE status IN ('pending', 'building', 'queued') ORDER BY created_at ASC"
         );
+    }
+
+    /**
+     * Get queued deployments (waiting for async processing)
+     */
+    public function get_queued_deployments(): array {
+        global $wpdb;
+
+        return $wpdb->get_results(
+            "SELECT * FROM {$this->table_name} WHERE status = 'queued' ORDER BY created_at ASC"
+        );
+    }
+
+    /**
+     * Get deployment processing lock status
+     * Returns the deployment ID if locked, false if available
+     */
+    public function get_deployment_lock(): int|false {
+        $lock = get_transient('deploy_forge_processing_lock');
+        return $lock ? (int) $lock : false;
+    }
+
+    /**
+     * Set deployment processing lock
+     * Prevents concurrent deployments
+     */
+    public function set_deployment_lock(int $deployment_id, int $timeout = 300): bool {
+        return set_transient('deploy_forge_processing_lock', $deployment_id, $timeout);
+    }
+
+    /**
+     * Release deployment processing lock
+     */
+    public function release_deployment_lock(): bool {
+        return delete_transient('deploy_forge_processing_lock');
     }
 
     /**
@@ -300,6 +335,8 @@ class Deploy_Forge_Database {
             'failed' => $this->get_deployment_count('failed'),
             'pending' => $this->get_deployment_count('pending'),
             'building' => $this->get_deployment_count('building'),
+            'queued' => $this->get_deployment_count('queued'),
+            'deploying' => $this->get_deployment_count('deploying'),
             'last_deployment' => $this->get_last_successful_deployment(),
         ];
     }

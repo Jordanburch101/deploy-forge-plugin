@@ -392,16 +392,26 @@ class Deploy_Forge_Webhook_Handler
 
         // Update deployment status based on workflow conclusion
         if ($conclusion === 'success') {
-            $this->logger->log('Webhook', "Workflow completed successfully, processing build for deployment #{$deployment->id}");
+            $this->logger->log('Webhook', "Workflow completed successfully, queueing deployment #{$deployment->id}");
 
-            // Workflow succeeded, continue with deployment
-            $deployment_manager->process_successful_build($deployment->id);
+            // Update deployment status to queued
+            $database->update_deployment($deployment->id, [
+                'status' => 'queued',
+                'deployment_logs' => 'Workflow completed successfully. Deployment queued for processing...',
+            ]);
 
-            return new WP_REST_Response([
+            // Send immediate HTTP 200 response to GitHub
+            $response_data = [
                 'success' => true,
-                'message' => __('Workflow completed successfully. Starting deployment...', 'deploy-forge'),
+                'message' => __('Workflow completed successfully. Deployment queued.', 'deploy-forge'),
                 'deployment_id' => $deployment->id,
-            ], 200);
+            ];
+
+            // Try to send early response and process async
+            $this->send_early_response_and_process_async($deployment->id, $response_data);
+
+            // This return is a fallback if send_early_response_and_process_async doesn't terminate
+            return new WP_REST_Response($response_data, 200);
         } else {
             // Workflow failed or was cancelled
             $this->logger->error('Webhook', "Workflow failed for deployment #{$deployment->id}", [
@@ -486,5 +496,58 @@ class Deploy_Forge_Webhook_Handler
         }
 
         do_action('deploy_forge_webhook_received', $event);
+    }
+
+    /**
+     * Send early HTTP response and process deployment asynchronously
+     * This prevents GitHub webhook timeouts by responding immediately
+     *
+     * Uses hybrid approach:
+     * 1. Try fastcgi_finish_request() if available (PHP-FPM)
+     * 2. Fallback to WP-Cron for background processing
+     */
+    private function send_early_response_and_process_async(int $deployment_id, array $response_data): void
+    {
+        $this->logger->log('Webhook', "Attempting async processing for deployment #{$deployment_id}");
+
+        // Check if we can use fastcgi for immediate async processing
+        if (function_exists('fastcgi_finish_request')) {
+            $this->logger->log('Webhook', 'Using fastcgi_finish_request for async processing');
+
+            // Send the HTTP response immediately
+            status_header(200);
+            header('Content-Type: application/json');
+            echo wp_json_encode($response_data);
+
+            // Flush output buffers
+            if (ob_get_level() > 0) {
+                ob_end_flush();
+            }
+            flush();
+
+            // Close connection to client (FastCGI-specific)
+            fastcgi_finish_request();
+
+            // Now we can do heavy work without keeping GitHub waiting
+            // Allow script to run for up to 5 minutes
+            @set_time_limit(300);
+            @ignore_user_abort(true);
+
+            // Process the deployment
+            $this->logger->log('Webhook', "Processing deployment #{$deployment_id} after early response");
+            $this->deployment_manager->process_successful_build($deployment_id);
+
+            // Terminate script
+            exit;
+        } else {
+            // Fallback to WP-Cron
+            $this->logger->log('Webhook', 'fastcgi_finish_request not available, using WP-Cron fallback');
+
+            // Schedule the deployment to be processed by WP-Cron
+            wp_schedule_single_event(time(), 'deploy_forge_process_queued_deployment', [$deployment_id]);
+
+            // Response will be sent normally by WordPress REST API
+            // (The calling function will return WP_REST_Response)
+        }
     }
 }

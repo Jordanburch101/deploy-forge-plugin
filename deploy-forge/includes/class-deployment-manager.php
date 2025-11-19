@@ -377,49 +377,81 @@ class Deploy_Forge_Deployment_Manager
             return;
         }
 
+        // Check deployment lock to prevent concurrent processing
+        $locked_deployment = $this->database->get_deployment_lock();
+        if ($locked_deployment && $locked_deployment !== $deployment_id) {
+            $this->logger->log('Deployment', "Deployment #$deployment_id skipped - another deployment (#$locked_deployment) is processing");
+            // Reschedule for later
+            wp_schedule_single_event(time() + 60, 'deploy_forge_process_queued_deployment', [$deployment_id]);
+            return;
+        }
+
+        // Set lock for this deployment
+        $this->database->set_deployment_lock($deployment_id, 300);
+
+        // Update status from 'queued' to 'deploying'
+        $this->database->update_deployment($deployment_id, [
+            'status' => 'deploying',
+        ]);
+
         $this->logger->log_deployment_step($deployment_id, 'Process Build Success', 'started');
         $this->log_deployment($deployment_id, 'Build completed successfully. Starting deployment...');
 
-        // Get artifacts
-        $this->logger->log_deployment_step($deployment_id, 'Fetch Artifacts', 'started', [
-            'workflow_run_id' => $deployment->workflow_run_id,
-        ]);
+        try {
+            // Get artifacts
+            $this->logger->log_deployment_step($deployment_id, 'Fetch Artifacts', 'started', [
+                'workflow_run_id' => $deployment->workflow_run_id,
+            ]);
 
-        $artifacts_result = $this->github_api->get_workflow_artifacts($deployment->workflow_run_id);
+            $artifacts_result = $this->github_api->get_workflow_artifacts($deployment->workflow_run_id);
 
-        if (!$artifacts_result['success'] || empty($artifacts_result['data'])) {
-            $this->logger->error('Deployment', "Deployment #$deployment_id no artifacts found", $artifacts_result);
+            if (!$artifacts_result['success'] || empty($artifacts_result['data'])) {
+                $this->logger->error('Deployment', "Deployment #$deployment_id no artifacts found", $artifacts_result);
+                $this->database->update_deployment($deployment_id, [
+                    'status' => 'failed',
+                    'error_message' => __('No artifacts found for successful build.', 'deploy-forge'),
+                ]);
+                $this->database->release_deployment_lock();
+                return;
+            }
+
+            // Get first artifact (assuming single artifact)
+            $artifact = $artifacts_result['data'][0];
+
+            // Handle both array and object formats
+            $artifact_name = is_array($artifact) ? ($artifact['name'] ?? 'unknown') : ($artifact->name ?? 'unknown');
+            $artifact_id = is_array($artifact) ? ($artifact['id'] ?? null) : ($artifact->id ?? null);
+
+            $this->logger->log_deployment_step($deployment_id, 'Artifacts Found', 'success', [
+                'artifact_count' => count($artifacts_result['data']),
+                'artifact_name' => $artifact_name,
+                'artifact_id' => $artifact_id,
+            ]);
+
+            if (!$artifact_id) {
+                $this->logger->error('Deployment', "Deployment #$deployment_id artifact has no ID", ['artifact' => $artifact]);
+                $this->database->update_deployment($deployment_id, [
+                    'status' => 'failed',
+                    'error_message' => __('Artifact ID not found.', 'deploy-forge'),
+                ]);
+                $this->database->release_deployment_lock();
+                return;
+            }
+
+            // Download and deploy
+            $this->download_and_deploy($deployment_id, $artifact_id);
+        } catch (Exception $e) {
+            // Catch any exceptions and update deployment status
+            $this->logger->error('Deployment', "Deployment #$deployment_id threw exception", [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
             $this->database->update_deployment($deployment_id, [
                 'status' => 'failed',
-                'error_message' => __('No artifacts found for successful build.', 'deploy-forge'),
+                'error_message' => sprintf(__('Deployment failed: %s', 'deploy-forge'), $e->getMessage()),
             ]);
-            return;
+            $this->database->release_deployment_lock();
         }
-
-        // Get first artifact (assuming single artifact)
-        $artifact = $artifacts_result['data'][0];
-
-        // Handle both array and object formats
-        $artifact_name = is_array($artifact) ? ($artifact['name'] ?? 'unknown') : ($artifact->name ?? 'unknown');
-        $artifact_id = is_array($artifact) ? ($artifact['id'] ?? null) : ($artifact->id ?? null);
-
-        $this->logger->log_deployment_step($deployment_id, 'Artifacts Found', 'success', [
-            'artifact_count' => count($artifacts_result['data']),
-            'artifact_name' => $artifact_name,
-            'artifact_id' => $artifact_id,
-        ]);
-
-        if (!$artifact_id) {
-            $this->logger->error('Deployment', "Deployment #$deployment_id artifact has no ID", ['artifact' => $artifact]);
-            $this->database->update_deployment($deployment_id, [
-                'status' => 'failed',
-                'error_message' => __('Artifact ID not found.', 'deploy-forge'),
-            ]);
-            return;
-        }
-
-        // Download and deploy
-        $this->download_and_deploy($deployment_id, $artifact_id);
     }
 
     /**
@@ -743,6 +775,9 @@ class Deploy_Forge_Deployment_Manager
             'status' => 'success',
             'deployed_at' => current_time('mysql'),
         ]);
+
+        // Release deployment lock
+        $this->database->release_deployment_lock();
 
         $this->logger->log_deployment_step($deployment_id, 'Deployment Complete', 'SUCCESS!');
         $this->log_deployment($deployment_id, 'Deployment completed successfully!');

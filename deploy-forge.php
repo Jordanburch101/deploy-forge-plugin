@@ -135,6 +135,9 @@ class Deploy_Forge {
 
         add_action('plugins_loaded', [$this, 'load_textdomain']);
         add_action('rest_api_init', [$this->webhook_handler, 'register_routes']);
+
+        // Register WP-Cron handler for async deployment processing
+        add_action('deploy_forge_process_queued_deployment', [$this, 'process_queued_deployment']);
     }
 
     /**
@@ -151,7 +154,38 @@ class Deploy_Forge {
     public function deactivate(): void {
         // Clear scheduled cron jobs
         wp_clear_scheduled_hook('deploy_forge_check_build_status');
+        wp_clear_scheduled_hook('deploy_forge_process_queued_deployment');
+
+        // Release any locks
+        $this->database->release_deployment_lock();
+
         flush_rewrite_rules();
+    }
+
+    /**
+     * Process queued deployment (WP-Cron callback)
+     * Called when webhook uses WP-Cron fallback for async processing
+     */
+    public function process_queued_deployment(int $deployment_id): void {
+        // Check if deployment lock exists
+        $locked_deployment = $this->database->get_deployment_lock();
+
+        if ($locked_deployment && $locked_deployment !== $deployment_id) {
+            // Another deployment is currently processing, reschedule this one
+            wp_schedule_single_event(time() + 60, 'deploy_forge_process_queued_deployment', [$deployment_id]);
+            return;
+        }
+
+        // Set lock for this deployment (5 minute timeout)
+        $this->database->set_deployment_lock($deployment_id, 300);
+
+        try {
+            // Process the deployment
+            $this->deployment_manager->process_successful_build($deployment_id);
+        } finally {
+            // Always release the lock when done (or on error)
+            $this->database->release_deployment_lock();
+        }
     }
 
     /**
