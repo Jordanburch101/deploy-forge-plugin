@@ -104,6 +104,9 @@ class Deploy_Forge_Update_Checker {
         // Clear cache when user manually checks for updates
         add_action('load-update-core.php', array($this, 'clear_cache'));
         add_action('load-plugins.php', array($this, 'clear_cache_on_demand'));
+
+        // Enable auto-update support (WordPress 5.5+)
+        add_filter('auto_update_plugin', array($this, 'enable_auto_update_support'), 10, 2);
     }
 
     /**
@@ -427,5 +430,26 @@ class Deploy_Forge_Update_Checker {
     public function manual_check() {
         $this->clear_cache();
         return $this->fetch_update_info();
+    }
+
+    /**
+     * Enable auto-update support for this plugin
+     *
+     * This filter allows WordPress to show the "Enable automatic updates" link
+     * for plugins that handle their own updates (via Update URI header).
+     *
+     * @param bool|null $update Whether to update. Default null.
+     * @param object $item The plugin item to check.
+     * @return bool|null Whether to update or null to use default behavior.
+     */
+    public function enable_auto_update_support($update, $item) {
+        // Only handle our plugin
+        if (isset($item->plugin) && $this->plugin_basename === $item->plugin) {
+            // Return null to allow WordPress to handle auto-update decision
+            // This enables the "Enable auto-updates" link in the admin
+            return $update;
+        }
+
+        return $update;
     }
 }
