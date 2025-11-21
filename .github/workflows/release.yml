@@ -3,11 +3,7 @@ name: Release Plugin
 on:
   push:
     tags:
-      - 'v*.*.*'
-    tags-ignore:
-      - '*-beta'
-      - '*-rc*'
-      - '*-alpha'
+      - 'v[0-9]+.[0-9]+.[0-9]+'
 
 permissions:
   contents: write
