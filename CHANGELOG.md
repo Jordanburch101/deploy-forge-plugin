@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.3] - 2025-11-21
+
+### Added
+- Added `Update URI` header to plugin file for native WordPress update support
+
 ## [0.5.2] - 2025-11-21
 
 ### Added
@@ -67,7 +72,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Secure**: OAuth-based GitHub App authentication
 - **Async Processing**: Non-blocking deployments with progress updates
 
-[Unreleased]: https://github.com/jordanburch101/deploy-forge-client-plugin/compare/v0.5.2...HEAD
+[Unreleased]: https://github.com/jordanburch101/deploy-forge-client-plugin/compare/v0.5.3...HEAD
+[0.5.3]: https://github.com/jordanburch101/deploy-forge-client-plugin/compare/v0.5.2...v0.5.3
 [0.5.2]: https://github.com/jordanburch101/deploy-forge-client-plugin/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/jordanburch101/deploy-forge-client-plugin/releases/tag/v0.5.1
 [1.0.0]: https://github.com/jordanburch101/deploy-forge-client-plugin/releases/tag/v1.0.0
