@@ -1,0 +1,179 @@
+name: Release Plugin
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+    tags-ignore:
+      - '*-beta'
+      - '*-rc*'
+      - '*-alpha'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Validate tag format
+        id: validate
+        run: |
+          TAG=${GITHUB_REF#refs/tags/}
+          echo "Validating tag: $TAG"
+
+          if ! [[ $TAG =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "❌ Error: Tag must match v*.*.* format (e.g., v1.0.0)"
+            echo "   Received: $TAG"
+            exit 1
+          fi
+
+          VERSION=${TAG#v}
+          echo "✅ Valid tag format"
+          echo "   Tag: $TAG"
+          echo "   Version: $VERSION"
+
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+
+      - name: Verify version in plugin file
+        run: |
+          echo "Checking version in deploy-forge.php..."
+          FILE_VERSION=$(grep -oP "Version:\s*\K[0-9]+\.[0-9]+\.[0-9]+" deploy-forge.php)
+          TAG_VERSION="${{ steps.validate.outputs.version }}"
+
+          echo "  Plugin file version: $FILE_VERSION"
+          echo "  Git tag version: $TAG_VERSION"
+
+          if [ "$FILE_VERSION" != "$TAG_VERSION" ]; then
+            echo ""
+            echo "❌ Error: Version mismatch detected!"
+            echo ""
+            echo "  The version in deploy-forge.php ($FILE_VERSION) does not match"
+            echo "  the git tag version ($TAG_VERSION)."
+            echo ""
+            echo "  Please update the version in deploy-forge.php and try again:"
+            echo "  1. Edit deploy-forge.php"
+            echo "  2. Change 'Version: $FILE_VERSION' to 'Version: $TAG_VERSION'"
+            echo "  3. Commit: git commit -am \"Update version to $TAG_VERSION\""
+            echo "  4. Move tag: git tag -f ${{ steps.validate.outputs.tag }}"
+            echo "  5. Push: git push -f origin ${{ steps.validate.outputs.tag }}"
+            echo ""
+            exit 1
+          fi
+
+          echo "✅ Version matches git tag"
+
+      - name: Build plugin ZIP
+        run: |
+          echo "Building plugin ZIP..."
+          chmod +x build-plugin.sh
+
+          # Modify build script to use version from tag instead of hardcoded
+          # Replace the VERSION line in the build script temporarily
+          sed -i "s/VERSION=\".*\"/VERSION=\"${{ steps.validate.outputs.version }}\"/" build-plugin.sh
+
+          ./build-plugin.sh
+
+          echo ""
+          echo "📦 Build output:"
+          ls -lh dist/
+
+      - name: Extract changelog
+        id: changelog
+        run: |
+          VERSION="${{ steps.validate.outputs.version }}"
+          CHANGELOG_FILE="CHANGELOG.md"
+
+          if [ -f "$CHANGELOG_FILE" ]; then
+            echo "Extracting changelog from $CHANGELOG_FILE..."
+
+            # Extract section for this version
+            CHANGELOG=$(sed -n "/## \[$VERSION\]/,/## \[/p" $CHANGELOG_FILE | sed '$ d' || echo "")
+
+            if [ -z "$CHANGELOG" ]; then
+              echo "⚠️  No changelog found for version $VERSION in $CHANGELOG_FILE"
+              CHANGELOG="Release version $VERSION"
+            else
+              echo "✅ Changelog extracted"
+            fi
+          else
+            echo "ℹ️  No CHANGELOG.md found, using default release notes"
+            CHANGELOG="Release version $VERSION"
+          fi
+
+          # Write to output using heredoc to handle multiline
+          {
+            echo "notes<<EOF"
+            echo "$CHANGELOG"
+            echo ""
+            echo "---"
+            echo ""
+            echo "**Installation:**"
+            echo "1. Download \`deploy-forge-$VERSION.zip\`"
+            echo "2. Go to WordPress Admin → Plugins → Add New → Upload Plugin"
+            echo "3. Upload the ZIP file and activate"
+            echo ""
+            echo "**Update Server:** This release will be automatically available to existing installations via the Deploy Forge update server."
+            echo "EOF"
+          } >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: dist/deploy-forge-${{ steps.validate.outputs.version }}.zip
+          body: ${{ steps.changelog.outputs.notes }}
+          draft: false
+          prerelease: false
+          tag_name: ${{ steps.validate.outputs.tag }}
+          name: Version ${{ steps.validate.outputs.version }}
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Invalidate update server cache
+        if: success()
+        continue-on-error: true
+        run: |
+          echo "Notifying update server of new release..."
+
+          # Only attempt if UPDATE_SERVER_URL secret is set
+          if [ -n "${{ secrets.UPDATE_SERVER_URL }}" ]; then
+            curl -X POST \
+              -H "Content-Type: application/json" \
+              -d '{"action":"published","release":{"tag_name":"${{ steps.validate.outputs.tag }}"}}' \
+              ${{ secrets.UPDATE_SERVER_URL }}/api/cache/invalidate \
+              || echo "⚠️  Failed to notify update server (non-fatal)"
+          else
+            echo "ℹ️  UPDATE_SERVER_URL not configured, skipping cache invalidation"
+          fi
+
+      - name: Release Summary
+        if: success()
+        run: |
+          echo ""
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "✅ Release ${{ steps.validate.outputs.tag }} Created Successfully!"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo ""
+          echo "📦 Release Details:"
+          echo "   Version: ${{ steps.validate.outputs.version }}"
+          echo "   Tag: ${{ steps.validate.outputs.tag }}"
+          echo "   ZIP: deploy-forge-${{ steps.validate.outputs.version }}.zip"
+          echo ""
+          echo "🔗 Release URL:"
+          echo "   https://github.com/${{ github.repository }}/releases/tag/${{ steps.validate.outputs.tag }}"
+          echo ""
+          echo "📥 Download URL:"
+          echo "   https://github.com/${{ github.repository }}/releases/download/${{ steps.validate.outputs.tag }}/deploy-forge-${{ steps.validate.outputs.version }}.zip"
+          echo ""
+          echo "✨ Next Steps:"
+          echo "   1. WordPress sites will be notified of the update automatically"
+          echo "   2. Update server will serve this version to authorized sites"
+          echo "   3. Users can update via WordPress admin → Plugins page"
+          echo ""
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"

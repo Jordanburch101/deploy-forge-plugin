@@ -1,0 +1,66 @@
+# Deploy Forge - Distribution Ignore File
+# Files and directories listed here will be excluded from the production ZIP
+
+# Version control
+.git
+.gitignore
+.gitattributes
+
+# GitHub
+.github
+
+# Development tools
+.vscode
+.idea
+.claude
+*.code-workspace
+
+# Build artifacts
+build
+dist
+node_modules
+vendor
+
+# Development files
+.cursorrules
+.intelephense.json
+.stubs
+*.log
+.DS_Store
+
+# Documentation (comment out if you want to include)
+spec
+TESTING-*.md
+ASYNC-*.md
+CLAUDE.md
+
+# Build scripts
+build.sh
+build-simple.sh
+# Note: We keep build-plugin.sh for reference
+
+# Testing
+tests
+phpunit.xml
+phpunit.xml.dist
+.phpunit.result.cache
+
+# CI/CD
+.travis.yml
+.circleci
+.gitlab-ci.yml
+
+# Composer (if not using in production)
+composer.json
+composer.lock
+
+# NPM (if not using in production)
+package.json
+package-lock.json
+yarn.lock
+
+# Misc
+*.map
+*.orig
+*~
+._*
