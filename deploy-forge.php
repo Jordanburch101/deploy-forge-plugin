@@ -71,6 +71,11 @@ class Deploy_Forge {
     public $setup_wizard;
 
     /**
+     * Update Checker instance
+     */
+    public $update_checker;
+
+    /**
      * Get singleton instance
      */
     public static function get_instance(): self {
@@ -100,6 +105,7 @@ class Deploy_Forge {
         require_once DEPLOY_FORGE_PLUGIN_DIR . 'includes/class-deployment-manager.php';
         require_once DEPLOY_FORGE_PLUGIN_DIR . 'includes/class-webhook-handler.php';
         require_once DEPLOY_FORGE_PLUGIN_DIR . 'includes/class-github-app-connector.php';
+        require_once DEPLOY_FORGE_PLUGIN_DIR . 'includes/class-update-checker.php';
 
         // Utility classes
         require_once DEPLOY_FORGE_PLUGIN_DIR . 'includes/class-ajax-handler-base.php';
@@ -124,6 +130,26 @@ class Deploy_Forge {
             $this->admin_pages = new Deploy_Forge_Admin_Pages($this->settings, $this->github_api, $this->deployment_manager, $this->database, $logger, $app_connector);
             $this->setup_wizard = new Deploy_Forge_Setup_Wizard($this->settings, $this->github_api, $this->database, $logger, $app_connector);
         }
+
+        // Initialize update checker
+        $this->init_update_checker();
+    }
+
+    /**
+     * Initialize the plugin update checker
+     */
+    private function init_update_checker(): void {
+        // API key is optional for now (no licensing system yet)
+        // Updates are currently public - no authentication required
+        $api_key = '';
+
+        // Initialize update checker
+        $this->update_checker = new Deploy_Forge_Update_Checker(
+            __FILE__, // Plugin file path
+            DEPLOY_FORGE_VERSION, // Current version
+            'https://updates.getdeployforge.com', // Update server URL
+            $api_key // API key (empty for now - public updates)
+        );
     }
 
     /**
@@ -138,6 +164,11 @@ class Deploy_Forge {
 
         // Register WP-Cron handler for async deployment processing
         add_action('deploy_forge_process_queued_deployment', [$this, 'process_queued_deployment']);
+
+        // Admin notices for update system
+        if (is_admin()) {
+            add_action('admin_notices', [$this, 'update_system_notices']);
+        }
     }
 
     /**
@@ -197,6 +228,14 @@ class Deploy_Forge {
             false,
             dirname(DEPLOY_FORGE_PLUGIN_BASENAME) . '/languages'
         );
+    }
+
+    /**
+     * Display admin notices about update system status
+     */
+    public function update_system_notices(): void {
+        // API key not required for updates currently
+        // This method is kept for future use when licensing is implemented
     }
 }
 
