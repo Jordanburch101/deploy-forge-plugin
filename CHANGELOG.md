@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.31] - 2025-11-23
+
+### Fixed
+- Removed duplicate update notifications in WordPress admin plugin list
+
 ## [0.5.3] - 2025-11-21
 
 ### Added

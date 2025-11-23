@@ -19,7 +19,7 @@ echo ""
 
 # Configuration
 PLUGIN_SLUG="deploy-forge"
-VERSION="0.5.3"
+VERSION="0.5.31"
 BUILD_DIR="build"
 DIST_DIR="dist"
 
