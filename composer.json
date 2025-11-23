@@ -1,0 +1,13 @@
+{
+    "name": "deploy-forge/client-plugin",
+    "description": "Deploy Forge WordPress Plugin",
+    "type": "wordpress-plugin",
+    "require-dev": {
+        "php-stubs/wordpress-stubs": "^6.7"
+    },
+    "config": {
+        "allow-plugins": {
+            "dealerdirect/phpcodesniffer-composer-installer": true
+        }
+    }
+}
