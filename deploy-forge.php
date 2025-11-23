@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Plugin Name: Deploy Forge
  * Plugin URI: https://github.com/jordanburch101/deploy-forge
@@ -29,7 +30,8 @@ define('DEPLOY_FORGE_PLUGIN_BASENAME', plugin_basename(__FILE__));
 /**
  * Main plugin class
  */
-class Deploy_Forge {
+class Deploy_Forge
+{
 
     /**
      * Instance of this class
@@ -79,7 +81,8 @@ class Deploy_Forge {
     /**
      * Get singleton instance
      */
-    public static function get_instance(): self {
+    public static function get_instance(): self
+    {
         if (null === self::$instance) {
             self::$instance = new self();
         }
@@ -89,7 +92,8 @@ class Deploy_Forge {
     /**
      * Constructor
      */
-    private function __construct() {
+    private function __construct()
+    {
         $this->load_dependencies();
         $this->init_hooks();
     }
@@ -97,7 +101,8 @@ class Deploy_Forge {
     /**
      * Load required files
      */
-    private function load_dependencies(): void {
+    private function load_dependencies(): void
+    {
         // Core classes
         require_once DEPLOY_FORGE_PLUGIN_DIR . 'includes/class-database.php';
         require_once DEPLOY_FORGE_PLUGIN_DIR . 'includes/class-settings.php';
@@ -139,7 +144,8 @@ class Deploy_Forge {
     /**
      * Initialize the plugin update checker
      */
-    private function init_update_checker(): void {
+    private function init_update_checker(): void
+    {
         // API key is optional for now (no licensing system yet)
         // Updates are currently public - no authentication required
         $api_key = '';
@@ -156,7 +162,8 @@ class Deploy_Forge {
     /**
      * Initialize WordPress hooks
      */
-    private function init_hooks(): void {
+    private function init_hooks(): void
+    {
         register_activation_hook(__FILE__, [$this, 'activate']);
         register_deactivation_hook(__FILE__, [$this, 'deactivate']);
 
@@ -175,7 +182,8 @@ class Deploy_Forge {
     /**
      * Plugin activation
      */
-    public function activate(): void {
+    public function activate(): void
+    {
         $this->database->create_tables();
         flush_rewrite_rules();
     }
@@ -183,7 +191,8 @@ class Deploy_Forge {
     /**
      * Plugin deactivation
      */
-    public function deactivate(): void {
+    public function deactivate(): void
+    {
         // Clear scheduled cron jobs
         wp_clear_scheduled_hook('deploy_forge_check_build_status');
         wp_clear_scheduled_hook('deploy_forge_process_queued_deployment');
@@ -198,7 +207,8 @@ class Deploy_Forge {
      * Process queued deployment (WP-Cron callback)
      * Called when webhook uses WP-Cron fallback for async processing
      */
-    public function process_queued_deployment(int $deployment_id): void {
+    public function process_queued_deployment(int $deployment_id): void
+    {
         // Check if deployment lock exists
         $locked_deployment = $this->database->get_deployment_lock();
 
@@ -223,7 +233,8 @@ class Deploy_Forge {
     /**
      * Load plugin textdomain
      */
-    public function load_textdomain(): void {
+    public function load_textdomain(): void
+    {
         load_plugin_textdomain(
             'deploy-forge',
             false,
@@ -234,7 +245,8 @@ class Deploy_Forge {
     /**
      * Display admin notices about update system status
      */
-    public function update_system_notices(): void {
+    public function update_system_notices(): void
+    {
         // API key not required for updates currently
         // This method is kept for future use when licensing is implemented
     }
@@ -243,7 +255,8 @@ class Deploy_Forge {
 /**
  * Initialize the plugin
  */
-function deploy_forge(): Deploy_Forge {
+function deploy_forge(): Deploy_Forge
+{
     return Deploy_Forge::get_instance();
 }
 

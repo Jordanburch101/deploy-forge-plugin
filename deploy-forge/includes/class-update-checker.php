@@ -98,9 +98,6 @@ class Deploy_Forge_Update_Checker {
         // Provide plugin information for the update modal
         add_filter('plugins_api', array($this, 'plugin_info'), 10, 3);
 
-        // Modify the plugin row to show update information
-        add_action("after_plugin_row_{$this->plugin_basename}", array($this, 'show_update_notification'), 10, 2);
-
         // Clear cache when user manually checks for updates
         add_action('load-update-core.php', array($this, 'clear_cache'));
         add_action('load-plugins.php', array($this, 'clear_cache_on_demand'));
@@ -309,65 +306,6 @@ class Deploy_Forge_Update_Checker {
         $info->icons = $data->icons ?? array();
 
         return $info;
-    }
-
-    /**
-     * Show update notification in plugin list
-     *
-     * @param string $plugin_file Plugin file path
-     * @param array $plugin_data Plugin data
-     */
-    public function show_update_notification($plugin_file, $plugin_data) {
-        // Only show if update is available
-        $update_cache = get_site_transient('update_plugins');
-        if (empty($update_cache->response[$this->plugin_basename])) {
-            return;
-        }
-
-        $update = $update_cache->response[$this->plugin_basename];
-
-        // Check if user has permission to update plugins
-        if (!current_user_can('update_plugins')) {
-            return;
-        }
-
-        $wp_list_table = _get_list_table('WP_Plugins_List_Table');
-
-        printf(
-            '<tr class="plugin-update-tr%s" id="%s" data-slug="%s" data-plugin="%s">' .
-            '<td colspan="%s" class="plugin-update colspanchange">' .
-            '<div class="update-message notice inline notice-warning notice-alt"><p>',
-            $this->is_active() ? ' active' : '',
-            esc_attr($this->plugin_slug . '-update'),
-            esc_attr($this->plugin_slug),
-            esc_attr($plugin_file),
-            esc_attr($wp_list_table->get_column_count())
-        );
-
-        printf(
-            /* translators: %s: plugin version */
-            __('A new version %s of Deploy Forge is available.', 'deploy-forge'),
-            '<strong>' . esc_html($update->new_version) . '</strong>'
-        );
-
-        printf(
-            ' <a href="%s" class="update-link" aria-label="%s">%s</a>',
-            wp_nonce_url(self_admin_url('update.php?action=upgrade-plugin&plugin=') . $plugin_file, 'upgrade-plugin_' . $plugin_file),
-            /* translators: %s: plugin name */
-            esc_attr(sprintf(__('Update %s now', 'deploy-forge'), $plugin_data['Name'])),
-            __('Update now', 'deploy-forge')
-        );
-
-        echo '</p></div></td></tr>';
-    }
-
-    /**
-     * Check if plugin is active
-     *
-     * @return bool
-     */
-    private function is_active() {
-        return is_plugin_active($this->plugin_basename);
     }
 
     /**
