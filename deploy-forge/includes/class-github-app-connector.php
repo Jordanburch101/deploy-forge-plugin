@@ -25,9 +25,15 @@ class Deploy_Forge_App_Connector
     }
 
     /**
-     * Get the Connect to GitHub URL
+     * Get the Connect to Deploy Forge URL
      * 
-     * @return string|WP_Error The OAuth initiation URL or error
+     * Uses the new /connect page flow:
+     * 1. Plugin calls /api/plugin/connect/init with site_url and return_url
+     * 2. Backend returns redirect URL to /connect page
+     * 3. User authenticates (if needed) and confirms connection
+     * 4. User is redirected back with connection_token
+     * 
+     * @return string|WP_Error The connection initiation URL or error
      */
     public function get_connect_url(): string|WP_Error
     {
@@ -46,16 +52,52 @@ class Deploy_Forge_App_Connector
         // Generate nonce for security
         $nonce = wp_create_nonce('deploy_forge_oauth');
 
-        // Build OAuth initiation URL
-        $connect_url = add_query_arg([
+        // Call the init endpoint to get redirect URL
+        $init_url = $backend_url . '/api/plugin/connect/init';
+
+        $this->logger->log('GitHub_App_Connector', 'Calling connect init endpoint', [
+            'url' => $init_url,
             'site_url' => home_url(),
             'return_url' => $return_url,
-            'nonce' => $nonce,
-        ], $backend_url . '/api/auth/connect');
+        ]);
+
+        $response = wp_remote_post($init_url, [
+            'headers' => ['Content-Type' => 'application/json'],
+            'body' => wp_json_encode([
+                'siteUrl' => home_url(),
+                'returnUrl' => $return_url,
+                'nonce' => $nonce,
+            ]),
+            'timeout' => 15
+        ]);
+
+        if (is_wp_error($response)) {
+            $this->logger->error('GitHub_App_Connector', 'Connect init failed', [
+                'error' => $response->get_error_message()
+            ]);
+            return $response;
+        }
+
+        $body = json_decode(wp_remote_retrieve_body($response), true);
+
+        if (!isset($body['success']) || !$body['success']) {
+            $error_msg = $body['error'] ?? 'Failed to initialize connection';
+            $this->logger->error('GitHub_App_Connector', 'Connect init returned error', [
+                'error' => $error_msg
+            ]);
+            return new WP_Error('connect_init_failed', $error_msg);
+        }
+
+        $connect_url = $body['redirectUrl'] ?? '';
+
+        if (empty($connect_url)) {
+            return new WP_Error('connect_init_failed', 'No redirect URL returned');
+        }
 
         $this->logger->log('GitHub_App_Connector', 'Generated connect URL', [
             'current_page' => $current_page,
             'return_url' => $return_url,
+            'connect_url' => $connect_url,
         ]);
 
         return $connect_url;
@@ -122,9 +164,9 @@ class Deploy_Forge_App_Connector
             return;
         }
 
-        // Exchange connection token for credentials via backend API
-        $backend_url = defined('DEPLOY_FORGE_BACKEND_URL') ? constant('DEPLOY_FORGE_BACKEND_URL') : 'https://deploy-forge.vercel.app';
-        $exchange_url = $backend_url . '/api/auth/exchange-token';
+        // Exchange connection token for credentials via plugin API
+        $backend_url = defined('DEPLOY_FORGE_BACKEND_URL') ? constant('DEPLOY_FORGE_BACKEND_URL') : 'https://deploy-forge-website.vercel.app';
+        $exchange_url = $backend_url . '/api/plugin/auth/exchange-token';
 
         $this->logger->log('GitHub_App_Connector', 'Calling token exchange endpoint', [
             'url' => $exchange_url,
@@ -134,8 +176,7 @@ class Deploy_Forge_App_Connector
         $response = wp_remote_post($exchange_url, [
             'headers' => ['Content-Type' => 'application/json'],
             'body' => wp_json_encode([
-                'connection_token' => $connection_token,
-                'nonce' => $nonce
+                'connectionToken' => $connection_token
             ]),
             'timeout' => 15
         ]);
@@ -178,10 +219,11 @@ class Deploy_Forge_App_Connector
             return;
         }
 
-        // Extract credentials from exchange response
-        $api_key = sanitize_text_field($body['api_key'] ?? '');
-        $webhook_secret = sanitize_text_field($body['webhook_secret'] ?? '');
-        $installation_id = intval($body['installation_id'] ?? 0);
+        // Extract credentials from exchange response (new API format)
+        $api_key = sanitize_text_field($body['apiKey'] ?? '');
+        $webhook_secret = sanitize_text_field($body['webhookSecret'] ?? '');
+        $site_id = sanitize_text_field($body['siteId'] ?? '');
+        $domain = sanitize_text_field($body['domain'] ?? '');
 
         // DEBUG: Log what we received
         $this->logger->log('GitHub_App_Connector', 'Extracted credentials from token exchange', [
@@ -189,14 +231,15 @@ class Deploy_Forge_App_Connector
             'api_key_length' => strlen($api_key ?? ''),
             'has_webhook_secret' => !empty($webhook_secret),
             'webhook_secret_length' => strlen($webhook_secret ?? ''),
-            'installation_id' => $installation_id
+            'site_id' => $site_id,
+            'domain' => $domain
         ]);
 
-        if (empty($api_key) || empty($installation_id)) {
+        if (empty($api_key) || empty($webhook_secret)) {
             $this->logger->error('GitHub_App_Connector', 'Missing credentials in token exchange response');
             add_action('admin_notices', function () {
                 echo '<div class="notice notice-error"><p>' .
-                    esc_html__('Failed to connect to GitHub: Missing credentials.', 'deploy-forge') .
+                    esc_html__('Failed to connect to Deploy Forge: Missing credentials.', 'deploy-forge') .
                     '</p></div>';
             });
             return;
@@ -223,25 +266,23 @@ class Deploy_Forge_App_Connector
             $this->logger->error('GitHub_App_Connector', 'No webhook secret received from backend!');
         }
 
-        // Store GitHub connection data
-        $github_data = [
-            'installation_id' => $installation_id,
+        // Store Deploy Forge connection data
+        $deploy_forge_data = [
+            'site_id' => $site_id,
+            'domain' => $domain,
             'connected_at' => current_time('mysql'),
         ];
 
-        // If repository was selected during installation, DON'T automatically bind it
-        // User must explicitly bind via the UI for security
+        // Store repo info if available from URL params
         if (!empty($repo_owner) && !empty($repo_name)) {
-            $github_data['account_login'] = $repo_owner;
-            // Store the repo info but don't bind it yet
-            // User will see the repo selector and must click "Bind Repository"
+            $deploy_forge_data['account_login'] = $repo_owner;
         }
 
-        $this->settings->set_github_data($github_data);
+        $this->settings->set_github_data($deploy_forge_data);
 
-        $this->logger->log('GitHub_App_Connector', 'OAuth connection successful', [
-            'installation_id' => $installation_id,
-            'repo' => $repo_owner . '/' . $repo_name,
+        $this->logger->log('GitHub_App_Connector', 'Deploy Forge connection successful', [
+            'site_id' => $site_id,
+            'domain' => $domain,
         ]);
 
         // Show success notice
@@ -297,9 +338,9 @@ class Deploy_Forge_App_Connector
 
         $backend_url = defined('DEPLOY_FORGE_BACKEND_URL')
             ? constant('DEPLOY_FORGE_BACKEND_URL')
-            : 'https://deploy-forge.vercel.app';
+            : 'https://deploy-forge-website.vercel.app';
 
-        $disconnect_url = $backend_url . '/api/auth/disconnect';
+        $disconnect_url = $backend_url . '/api/plugin/auth/disconnect';
 
         $this->logger->log('GitHub_App_Connector', 'Notifying backend of disconnect', [
             'url' => $disconnect_url
@@ -406,9 +447,9 @@ class Deploy_Forge_App_Connector
 
         $backend_url = defined('DEPLOY_FORGE_BACKEND_URL')
             ? constant('DEPLOY_FORGE_BACKEND_URL')
-            : 'https://deploy-forge.vercel.app';
+            : 'https://deploy-forge-website.vercel.app';
 
-        $disconnect_url = $backend_url . '/api/auth/disconnect';
+        $disconnect_url = $backend_url . '/api/plugin/auth/disconnect';
 
         $this->logger->log('GitHub_App_Connector', 'RESET: Notifying backend to delete data', [
             'url' => $disconnect_url
@@ -511,12 +552,51 @@ class Deploy_Forge_App_Connector
     /**
      * Get backend URL from constant or use default
      * 
+     * The backend URL points to the Deploy Forge website which hosts the plugin API.
+     * 
      * @return string Backend URL
      */
     private function get_backend_url(): string
     {
         return defined('DEPLOY_FORGE_BACKEND_URL')
             ? constant('DEPLOY_FORGE_BACKEND_URL')
-            : 'https://deploy-forge.vercel.app';
+            : 'https://deploy-forge-website.vercel.app';
+    }
+
+    /**
+     * Verify API connection is still valid
+     * 
+     * @return bool|WP_Error True if connected, WP_Error on failure
+     */
+    public function verify_connection()
+    {
+        $api_key = $this->settings->get_api_key();
+
+        if (empty($api_key)) {
+            return new WP_Error('not_connected', 'Not connected to Deploy Forge');
+        }
+
+        $backend_url = $this->get_backend_url();
+        $verify_url = $backend_url . '/api/plugin/auth/verify';
+
+        $response = wp_remote_post($verify_url, [
+            'headers' => [
+                'Content-Type' => 'application/json',
+                'X-API-Key' => $api_key,
+            ],
+            'timeout' => 15
+        ]);
+
+        if (is_wp_error($response)) {
+            return $response;
+        }
+
+        $body = json_decode(wp_remote_retrieve_body($response), true);
+
+        if (!isset($body['success']) || !$body['success']) {
+            return new WP_Error('verification_failed', $body['error'] ?? 'Connection verification failed');
+        }
+
+        return true;
     }
 }

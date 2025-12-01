@@ -541,6 +541,155 @@ For testing without GitHub API access:
 - Implement mock backend proxy
 - Use test webhook payloads
 
+## Deploy Forge Connection API
+
+The plugin connects to the Deploy Forge website for site management and GitHub webhook routing.
+
+### Base URL
+
+`https://deploy-forge-website.vercel.app/api/plugin`
+
+### Connection Flow
+
+1. User clicks "Connect to Deploy Forge" in plugin setup wizard
+2. Plugin calls `POST /api/plugin/connect/init` with site URL and return URL
+3. API returns redirect URL to Deploy Forge website `/connect` page
+4. User authenticates on Deploy Forge (if needed) and confirms connection
+5. User is redirected back to WordPress with `connection_token` in URL
+6. Plugin calls `POST /api/plugin/auth/exchange-token` to get credentials
+7. Plugin stores `api_key` and `webhook_secret` in settings
+
+### Endpoints Used by Plugin
+
+#### Initialize Connection
+
+```http
+POST /api/plugin/connect/init
+Content-Type: application/json
+
+{
+  "siteUrl": "https://example.com",
+  "returnUrl": "https://example.com/wp-admin/admin.php?page=deploy-forge-settings",
+  "nonce": "abc123def456"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "redirectUrl": "https://deploy-forge-website.vercel.app/connect?site_url=..."
+}
+```
+
+#### Exchange Connection Token
+
+```http
+POST /api/plugin/auth/exchange-token
+Content-Type: application/json
+
+{
+  "connectionToken": "conn_xxxxxxxxxxxxxxxx"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "apiKey": "df_live_xxxxxxxxxxxxxxxx",
+  "webhookSecret": "whsec_xxxxxxxxxxxxxxxx",
+  "siteId": "uuid",
+  "domain": "example.com"
+}
+```
+
+#### Verify Connection
+
+```http
+POST /api/plugin/auth/verify
+X-API-Key: df_live_xxxxxxxxxxxxxxxx
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "siteId": "uuid",
+  "domain": "example.com",
+  "status": "active",
+  "hasLicense": false
+}
+```
+
+#### Disconnect
+
+```http
+POST /api/plugin/auth/disconnect
+X-API-Key: df_live_xxxxxxxxxxxxxxxx
+```
+
+### Webhook Flow
+
+With the new architecture, GitHub webhooks are routed through Deploy Forge:
+
+1. GitHub App sends webhook to `https://deploy-forge-website.vercel.app/api/plugin/webhooks/github`
+2. Deploy Forge verifies signature using GitHub App webhook secret
+3. Deploy Forge finds all connected sites matching the repository
+4. Deploy Forge forwards webhook to each site's REST endpoint
+5. Webhook is signed using the site-specific `webhook_secret`
+
+```
+GitHub --> Deploy Forge Website --> WordPress Site 1
+                               --> WordPress Site 2
+                               --> WordPress Site n
+```
+
+### Plugin Implementation
+
+**File:** `includes/class-github-app-connector.php`
+
+```php
+// Get connection URL (calls /api/plugin/connect/init)
+public function get_connect_url(): string|WP_Error
+
+// Handle OAuth callback (exchanges token for credentials)
+public function handle_oauth_callback(): void
+
+// Verify connection is still valid
+public function verify_connection(): bool|WP_Error
+
+// Disconnect from Deploy Forge
+public function disconnect(): bool
+```
+
+### Credentials Storage
+
+After successful connection, the plugin stores:
+
+- `api_key` - Used in `X-API-Key` header for authenticated requests
+- `webhook_secret` - Used to verify incoming webhooks from Deploy Forge
+- `site_id` - Unique identifier for this site on Deploy Forge
+- `domain` - The connected domain
+
+### Error Handling
+
+All API responses include a `success` boolean:
+
+```json
+// Success
+{ "success": true, "data": {...} }
+
+// Error
+{ "success": false, "error": "Error message" }
+```
+
+Common error codes:
+- `401` - Invalid or missing API key
+- `403` - Site is inactive/revoked
+- `404` - Resource not found
+- `422` - Validation error
+
 ## Future Enhancements
 
 - GraphQL API support (better performance)
@@ -548,3 +697,5 @@ For testing without GitHub API access:
 - IP allowlist for webhooks
 - Custom webhook events
 - API response caching improvements
+- License validation integration
+- Usage analytics

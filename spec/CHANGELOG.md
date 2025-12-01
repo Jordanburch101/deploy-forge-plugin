@@ -1,6 +1,6 @@
 # Changelog
 
-**Last Updated:** 2025-11-15
+**Last Updated:** 2025-12-01
 
 This file tracks all significant changes, features, and planned enhancements for Deploy Forge by Jordan Burch.
 
@@ -21,7 +21,40 @@ Each entry should include:
 
 ## [Unreleased] - Planned Features
 
-### High Priority
+_No unreleased changes_
+
+---
+
+## [0.5.4] - 2025-12-01
+
+### Deploy Forge Website Integration
+
+- Type: Feature / Architecture
+- Description: Updated plugin to connect to the new Deploy Forge website API instead of the standalone backend
+- Changes:
+  - Updated `class-github-app-connector.php` to use new `/api/plugin/*` endpoints
+  - Changed connection flow to use `/connect` page on Deploy Forge website
+  - Token exchange now uses `/api/plugin/auth/exchange-token`
+  - Disconnect uses `/api/plugin/auth/disconnect`
+  - Added `verify_connection()` method for connection health checks
+  - Updated default backend URL to `https://deploy-forge-website.vercel.app`
+- New Connection Flow:
+  1. Plugin calls `/api/plugin/connect/init` to get redirect URL
+  2. User authenticates on Deploy Forge website if needed
+  3. User confirms connection on `/connect` page
+  4. User redirected back with `connection_token`
+  5. Plugin exchanges token for `apiKey` and `webhookSecret`
+- Benefits:
+  - Sites can be connected independently from licenses
+  - Centralized webhook routing through Deploy Forge
+  - Better user management and site tracking
+  - Foundation for future licensing integration
+- Files Modified:
+  - `deploy-forge/includes/class-github-app-connector.php`
+  - `spec/api-integration.md`
+- Related Spec: `spec/api-integration.md` (Deploy Forge Connection API section)
+
+---
 
 **Data Formatter Usage** (2025-11-15)
 
