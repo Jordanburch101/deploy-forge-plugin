@@ -28,7 +28,7 @@ class Deploy_Forge_Connection_Handler
     public function initiate_connection(): array
     {
         $site_url = home_url();
-        $return_url = admin_url('admin.php?page=deploy-forge&action=df_callback');
+        $return_url = admin_url('admin.php?page=deploy-forge-settings&action=df_callback');
         $nonce = wp_generate_password(16, false);
 
         // Store nonce temporarily (5 minutes) for verification
