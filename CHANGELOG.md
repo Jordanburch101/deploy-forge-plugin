@@ -7,6 +7,68 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0] - 2025-12-05
+
+### 🚀 MAJOR RELEASE - Deploy Forge Platform Integration
+
+This release represents a complete architectural shift from direct GitHub integration to a centralized Deploy Forge platform.
+
+### ⚠️ BREAKING CHANGES
+- **Removed Setup Wizard**: Connection now handled entirely by Deploy Forge platform
+- **No Direct GitHub Integration**: Plugin now connects to Deploy Forge platform instead of GitHub directly
+- **Repository Configuration**: Repository selection and GitHub App setup moved to platform
+- **Credentials Structure**: Changed from GitHub token to platform API key + webhook secret
+- **No Backward Compatibility**: Existing installations must reconnect through the platform
+
+### Added
+- **Deploy Forge Platform Integration**: Centralized platform for managing GitHub connections
+- **Connection Handler**: New `Deploy_Forge_Connection_Handler` class for platform communication
+- **Platform API Endpoints**: Integration with Deploy Forge website API
+  - `/api/plugin/connect/init` - Initialize connection
+  - `/api/plugin/auth/exchange-token` - Exchange connection token for credentials
+  - `/api/plugin/auth/verify` - Verify connection status
+  - `/api/plugin/auth/disconnect` - Disconnect from platform
+  - `/api/plugin/github/proxy` - Proxy GitHub API requests
+  - `/api/plugin/github/artifacts/:id/download` - Download artifacts
+  - `/api/plugin/github/clone-token` - Get clone credentials
+- **Simplified Settings UI**: Clean interface with platform-managed configuration
+- **Read-Only Repository Info**: Display repository details configured on platform
+- **Connection Callback Handler**: Seamless return from platform after setup
+
+### Changed
+- **Settings Class**: Refactored credential storage (API key, webhook secret, site ID)
+- **GitHub API Class**: Updated to use Deploy Forge proxy endpoints
+- **Webhook Handler**: Adapted for platform-forwarded webhooks
+- **Admin Pages**: Simplified AJAX handlers for platform connection flow
+- **Settings Template**: Replaced complex UI with simple connect/disconnect buttons
+- **Admin JavaScript**: Updated connection methods for platform integration
+
+### Removed
+- **Setup Wizard**: Entire wizard system (7 template files, CSS, JS)
+- **GitHub App Connector**: `class-github-app-connector.php` (replaced by platform)
+- **Repository Selector**: UI for selecting repositories (now on platform)
+- **Direct OAuth Flow**: No longer handled in plugin
+- **Manual Webhook Configuration**: Automatically managed by platform
+
+### Technical Details
+- **Backend URL**: `https://deploy-forge-website.vercel.app`
+- **API Key Format**: `df_live_[32 hex chars]`
+- **Webhook Secret Format**: `whsec_[32 hex chars]`
+- **Connection Flow**: Plugin → Platform Setup → Callback → Credential Exchange
+- **Lines Changed**: 622 insertions, 4,032 deletions
+
+### Migration Notes
+- No automatic migration path from v0.5.x
+- Users must disconnect existing GitHub integration (if any)
+- Reconnect through new Deploy Forge platform
+- Repository and deployment settings preserved after reconnection
+
+### Developer Notes
+- New connection handler abstracts platform communication
+- Settings class now uses separate options for credentials
+- GitHub API methods remain mostly unchanged (proxy layer updated)
+- Webhook signature verification unchanged (uses platform secret)
+
 ## [0.5.31] - 2025-11-23
 
 ### Fixed
