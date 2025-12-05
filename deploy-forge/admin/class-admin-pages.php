@@ -42,16 +42,13 @@ class Deploy_Forge_Admin_Pages extends Deploy_Forge_Ajax_Handler_Base
         add_action('wp_ajax_deploy_forge_get_commits', [$this, 'ajax_get_commits']);
         add_action('wp_ajax_deploy_forge_get_repos', [$this, 'ajax_get_repos']);
         add_action('wp_ajax_deploy_forge_get_workflows', [$this, 'ajax_get_workflows']);
-        add_action('wp_ajax_deploy_forge_generate_secret', [$this, 'ajax_generate_secret']);
         add_action('wp_ajax_deploy_forge_get_logs', [$this, 'ajax_get_logs']);
         add_action('wp_ajax_deploy_forge_clear_logs', [$this, 'ajax_clear_logs']);
 
-        // GitHub App connection AJAX handlers
-        add_action('wp_ajax_deploy_forge_get_connect_url', [$this, 'ajax_get_connect_url']);
-        add_action('wp_ajax_deploy_forge_disconnect', [$this, 'ajax_disconnect_github']);
-        add_action('wp_ajax_deploy_forge_get_installation_repos', [$this, 'ajax_get_installation_repos']);
-        add_action('wp_ajax_deploy_forge_bind_repo', [$this, 'ajax_bind_repo']);
-        add_action('wp_ajax_deploy_forge_reset_all_data', [$this, 'ajax_reset_all_data']);
+        // Deploy Forge platform connection AJAX handlers
+        add_action('wp_ajax_deploy_forge_connect', [$this, 'ajax_connect']);
+        add_action('wp_ajax_deploy_forge_disconnect', [$this, 'ajax_disconnect']);
+        add_action('wp_ajax_deploy_forge_verify_connection', [$this, 'ajax_verify_connection']);
     }
 
     /**
@@ -197,29 +194,44 @@ class Deploy_Forge_Admin_Pages extends Deploy_Forge_Ajax_Handler_Base
      */
     public function render_settings_page(): void
     {
+        // Handle callback from Deploy Forge
+        if (isset($_GET['action']) && $_GET['action'] === 'df_callback') {
+            $connection_token = $_GET['connection_token'] ?? '';
+            $returned_nonce = $_GET['nonce'] ?? '';
+
+            if (!empty($connection_token) && !empty($returned_nonce)) {
+                $result = $this->connection_handler->handle_callback($connection_token, $returned_nonce);
+
+                if ($result['success']) {
+                    echo '<div class="notice notice-success is-dismissible"><p>' . esc_html($result['message']) . '</p></div>';
+                } else {
+                    echo '<div class="notice notice-error is-dismissible"><p>' . esc_html($result['message']) . '</p></div>';
+                }
+            } else {
+                echo '<div class="notice notice-error is-dismissible"><p>' . esc_html__('Invalid callback parameters.', 'deploy-forge') . '</p></div>';
+            }
+
+            // Remove query params from URL to prevent reprocessing
+            echo '<script>window.history.replaceState({}, "", "' . esc_url(admin_url('admin.php?page=deploy-forge-settings')) . '");</script>';
+        }
+
         // Save settings if form submitted
         if (isset($_POST['deploy_forge_save_settings'])) {
             // Verify nonce
             if (!isset($_POST['_wpnonce']) || !wp_verify_nonce($_POST['_wpnonce'], 'deploy_forge_settings')) {
                 echo '<div class="notice notice-error"><p>' . esc_html__('Security verification failed. Please try again.', 'deploy-forge') . '</p></div>';
             } else {
-                // Get current settings to preserve webhook_secret
-                $current = $this->settings->get_all();
-
                 $settings = [
-                    'github_repo_owner' => $_POST['github_repo_owner'] ?? '',
-                    'github_repo_name' => $_POST['github_repo_name'] ?? '',
-                    'github_branch' => $_POST['github_branch'] ?? 'main',
-                    'github_workflow_name' => $_POST['github_workflow_name'] ?? 'deploy-theme.yml',
-                    'deployment_method' => $_POST['deployment_method'] ?? 'github_actions',
                     'auto_deploy_enabled' => isset($_POST['auto_deploy_enabled']),
                     'require_manual_approval' => isset($_POST['require_manual_approval']),
                     'create_backups' => isset($_POST['create_backups']),
                     'notification_email' => $_POST['notification_email'] ?? '',
-                    // CRITICAL: Preserve webhook_secret from current settings (not editable in form)
-                    'webhook_secret' => $current['webhook_secret'] ?? '',
                     'debug_mode' => isset($_POST['debug_mode']),
                 ];
+
+                // Merge with existing settings to preserve repo info
+                $current = $this->settings->get_all();
+                $settings = array_merge($current, $settings);
 
                 $this->settings->save($settings);
 
@@ -229,8 +241,8 @@ class Deploy_Forge_Admin_Pages extends Deploy_Forge_Ajax_Handler_Base
 
         $current_settings = $this->settings->get_all();
         $webhook_url = $this->settings->get_webhook_url();
-        $is_connected = $this->app_connector->is_connected();
-        $connection_details = $this->app_connector->get_connection_details();
+        $is_connected = $this->settings->is_connected();
+        $connection_data = $this->settings->get_connection_data();
         $settings = $this->settings; // Make settings object available to template
 
         include DEPLOY_FORGE_PLUGIN_DIR . 'templates/settings-page.php';
@@ -587,130 +599,57 @@ class Deploy_Forge_Admin_Pages extends Deploy_Forge_Ajax_Handler_Base
     }
 
     /**
-     * AJAX: Get GitHub App connect URL
+     * AJAX: Initiate connection to Deploy Forge
      */
-    public function ajax_get_connect_url(): void
+    public function ajax_connect(): void
     {
         $this->verify_ajax_request('deploy_forge_admin');
 
-        $connect_url = $this->app_connector->get_connect_url();
-
-        if (is_wp_error($connect_url)) {
-            $this->send_error($connect_url->get_error_message());
-            return;
-        }
-
-        $this->send_success(['connect_url' => $connect_url]);
-    }
-
-    /**
-     * AJAX: Disconnect from GitHub
-     */
-    public function ajax_disconnect_github(): void
-    {
-        $this->verify_ajax_request('deploy_forge_admin');
-
-        $result = $this->app_connector->disconnect();
-
-        if ($result) {
-            $this->send_success(null, __('Disconnected from GitHub successfully', 'deploy-forge'));
-        } else {
-            $this->send_error(__('Failed to disconnect', 'deploy-forge'));
-        }
-    }
-
-    /**
-     * AJAX: Get installation repositories (repos accessible by GitHub App)
-     */
-    public function ajax_get_installation_repos(): void
-    {
-        $this->verify_ajax_request('deploy_forge_admin');
-
-        // Check if already bound
-        if ($this->settings->is_repo_bound()) {
-            $this->send_error(__('Repository is already bound. Disconnect to change repository.', 'deploy-forge'));
-            return;
-        }
-
-        $this->log('Admin', 'Fetching installation repositories');
-
-        $result = $this->github_api->get_installation_repositories();
-
-        $this->log('Admin', 'Installation repositories result', [
-            'success' => $result['success'],
-            'repo_count' => isset($result['data']) ? count($result['data']) : 0,
-            'message' => $result['message'] ?? 'N/A'
-        ]);
+        $result = $this->connection_handler->initiate_connection();
 
         if ($result['success']) {
-            $this->send_success(['repos' => $result['data']]);
+            $this->send_success([
+                'redirect_url' => $result['redirect_url'],
+            ], __('Redirecting to Deploy Forge...', 'deploy-forge'));
         } else {
             $this->send_error($result['message']);
         }
     }
 
     /**
-     * AJAX: Bind repository (one-time selection, cannot be changed without reconnecting)
+     * AJAX: Disconnect from Deploy Forge
      */
-    public function ajax_bind_repo(): void
+    public function ajax_disconnect(): void
     {
         $this->verify_ajax_request('deploy_forge_admin');
 
-        // Check if already bound
-        if ($this->settings->is_repo_bound()) {
-            $this->send_error(__('Repository is already bound. Disconnect from GitHub to change repository.', 'deploy-forge'));
-            return;
-        }
+        $result = $this->connection_handler->disconnect();
 
-        $owner = $this->get_post_param('owner');
-        $name = $this->get_post_param('name');
-        $default_branch = $this->get_post_param('default_branch', 'main');
-
-        if (empty($owner) || empty($name)) {
-            $this->send_error(__('Invalid repository data', 'deploy-forge'));
-            return;
-        }
-
-        $result = $this->settings->bind_repository($owner, $name, $default_branch);
-
-        if ($result) {
-            $this->log('Admin', 'Repository bound', [
-                'repo' => $owner . '/' . $name,
-                'branch' => $default_branch,
-            ]);
-
-            $this->send_success(
-                [
-                    'repo' => [
-                        'owner' => $owner,
-                        'name' => $name,
-                        'full_name' => $owner . '/' . $name,
-                        'default_branch' => $default_branch,
-                    ],
-                ],
-                sprintf(
-                    __('Repository %s successfully bound. This cannot be changed without disconnecting from GitHub.', 'deploy-forge'),
-                    $owner . '/' . $name
-                )
-            );
+        if ($result['success']) {
+            $this->send_success(null, $result['message']);
         } else {
-            $this->send_error(__('Failed to bind repository', 'deploy-forge'));
+            $this->send_error($result['message']);
         }
     }
 
     /**
-     * AJAX: Reset all plugin data (DANGER!)
+     * AJAX: Verify Deploy Forge connection
      */
-    public function ajax_reset_all_data(): void
+    public function ajax_verify_connection(): void
     {
         $this->verify_ajax_request('deploy_forge_admin');
 
-        $result = $this->app_connector->reset_all_data();
+        $result = $this->connection_handler->verify_connection();
 
-        if (is_wp_error($result)) {
-            $this->send_error($result->get_error_message());
+        if ($result['success']) {
+            $this->send_success([
+                'connected' => $result['connected'],
+                'site_id' => $result['site_id'] ?? '',
+                'domain' => $result['domain'] ?? '',
+                'status' => $result['status'] ?? 'active',
+            ]);
         } else {
-            $this->send_success(null, __('All plugin data has been reset. The page will reload.', 'deploy-forge'));
+            $this->send_error($result['message']);
         }
     }
 }
