@@ -13,13 +13,9 @@
     },
 
     bindEvents: function () {
-      // GitHub App connection
-      $("#connect-github-btn").on("click", this.connectGitHub.bind(this));
-      $("#disconnect-github-btn").on("click", this.disconnectGitHub.bind(this));
-
-      // Repository binding
-      $("#repo-select").on("change", this.onRepoSelectChange.bind(this));
-      $("#bind-repo-btn").on("click", this.bindRepository.bind(this));
+      // Deploy Forge connection
+      $("#connect-btn").on("click", this.connectToDeployForge.bind(this));
+      $("#disconnect-btn").on("click", this.disconnectFromDeployForge.bind(this));
 
       // Workflow loading
       $("#load-workflows-btn").on("click", this.loadWorkflows.bind(this));
@@ -63,15 +59,7 @@
         }
       });
 
-      // Load installation repos if repo selector is present
-      if ($("#repo-selector-section").length) {
-        console.log("Repo selector found, loading installation repos...");
-        this.loadInstallationRepos();
-      } else {
-        console.log("Repo selector section not found on page");
-      }
-
-      // Show workflow button if repo is bound (after page load)
+      // Show workflow button if repo is configured (after page load)
       this.checkWorkflowButtonVisibility();
 
       // Handle deployment method change
@@ -134,7 +122,7 @@
       });
     },
 
-    connectGitHub: function (e) {
+    connectToDeployForge: function (e) {
       e.preventDefault();
 
       const button = $(e.target).closest("button");
@@ -147,15 +135,15 @@
         url: deployForgeAdmin.ajaxUrl,
         method: "POST",
         data: {
-          action: "deploy_forge_get_connect_url",
+          action: "deploy_forge_connect",
           nonce: deployForgeAdmin.nonce,
         },
         success: function (response) {
-          if (response.success && response.data.connect_url) {
-            // Redirect to OAuth flow
-            window.location.href = response.data.connect_url;
+          if (response.success && response.data.redirect_url) {
+            // Redirect to Deploy Forge platform
+            window.location.href = response.data.redirect_url;
           } else {
-            alert(response.data?.message || "Failed to get connection URL");
+            alert(response.data?.message || "Failed to initiate connection");
             button.prop("disabled", false);
             spinner.removeClass("is-active");
           }
@@ -168,12 +156,12 @@
       });
     },
 
-    disconnectGitHub: function (e) {
+    disconnectFromDeployForge: function (e) {
       e.preventDefault();
 
       if (
         !confirm(
-          "Are you sure you want to disconnect from GitHub? You will need to reconnect to continue using automatic deployments."
+          "Are you sure you want to disconnect from Deploy Forge? You will need to reconnect to continue using automatic deployments."
         )
       ) {
         return;
