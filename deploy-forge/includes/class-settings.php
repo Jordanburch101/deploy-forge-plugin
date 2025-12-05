@@ -2,7 +2,7 @@
 
 /**
  * Settings management class
- * Handles plugin options and encrypted token storage
+ * Handles plugin options and Deploy Forge API credentials
  */
 
 if (!defined('ABSPATH')) {
@@ -14,7 +14,11 @@ class Deploy_Forge_Settings
 
     private const OPTION_NAME = 'deploy_forge_settings';
     private const API_KEY_OPTION = 'deploy_forge_api_key';
-    private const GITHUB_DATA_OPTION = 'deploy_forge_github_data';
+    private const WEBHOOK_SECRET_OPTION = 'deploy_forge_webhook_secret';
+    private const SITE_ID_OPTION = 'deploy_forge_site_id';
+    private const CONNECTION_DATA_OPTION = 'deploy_forge_connection_data';
+    private const BACKEND_URL = 'https://deploy-forge-website.vercel.app';
+
     private array $settings;
 
     public function __construct()
@@ -37,7 +41,6 @@ class Deploy_Forge_Settings
             'require_manual_approval' => false,
             'create_backups' => true,
             'notification_email' => get_option('admin_email'),
-            'webhook_secret' => '',
             'debug_mode' => false,
         ];
 
@@ -49,13 +52,6 @@ class Deploy_Forge_Settings
      */
     public function get(string $key, $default = null)
     {
-        // CRITICAL FIX: For webhook_secret, always read fresh from database
-        // This ensures we get the latest value even if it was updated after this instance was created
-        if ($key === 'webhook_secret') {
-            $fresh_settings = get_option(self::OPTION_NAME, []);
-            return $fresh_settings['webhook_secret'] ?? $default;
-        }
-
         return $this->settings[$key] ?? $default;
     }
 
@@ -85,8 +81,6 @@ class Deploy_Forge_Settings
             'require_manual_approval' => (bool) ($settings['require_manual_approval'] ?? false),
             'create_backups' => (bool) ($settings['create_backups'] ?? true),
             'notification_email' => sanitize_email($settings['notification_email'] ?? get_option('admin_email')),
-            // Webhook secret is a hex string - only allow a-f0-9
-            'webhook_secret' => preg_replace('/[^a-f0-9]/i', '', $settings['webhook_secret'] ?? ''),
             'debug_mode' => (bool) ($settings['debug_mode'] ?? false),
         ];
 
@@ -107,8 +101,6 @@ class Deploy_Forge_Settings
         $this->settings[$key] = $value;
         $result = update_option(self::OPTION_NAME, $this->settings);
 
-        // CRITICAL: Reload settings from database to ensure in-memory cache is fresh
-        // This is necessary because other instances of this class may have stale cached data
         if ($result) {
             $this->load_settings();
         }
@@ -117,7 +109,7 @@ class Deploy_Forge_Settings
     }
 
     /**
-     * Get GitHub API key (for backend communication)
+     * Get Deploy Forge API key
      */
     public function get_api_key(): string
     {
@@ -125,7 +117,7 @@ class Deploy_Forge_Settings
     }
 
     /**
-     * Set GitHub API key
+     * Set Deploy Forge API key
      */
     public function set_api_key(string $api_key): bool
     {
@@ -133,226 +125,174 @@ class Deploy_Forge_Settings
             return delete_option(self::API_KEY_OPTION);
         }
 
+        // Validate API key format (df_live_XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX)
+        if (!preg_match('/^df_live_[a-f0-9]{32}$/i', $api_key)) {
+            return false;
+        }
+
         return update_option(self::API_KEY_OPTION, $api_key);
     }
 
     /**
-     * Get GitHub connection data
+     * Get webhook secret
      */
-    public function get_github_data(): array
+    public function get_webhook_secret(): string
+    {
+        return get_option(self::WEBHOOK_SECRET_OPTION, '');
+    }
+
+    /**
+     * Set webhook secret
+     */
+    public function set_webhook_secret(string $secret): bool
+    {
+        if (empty($secret)) {
+            return delete_option(self::WEBHOOK_SECRET_OPTION);
+        }
+
+        // Validate webhook secret format (whsec_XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX)
+        if (!preg_match('/^whsec_[a-f0-9]{32}$/i', $secret)) {
+            return false;
+        }
+
+        return update_option(self::WEBHOOK_SECRET_OPTION, $secret);
+    }
+
+    /**
+     * Get site ID
+     */
+    public function get_site_id(): string
+    {
+        return get_option(self::SITE_ID_OPTION, '');
+    }
+
+    /**
+     * Set site ID
+     */
+    public function set_site_id(string $site_id): bool
+    {
+        if (empty($site_id)) {
+            return delete_option(self::SITE_ID_OPTION);
+        }
+
+        return update_option(self::SITE_ID_OPTION, $site_id);
+    }
+
+    /**
+     * Get connection data (repo info, installation ID, etc.)
+     */
+    public function get_connection_data(): array
     {
         $defaults = [
-            'installation_id' => 0,
-            'account_login' => '',
-            'account_type' => '',
-            'account_avatar' => '',
-            'selected_repo_id' => 0,
-            'selected_repo_name' => '',
-            'selected_repo_full_name' => '',
-            'selected_repo_default_branch' => '',
+            'installation_id' => '',
+            'repo_owner' => '',
+            'repo_name' => '',
+            'repo_branch' => 'main',
+            'deployment_method' => 'github_actions',
+            'workflow_path' => '',
             'connected_at' => '',
+            'domain' => '',
         ];
 
-        return wp_parse_args(get_option(self::GITHUB_DATA_OPTION, []), $defaults);
+        return wp_parse_args(get_option(self::CONNECTION_DATA_OPTION, []), $defaults);
     }
 
     /**
-     * Set GitHub connection data
+     * Set connection data
      */
-    public function set_github_data(array $data): bool
+    public function set_connection_data(array $data): bool
     {
-        return update_option(self::GITHUB_DATA_OPTION, $data);
-    }
+        $sanitized = [
+            'installation_id' => sanitize_text_field($data['installation_id'] ?? ''),
+            'repo_owner' => sanitize_text_field($data['repo_owner'] ?? ''),
+            'repo_name' => sanitize_text_field($data['repo_name'] ?? ''),
+            'repo_branch' => sanitize_text_field($data['repo_branch'] ?? 'main'),
+            'deployment_method' => sanitize_text_field($data['deployment_method'] ?? 'github_actions'),
+            'workflow_path' => sanitize_text_field($data['workflow_path'] ?? ''),
+            'connected_at' => sanitize_text_field($data['connected_at'] ?? current_time('mysql')),
+            'domain' => sanitize_text_field($data['domain'] ?? ''),
+        ];
 
-    /**
-     * Check if GitHub is connected
-     */
-    public function is_github_connected(): bool
-    {
-        return !empty($this->get_api_key()) && !empty($this->get_github_data()['installation_id']);
-    }
-
-    /**
-     * Check if repository is bound (locked to a specific repo)
-     */
-    public function is_repo_bound(): bool
-    {
-        $github_data = $this->get_github_data();
-        return !empty($github_data['repo_bound']) && $github_data['repo_bound'] === true;
-    }
-
-    /**
-     * Bind repository (lock it so it cannot be changed without reconnecting GitHub)
-     *
-     * @param string $owner Repository owner
-     * @param string $name Repository name
-     * @param string $default_branch Repository default branch
-     * @return bool Success
-     */
-    public function bind_repository(string $owner, string $name, string $default_branch): bool
-    {
-        // Get current GitHub data
-        $github_data = $this->get_github_data();
-
-        // Check if already bound to prevent re-binding
-        if ($this->is_repo_bound()) {
-            return false;
-        }
-
-        // Update GitHub data with bound repo info
-        $github_data['repo_bound'] = true;
-        $github_data['selected_repo_name'] = $name;
-        $github_data['selected_repo_full_name'] = $owner . '/' . $name;
-        $github_data['selected_repo_default_branch'] = $default_branch;
-        $github_data['account_login'] = $owner;
-        $github_data['bound_at'] = current_time('mysql');
-
-        // CRITICAL: Reload settings from database FIRST to ensure we have latest values
-        // This prevents overwriting values (like webhook_secret) that may have been set recently
-        $this->load_settings();
-
-        // Update plugin settings with repo info
+        // Also update settings with repo info for backward compatibility
         $current_settings = $this->get_all();
-        $current_settings['github_repo_owner'] = $owner;
-        $current_settings['github_repo_name'] = $name;
-        $current_settings['github_branch'] = $default_branch;
+        $current_settings['github_repo_owner'] = $sanitized['repo_owner'];
+        $current_settings['github_repo_name'] = $sanitized['repo_name'];
+        $current_settings['github_branch'] = $sanitized['repo_branch'];
+        $current_settings['deployment_method'] = $sanitized['deployment_method'];
+        $current_settings['github_workflow_name'] = basename($sanitized['workflow_path']);
+        $this->save($current_settings);
 
-        // Save both GitHub data and settings locally
-        $saved = $this->set_github_data($github_data) && $this->save($current_settings);
-
-        if (!$saved) {
-            return false;
-        }
-
-        // Notify backend about repository binding
-        $this->notify_backend_repo_binding($owner . '/' . $name, $name, $default_branch);
-
-        return true;
+        return update_option(self::CONNECTION_DATA_OPTION, $sanitized);
     }
 
     /**
-     * Notify backend about repository binding
-     *
-     * @param string $repo_full_name Full repository name (owner/repo)
-     * @param string $repo_name Repository name
-     * @param string $default_branch Default branch
+     * Check if connected to Deploy Forge
      */
-    private function notify_backend_repo_binding(string $repo_full_name, string $repo_name, string $default_branch): void
+    public function is_connected(): bool
+    {
+        return !empty($this->get_api_key())
+            && !empty($this->get_webhook_secret())
+            && !empty($this->get_site_id());
+    }
+
+    /**
+     * Check if repository is configured
+     */
+    public function is_repo_configured(): bool
+    {
+        $data = $this->get_connection_data();
+        return !empty($data['repo_owner']) && !empty($data['repo_name']);
+    }
+
+    /**
+     * Disconnect from Deploy Forge
+     * Calls the API to disconnect and clears local credentials
+     */
+    public function disconnect(): bool
     {
         $api_key = $this->get_api_key();
 
-        if (empty($api_key)) {
-            return;
-        }
+        // Call API to disconnect if we have an API key
+        if (!empty($api_key)) {
+            $response = wp_remote_post(self::BACKEND_URL . '/api/plugin/auth/disconnect', [
+                'headers' => [
+                    'Content-Type' => 'application/json',
+                    'X-API-Key' => $api_key,
+                ],
+                'timeout' => 15,
+            ]);
 
-        $backend_url = defined('DEPLOY_FORGE_BACKEND_URL')
-            ? constant('DEPLOY_FORGE_BACKEND_URL')
-            : 'https://deploy-forge.vercel.app';
-
-        $response = wp_remote_post($backend_url . '/api/repo/bind', [
-            'headers' => [
-                'Content-Type' => 'application/json',
-                'X-API-Key' => $api_key,
-            ],
-            'body' => wp_json_encode([
-                'repo_full_name' => $repo_full_name,
-                'repo_name' => $repo_name,
-                'default_branch' => $default_branch,
-            ]),
-            'timeout' => 15,
-        ]);
-
-        // Log the response (non-blocking, just for debugging)
-        if (is_wp_error($response)) {
-            error_log('Deploy Forge: Failed to notify backend about repo binding - ' . $response->get_error_message());
-        } else {
-            $status_code = wp_remote_retrieve_response_code($response);
-            if ($status_code !== 200) {
-                $body = wp_remote_retrieve_body($response);
-                error_log('Deploy Forge: Backend repo binding failed - Status: ' . $status_code . ', Body: ' . $body);
+            // Log any errors but don't fail the disconnect
+            if (is_wp_error($response)) {
+                error_log('Deploy Forge: Disconnect API error - ' . $response->get_error_message());
             }
         }
-    }
 
-    /**
-     * Disconnect from GitHub (remove API key and installation data)
-     */
-    public function disconnect_github(): bool
-    {
+        // Clear all stored credentials and data
         delete_option(self::API_KEY_OPTION);
-        delete_option(self::GITHUB_DATA_OPTION);
+        delete_option(self::WEBHOOK_SECRET_OPTION);
+        delete_option(self::SITE_ID_OPTION);
+        delete_option(self::CONNECTION_DATA_OPTION);
 
-        // Clear repo settings too
+        // Clear repo settings
         $current_settings = $this->get_all();
         $current_settings['github_repo_owner'] = '';
         $current_settings['github_repo_name'] = '';
         $current_settings['github_branch'] = 'main';
+        $current_settings['github_workflow_name'] = 'deploy-theme.yml';
         $this->save($current_settings);
 
         return true;
     }
 
     /**
-     * Reset all plugin settings (for complete reset)
+     * Get Deploy Forge backend URL
      */
-    public function reset_all_settings(): bool
+    public function get_backend_url(): string
     {
-        // Delete all options
-        delete_option(self::OPTION_NAME);
-        delete_option(self::API_KEY_OPTION);
-        delete_option(self::GITHUB_DATA_OPTION);
-        delete_option('deploy_forge_db_version');
-
-        // Reload settings from defaults after reset
-        $this->load_settings();
-
-        return true;
-    }
-
-    /**
-     * Validate settings
-     */
-    public function validate(): array
-    {
-        $errors = [];
-
-        if (empty($this->get('github_repo_owner'))) {
-            $errors[] = __('GitHub repository owner is required.', 'deploy-forge');
-        }
-
-        if (empty($this->get('github_repo_name'))) {
-            $errors[] = __('GitHub repository name is required.', 'deploy-forge');
-        }
-
-        if (empty($this->get('github_branch'))) {
-            $errors[] = __('GitHub branch is required.', 'deploy-forge');
-        }
-
-        if (!$this->is_github_connected()) {
-            $errors[] = __('GitHub connection is required. Please connect your GitHub account.', 'deploy-forge');
-        }
-
-        // Validate theme directory exists (uses repo name)
-        $theme_path = $this->get_theme_path();
-        if (!empty($this->get('github_repo_name')) && !is_dir($theme_path)) {
-            $errors[] = sprintf(
-                __('Theme directory does not exist: %s', 'deploy-forge'),
-                $theme_path
-            );
-        }
-
-        return $errors;
-    }
-
-    /**
-     * Check if settings are configured
-     */
-    public function is_configured(): bool
-    {
-        return !empty($this->get('github_repo_owner'))
-            && !empty($this->get('github_repo_name'))
-            && !empty($this->get('github_branch'))
-            && $this->is_github_connected();
+        return defined('DEPLOY_FORGE_BACKEND_URL')
+            ? constant('DEPLOY_FORGE_BACKEND_URL')
+            : self::BACKEND_URL;
     }
 
     /**
@@ -360,6 +300,12 @@ class Deploy_Forge_Settings
      */
     public function get_repo_full_name(): string
     {
+        $data = $this->get_connection_data();
+        if (!empty($data['repo_owner']) && !empty($data['repo_name'])) {
+            return $data['repo_owner'] . '/' . $data['repo_name'];
+        }
+
+        // Fallback to settings for backward compatibility
         return $this->get('github_repo_owner') . '/' . $this->get('github_repo_name');
     }
 
@@ -368,7 +314,8 @@ class Deploy_Forge_Settings
      */
     public function get_theme_path(): string
     {
-        $repo_name = $this->get('github_repo_name');
+        $data = $this->get_connection_data();
+        $repo_name = !empty($data['repo_name']) ? $data['repo_name'] : $this->get('github_repo_name');
         return WP_CONTENT_DIR . '/themes/' . $repo_name;
     }
 
@@ -388,20 +335,120 @@ class Deploy_Forge_Settings
     }
 
     /**
-     * Generate webhook secret
-     */
-    public function generate_webhook_secret(): string
-    {
-        $secret = wp_generate_password(32, false);
-        $this->update('webhook_secret', $secret);
-        return $secret;
-    }
-
-    /**
      * Get webhook URL
      */
     public function get_webhook_url(): string
     {
         return rest_url('deploy-forge/v1/webhook');
+    }
+
+    /**
+     * Validate settings
+     */
+    public function validate(): array
+    {
+        $errors = [];
+
+        if (!$this->is_connected()) {
+            $errors[] = __('Not connected to Deploy Forge. Please connect your site.', 'deploy-forge');
+        }
+
+        if (!$this->is_repo_configured()) {
+            $errors[] = __('Repository not configured. Please reconnect to configure your repository.', 'deploy-forge');
+        }
+
+        // Validate theme directory exists
+        $theme_path = $this->get_theme_path();
+        $repo_name = $this->get_connection_data()['repo_name'] ?? $this->get('github_repo_name');
+        if (!empty($repo_name) && !is_dir($theme_path)) {
+            $errors[] = sprintf(
+                __('Theme directory does not exist: %s', 'deploy-forge'),
+                $theme_path
+            );
+        }
+
+        return $errors;
+    }
+
+    /**
+     * Check if settings are configured
+     */
+    public function is_configured(): bool
+    {
+        return $this->is_connected() && $this->is_repo_configured();
+    }
+
+    /**
+     * Reset all plugin settings (for complete reset)
+     */
+    public function reset_all_settings(): bool
+    {
+        // Delete all options
+        delete_option(self::OPTION_NAME);
+        delete_option(self::API_KEY_OPTION);
+        delete_option(self::WEBHOOK_SECRET_OPTION);
+        delete_option(self::SITE_ID_OPTION);
+        delete_option(self::CONNECTION_DATA_OPTION);
+        delete_option('deploy_forge_db_version');
+
+        // Reload settings from defaults after reset
+        $this->load_settings();
+
+        return true;
+    }
+
+    /**
+     * Legacy method for backward compatibility
+     * @deprecated Use get_webhook_secret() instead
+     */
+    public function generate_webhook_secret(): string
+    {
+        // This is now handled by Deploy Forge platform
+        return $this->get_webhook_secret();
+    }
+
+    /**
+     * Legacy method for backward compatibility
+     * @deprecated Use is_connected() instead
+     */
+    public function is_github_connected(): bool
+    {
+        return $this->is_connected();
+    }
+
+    /**
+     * Legacy method for backward compatibility
+     * @deprecated No longer used - repo binding handled by platform
+     */
+    public function is_repo_bound(): bool
+    {
+        return $this->is_repo_configured();
+    }
+
+    /**
+     * Legacy method for backward compatibility
+     * @deprecated No longer used - GitHub data structure changed
+     */
+    public function get_github_data(): array
+    {
+        return $this->get_connection_data();
+    }
+
+    /**
+     * Legacy method for backward compatibility
+     * @deprecated No longer used - GitHub data structure changed
+     */
+    public function set_github_data(array $data): bool
+    {
+        return $this->set_connection_data($data);
+    }
+
+    /**
+     * Legacy method for backward compatibility
+     * @deprecated Use disconnect() instead
+     */
+    public function disconnect_github(): bool
+    {
+        return $this->disconnect();
     }
 }

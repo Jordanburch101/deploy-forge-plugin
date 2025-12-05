@@ -3,8 +3,8 @@
 /**
  * Plugin Name: Deploy Forge
  * Plugin URI: https://github.com/jordanburch101/deploy-forge
- * Description: Automates theme deployment from GitHub repositories using GitHub Actions
- * Version: 0.5.4
+ * Description: Automates theme deployment from GitHub repositories via Deploy Forge platform
+ * Version: 1.0.0
  * Author: Jordan Burch
  * Author URI: https://jordanburch.dev
  * License: GPL v2 or later
@@ -22,7 +22,7 @@ if (!defined('ABSPATH')) {
 }
 
 // Define plugin constants
-define('DEPLOY_FORGE_VERSION', '0.5.4');
+define('DEPLOY_FORGE_VERSION', '1.0.0');
 define('DEPLOY_FORGE_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('DEPLOY_FORGE_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('DEPLOY_FORGE_PLUGIN_BASENAME', plugin_basename(__FILE__));
@@ -69,11 +69,6 @@ class Deploy_Forge
     public $admin_pages;
 
     /**
-     * Setup Wizard instance
-     */
-    public $setup_wizard;
-
-    /**
      * Update Checker instance
      */
     public $update_checker;
@@ -107,10 +102,10 @@ class Deploy_Forge
         require_once DEPLOY_FORGE_PLUGIN_DIR . 'includes/class-database.php';
         require_once DEPLOY_FORGE_PLUGIN_DIR . 'includes/class-settings.php';
         require_once DEPLOY_FORGE_PLUGIN_DIR . 'includes/class-debug-logger.php';
+        require_once DEPLOY_FORGE_PLUGIN_DIR . 'includes/class-connection-handler.php';
         require_once DEPLOY_FORGE_PLUGIN_DIR . 'includes/class-github-api.php';
         require_once DEPLOY_FORGE_PLUGIN_DIR . 'includes/class-deployment-manager.php';
         require_once DEPLOY_FORGE_PLUGIN_DIR . 'includes/class-webhook-handler.php';
-        require_once DEPLOY_FORGE_PLUGIN_DIR . 'includes/class-github-app-connector.php';
         require_once DEPLOY_FORGE_PLUGIN_DIR . 'includes/class-update-checker.php';
 
         // Utility classes
@@ -120,21 +115,19 @@ class Deploy_Forge
         // Admin classes
         if (is_admin()) {
             require_once DEPLOY_FORGE_PLUGIN_DIR . 'admin/class-admin-pages.php';
-            require_once DEPLOY_FORGE_PLUGIN_DIR . 'admin/class-setup-wizard.php';
         }
 
         // Initialize instances
         $this->database = new Deploy_Forge_Database();
         $this->settings = new Deploy_Forge_Settings();
         $logger = new Deploy_Forge_Debug_Logger($this->settings);
-        $app_connector = new Deploy_Forge_App_Connector($this->settings, $logger);
+        $connection_handler = new Deploy_Forge_Connection_Handler($this->settings, $logger);
         $this->github_api = new Deploy_Forge_GitHub_API($this->settings, $logger);
         $this->deployment_manager = new Deploy_Forge_Deployment_Manager($this->settings, $this->github_api, $this->database, $logger);
         $this->webhook_handler = new Deploy_Forge_Webhook_Handler($this->settings, $this->github_api, $logger, $this->deployment_manager);
 
         if (is_admin()) {
-            $this->admin_pages = new Deploy_Forge_Admin_Pages($this->settings, $this->github_api, $this->deployment_manager, $this->database, $logger, $app_connector);
-            $this->setup_wizard = new Deploy_Forge_Setup_Wizard($this->settings, $this->github_api, $this->database, $logger, $app_connector);
+            $this->admin_pages = new Deploy_Forge_Admin_Pages($this->settings, $this->github_api, $this->deployment_manager, $this->database, $logger, $connection_handler);
         }
 
         // Initialize update checker

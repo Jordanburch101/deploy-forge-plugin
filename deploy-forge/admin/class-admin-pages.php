@@ -17,16 +17,16 @@ class Deploy_Forge_Admin_Pages extends Deploy_Forge_Ajax_Handler_Base
     private Deploy_Forge_Deployment_Manager $deployment_manager;
     private Deploy_Forge_Database $database;
     private Deploy_Forge_Debug_Logger $logger;
-    private Deploy_Forge_App_Connector $app_connector;
+    private Deploy_Forge_Connection_Handler $connection_handler;
 
-    public function __construct(Deploy_Forge_Settings $settings, Deploy_Forge_GitHub_API $github_api, Deploy_Forge_Deployment_Manager $deployment_manager, Deploy_Forge_Database $database, Deploy_Forge_Debug_Logger $logger, Deploy_Forge_App_Connector $app_connector)
+    public function __construct(Deploy_Forge_Settings $settings, Deploy_Forge_GitHub_API $github_api, Deploy_Forge_Deployment_Manager $deployment_manager, Deploy_Forge_Database $database, Deploy_Forge_Debug_Logger $logger, Deploy_Forge_Connection_Handler $connection_handler)
     {
         $this->settings = $settings;
         $this->github_api = $github_api;
         $this->deployment_manager = $deployment_manager;
         $this->database = $database;
         $this->logger = $logger;
-        $this->app_connector = $app_connector;
+        $this->connection_handler = $connection_handler;
 
         add_action('admin_menu', [$this, 'add_admin_menu']);
         add_action('admin_enqueue_scripts', [$this, 'enqueue_admin_assets']);

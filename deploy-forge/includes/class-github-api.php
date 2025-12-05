@@ -16,6 +16,7 @@ class Deploy_Forge_GitHub_API
     private Deploy_Forge_Debug_Logger $logger;
     private const API_BASE = 'https://api.github.com';
     private const USER_AGENT = 'WordPress-Deploy-Forge/1.0';
+    private const BACKEND_URL = 'https://deploy-forge-website.vercel.app';
 
     public function __construct(Deploy_Forge_Settings $settings, Deploy_Forge_Debug_Logger $logger)
     {
@@ -282,129 +283,43 @@ class Deploy_Forge_GitHub_API
     }
 
     /**
-     * Download artifact
-     * Note: Artifact downloads still use direct GitHub API because they return binary data
+     * Download artifact via Deploy Forge backend
      */
     public function download_artifact(int $artifact_id, string $destination): bool|WP_Error
     {
-        $endpoint = "/repos/{$this->settings->get_repo_full_name()}/actions/artifacts/{$artifact_id}/zip";
-
         $api_key = $this->settings->get_api_key();
         if (empty($api_key)) {
-            return new WP_Error('no_api_key', __('Not connected to GitHub', 'deploy-forge'));
+            return new WP_Error('no_api_key', __('Not connected to Deploy Forge', 'deploy-forge'));
         }
 
         $this->logger->log('GitHub_API', "Downloading artifact #$artifact_id to $destination");
 
-        // For artifact downloads, we need to get the redirect URL through the proxy first
-        // Then download directly from the Azure/S3 URL
-        $redirect_result = $this->request('GET', $endpoint);
+        // Use Deploy Forge artifact download endpoint
+        $backend_url = $this->settings->get_backend_url();
+        $download_url = $backend_url . '/api/plugin/github/artifacts/' . $artifact_id . '/download';
 
-        if (is_wp_error($redirect_result)) {
-            $this->logger->error('GitHub_API', "Failed to get artifact download URL", $redirect_result);
-            return $redirect_result;
-        }
+        $this->logger->log('GitHub_API', "Requesting artifact from Deploy Forge backend");
 
-        // The backend should handle the redirect and return the actual download URL
-        // For now, we'll use a workaround: make a direct request with installation token
-        // This requires the backend to expose a download endpoint or we handle it differently
-
-        // Use backend proxy to get installation token for direct download
-        $backend_url = defined('DEPLOY_FORGE_BACKEND_URL')
-            ? constant('DEPLOY_FORGE_BACKEND_URL')
-            : 'https://deploy-forge.vercel.app';
-
-        $token_url = $backend_url . '/api/github/token';
-
-        $token_response = wp_remote_post($token_url, [
+        // Download artifact through Deploy Forge proxy
+        $download_args = [
             'headers' => [
-                'Content-Type' => 'application/json',
                 'X-API-Key' => $api_key,
             ],
-            'timeout' => 15,
-        ]);
-
-        if (is_wp_error($token_response)) {
-            $this->logger->error('GitHub_API', "Failed to get installation token", $token_response);
-            return $token_response;
-        }
-
-        $token_response_code = wp_remote_retrieve_response_code($token_response);
-        $token_response_body = wp_remote_retrieve_body($token_response);
-        $token_body = json_decode($token_response_body, true);
-
-        $this->logger->log('GitHub_API', "Token endpoint response", [
-            'status' => $token_response_code,
-            'body_length' => strlen($token_response_body),
-            'has_token' => isset($token_body['token']),
-            'response_keys' => $token_body ? array_keys($token_body) : [],
-        ]);
-
-        if (!isset($token_body['token'])) {
-            $this->logger->error('GitHub_API', "No token in response", [
-                'status' => $token_response_code,
-                'body' => $token_body
-            ]);
-            return new WP_Error('no_token', __('Could not get GitHub installation token', 'deploy-forge'));
-        }
-
-        $installation_token = $token_body['token'];
-
-        $this->logger->log('GitHub_API', "Got installation token, requesting artifact download URL");
-
-        // Make direct GitHub API request to get redirect URL (don't follow redirect)
-        $github_api_url = 'https://api.github.com' . $endpoint;
-
-        $redirect_response = wp_remote_get($github_api_url, [
-            'headers' => [
-                'Authorization' => 'Bearer ' . $installation_token,
-                'Accept' => 'application/vnd.github+json',
-                'X-GitHub-Api-Version' => '2022-11-28',
-                'User-Agent' => 'WordPress-deploy-forge',
-            ],
-            'timeout' => 30,
-            'redirection' => 0, // Don't follow redirects - we want the Location header
-        ]);
-
-        if (is_wp_error($redirect_response)) {
-            $this->logger->error('GitHub_API', "Failed to get artifact redirect", $redirect_response);
-            return $redirect_response;
-        }
-
-        // GitHub returns 302 redirect with Location header pointing to Azure blob storage
-        $location = wp_remote_retrieve_header($redirect_response, 'location');
-
-        if (empty($location)) {
-            $status = wp_remote_retrieve_response_code($redirect_response);
-            $this->logger->error('GitHub_API', "No redirect location in response", [
-                'status' => $status,
-                'headers' => wp_remote_retrieve_headers($redirect_response)->getAll()
-            ]);
-            return new WP_Error('no_redirect', __('Could not get artifact download URL', 'deploy-forge'));
-        }
-
-        $this->logger->log('GitHub_API', "Got download URL, downloading...", [
-            'url_length' => strlen($location),
-            'is_azure' => strpos($location, 'blob.core.windows.net') !== false,
-        ]);
-
-        // Download from the pre-signed URL (no auth needed)
-        $download_args = [
             'timeout' => 300,
             'stream' => true,
             'filename' => $destination,
         ];
 
-        $download_response = wp_remote_get($location, $download_args);
+        $download_response = wp_remote_get($download_url, $download_args);
 
         if (is_wp_error($download_response)) {
-            $this->logger->error('GitHub_API', "Download failed", $download_response);
+            $this->logger->error('GitHub_API', "Artifact download failed", $download_response);
             return $download_response;
         }
 
         $download_status = wp_remote_retrieve_response_code($download_response);
 
-        $this->logger->log('GitHub_API', "Download response", [
+        $this->logger->log('GitHub_API', "Artifact download response", [
             'status_code' => $download_status,
             'file_exists' => file_exists($destination),
             'file_size' => file_exists($destination) ? filesize($destination) : 0,
@@ -415,7 +330,7 @@ class Deploy_Forge_GitHub_API
             return true;
         }
 
-        $this->logger->error('GitHub_API', "Download failed", [
+        $this->logger->error('GitHub_API', "Artifact download failed", [
             'status_code' => $download_status,
             'file_exists' => file_exists($destination),
             'file_size' => file_exists($destination) ? filesize($destination) : 0,
@@ -429,24 +344,22 @@ class Deploy_Forge_GitHub_API
 
     /**
      * Download repository as ZIP archive (for direct clone deployment)
-     * Downloads the repository at a specific commit/branch without build artifacts
+     * Uses Deploy Forge clone token endpoint to get temporary credentials
      */
     public function download_repository(string $ref, string $destination): bool|WP_Error
     {
         $api_key = $this->settings->get_api_key();
         if (empty($api_key)) {
-            return new WP_Error('no_api_key', __('Not connected to GitHub', 'deploy-forge'));
+            return new WP_Error('no_api_key', __('Not connected to Deploy Forge', 'deploy-forge'));
         }
 
         $this->logger->log('GitHub_API', "Downloading repository at ref: $ref to $destination");
 
-        // Get backend URL from constant or use default
-        $backend_url = defined('DEPLOY_FORGE_BACKEND_URL')
-            ? constant('DEPLOY_FORGE_BACKEND_URL')
-            : 'https://deploy-forge.vercel.app';
+        // Get backend URL
+        $backend_url = $this->settings->get_backend_url();
 
-        // Request download URL from backend
-        $proxy_url = $backend_url . '/api/github/download-repo';
+        // Request clone token from Deploy Forge
+        $clone_token_url = $backend_url . '/api/plugin/github/clone-token';
 
         $args = [
             'method' => 'POST',
@@ -454,23 +367,15 @@ class Deploy_Forge_GitHub_API
                 'Content-Type' => 'application/json',
                 'X-API-Key' => $api_key,
             ],
-            'body' => wp_json_encode([
-                'owner' => $this->settings->get('github_repo_owner'),
-                'repo' => $this->settings->get('github_repo_name'),
-                'ref' => $ref,
-            ]),
             'timeout' => 30,
         ];
 
-        $this->logger->log('GitHub_API', "Requesting download URL from backend", [
-            'backend_url' => $backend_url,
-            'ref' => $ref,
-        ]);
+        $this->logger->log('GitHub_API', "Requesting clone token from Deploy Forge");
 
-        $response = wp_remote_post($proxy_url, $args);
+        $response = wp_remote_post($clone_token_url, $args);
 
         if (is_wp_error($response)) {
-            $this->logger->error('GitHub_API', "Failed to get download URL from backend", $response);
+            $this->logger->error('GitHub_API', "Failed to get clone token", $response);
             return $response;
         }
 
@@ -478,61 +383,84 @@ class Deploy_Forge_GitHub_API
         $body = wp_remote_retrieve_body($response);
         $parsed_body = json_decode($body, true);
 
-        if ($status_code >= 400 || (isset($parsed_body['error']) && $parsed_body['error'])) {
-            $error_message = $parsed_body['message'] ?? 'Failed to get repository download URL';
-            $this->logger->error('GitHub_API', "Backend error getting download URL", [
+        if ($status_code >= 400 || !isset($parsed_body['success']) || !$parsed_body['success']) {
+            $error_message = $parsed_body['error'] ?? 'Failed to get clone credentials';
+            $this->logger->error('GitHub_API', "Backend error getting clone token", [
                 'status' => $status_code,
                 'message' => $error_message,
             ]);
             return new WP_Error('backend_error', $error_message);
         }
 
-        $download_url = $parsed_body['download_url'] ?? null;
+        $clone_url = $parsed_body['cloneUrl'] ?? null;
+        $repo_ref = $parsed_body['ref'] ?? $ref;
 
-        if (empty($download_url)) {
-            $this->logger->error('GitHub_API', "No download URL in response", $parsed_body);
-            return new WP_Error('no_download_url', __('Could not get repository download URL', 'deploy-forge'));
+        if (empty($clone_url)) {
+            $this->logger->error('GitHub_API', "No clone URL in response", $parsed_body);
+            return new WP_Error('no_clone_url', __('Could not get repository clone URL', 'deploy-forge'));
         }
 
-        $this->logger->log('GitHub_API', "Got download URL, downloading repository archive...");
+        // Extract owner and repo from clone URL
+        // Format: https://x-access-token:TOKEN@github.com/owner/repo.git
+        if (preg_match('#github\.com/([^/]+)/([^/]+?)(?:\.git)?$#', $clone_url, $matches)) {
+            $owner = $matches[1];
+            $repo = $matches[2];
 
-        // Download from the URL
-        $download_args = [
-            'timeout' => 300,
-            'stream' => true,
-            'filename' => $destination,
-        ];
+            // Use GitHub's zipball endpoint to download specific ref
+            // Replace .git suffix and use API endpoint
+            $download_url = "https://api.github.com/repos/{$owner}/{$repo}/zipball/{$repo_ref}";
 
-        $download_response = wp_remote_get($download_url, $download_args);
+            // Extract token from clone URL
+            if (preg_match('#x-access-token:([^@]+)@#', $clone_url, $token_matches)) {
+                $token = $token_matches[1];
 
-        if (is_wp_error($download_response)) {
-            $this->logger->error('GitHub_API', "Repository download failed", $download_response);
-            return $download_response;
+                $this->logger->log('GitHub_API', "Downloading repository archive from GitHub...");
+
+                // Download using the token
+                $download_args = [
+                    'headers' => [
+                        'Authorization' => 'token ' . $token,
+                        'Accept' => 'application/vnd.github+json',
+                    ],
+                    'timeout' => 300,
+                    'stream' => true,
+                    'filename' => $destination,
+                ];
+
+                $download_response = wp_remote_get($download_url, $download_args);
+
+                if (is_wp_error($download_response)) {
+                    $this->logger->error('GitHub_API', "Repository download failed", $download_response);
+                    return $download_response;
+                }
+
+                $download_status = wp_remote_retrieve_response_code($download_response);
+
+                $this->logger->log('GitHub_API', "Repository download response", [
+                    'status_code' => $download_status,
+                    'file_exists' => file_exists($destination),
+                    'file_size' => file_exists($destination) ? filesize($destination) : 0,
+                ]);
+
+                if ($download_status === 200 && file_exists($destination) && filesize($destination) > 0) {
+                    $this->logger->log('GitHub_API', "Repository download successful!");
+                    return true;
+                }
+
+                $this->logger->error('GitHub_API', "Repository download failed", [
+                    'status_code' => $download_status,
+                    'file_exists' => file_exists($destination),
+                    'file_size' => file_exists($destination) ? filesize($destination) : 0,
+                ]);
+
+                return new WP_Error(
+                    'download_failed',
+                    sprintf(__('Failed to download repository. Status: %d', 'deploy-forge'), $download_status)
+                );
+            }
         }
 
-        $download_status = wp_remote_retrieve_response_code($download_response);
-
-        $this->logger->log('GitHub_API', "Repository download response", [
-            'status_code' => $download_status,
-            'file_exists' => file_exists($destination),
-            'file_size' => file_exists($destination) ? filesize($destination) : 0,
-        ]);
-
-        if ($download_status === 200 && file_exists($destination) && filesize($destination) > 0) {
-            $this->logger->log('GitHub_API', "Repository download successful!");
-            return true;
-        }
-
-        $this->logger->error('GitHub_API', "Repository download failed", [
-            'status_code' => $download_status,
-            'file_exists' => file_exists($destination),
-            'file_size' => file_exists($destination) ? filesize($destination) : 0,
-        ]);
-
-        return new WP_Error(
-            'download_failed',
-            sprintf(__('Failed to download repository. Status: %d', 'deploy-forge'), $download_status)
-        );
+        return new WP_Error('invalid_clone_url', __('Invalid clone URL format', 'deploy-forge'));
     }
 
     /**
@@ -608,25 +536,23 @@ class Deploy_Forge_GitHub_API
     }
 
     /**
-     * Make a request to GitHub API (proxied through backend)
+     * Make a request to GitHub API (proxied through Deploy Forge backend)
      */
     private function request(string $method, string $endpoint, ?array $data = null): array|WP_Error
     {
         $api_key = $this->settings->get_api_key();
 
         if (empty($api_key)) {
-            $error = new WP_Error('no_api_key', __('Not connected to GitHub. Please connect from settings.', 'deploy-forge'));
+            $error = new WP_Error('no_api_key', __('Not connected to Deploy Forge. Please connect from settings.', 'deploy-forge'));
             $this->logger->error('GitHub_API', 'No API key configured', $error);
             return $error;
         }
 
-        // Get backend URL from constant or use default
-        $backend_url = defined('DEPLOY_FORGE_BACKEND_URL')
-            ? constant('DEPLOY_FORGE_BACKEND_URL')
-            : 'https://deploy-forge.vercel.app';
+        // Get backend URL
+        $backend_url = $this->settings->get_backend_url();
 
         // Prepare proxy request
-        $proxy_url = $backend_url . '/api/github/proxy';
+        $proxy_url = $backend_url . '/api/plugin/github/proxy';
 
         $args = [
             'method' => 'POST',

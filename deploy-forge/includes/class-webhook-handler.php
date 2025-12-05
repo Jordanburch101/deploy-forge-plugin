@@ -51,7 +51,7 @@ class Deploy_Forge_Webhook_Handler
      */
     public function check_webhook_status(): WP_REST_Response
     {
-        $webhook_secret = $this->settings->get('webhook_secret');
+        $webhook_secret = $this->settings->get_webhook_secret();
 
         return new WP_REST_Response([
             'configured' => !empty($webhook_secret),
@@ -128,17 +128,16 @@ class Deploy_Forge_Webhook_Handler
         $signature_payload = (strpos($content_type, 'application/x-www-form-urlencoded') !== false) ? $raw_payload : $payload;
 
         // Get webhook secret - ALWAYS required for security
-        $webhook_secret = $this->settings->get('webhook_secret');
+        $webhook_secret = $this->settings->get_webhook_secret();
 
-        // DEBUG: Log detailed webhook secret retrieval info
-        $direct_option = get_option('deploy_forge_settings');
-        $this->logger->log('Webhook', 'Webhook secret debug info', [
-            'from_settings_get' => strlen($webhook_secret ?? ''),
-            'direct_option_type' => gettype($direct_option),
-            'direct_option_is_array' => is_array($direct_option),
-            'direct_option_has_webhook_secret' => is_array($direct_option) && isset($direct_option['webhook_secret']),
-            'direct_option_webhook_secret_length' => is_array($direct_option) && isset($direct_option['webhook_secret']) ? strlen($direct_option['webhook_secret']) : 0,
-            'all_option_keys' => is_array($direct_option) ? array_keys($direct_option) : []
+        // Check for Deploy Forge forwarded webhook header
+        $is_forwarded = $request->get_header('x-deploy-forge-forwarded') === 'true';
+
+        // DEBUG: Log webhook info
+        $this->logger->log('Webhook', 'Webhook secret and forwarding info', [
+            'has_webhook_secret' => !empty($webhook_secret),
+            'secret_length' => strlen($webhook_secret ?? ''),
+            'is_forwarded' => $is_forwarded,
         ]);
 
         // ALWAYS require webhook secret - no exceptions
@@ -435,6 +434,8 @@ class Deploy_Forge_Webhook_Handler
     /**
      * Verify webhook signature
      * Note: Secret existence is validated before calling this method
+     * Signature verification works the same for both direct GitHub webhooks
+     * and Deploy Forge forwarded webhooks
      */
     private function verify_signature(string $payload, ?string $signature): bool
     {
@@ -442,7 +443,7 @@ class Deploy_Forge_Webhook_Handler
             return false;
         }
 
-        $secret = $this->settings->get('webhook_secret');
+        $secret = $this->settings->get_webhook_secret();
 
         // Secret should always exist at this point (validated in handle_webhook)
         // But double-check for safety
@@ -450,7 +451,7 @@ class Deploy_Forge_Webhook_Handler
             return false;
         }
 
-        // GitHub sends signature as sha256=<hash>
+        // GitHub/Deploy Forge sends signature as sha256=<hash>
         $hash_algo = 'sha256';
         if (strpos($signature, '=') !== false) {
             list($algo, $hash) = explode('=', $signature, 2);
