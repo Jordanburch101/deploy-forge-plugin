@@ -12,7 +12,7 @@ class Deploy_Forge_Database {
 
     private string $table_name;
     private string $charset_collate;
-    private const DB_VERSION = '1.0';
+    private const DB_VERSION = '1.1';
 
     public function __construct() {
         global $wpdb;
@@ -43,6 +43,12 @@ class Deploy_Forge_Database {
             artifact_url varchar(500),
             backup_path varchar(500),
             error_message text,
+            remote_deployment_id varchar(100),
+            deployment_method varchar(50),
+            artifact_id varchar(100),
+            artifact_name varchar(255),
+            artifact_size bigint(20) unsigned,
+            artifact_download_url varchar(500),
             created_at datetime DEFAULT CURRENT_TIMESTAMP,
             updated_at datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             PRIMARY KEY (id),
@@ -50,13 +56,69 @@ class Deploy_Forge_Database {
             KEY status (status),
             KEY deployed_at (deployed_at),
             KEY trigger_type (trigger_type),
-            KEY workflow_run_id (workflow_run_id)
+            KEY workflow_run_id (workflow_run_id),
+            KEY remote_deployment_id (remote_deployment_id)
         ) {$this->charset_collate};";
 
         require_once ABSPATH . 'wp-admin/includes/upgrade.php';
         dbDelta($sql);
 
         // Store database version
+        update_option('deploy_forge_db_version', self::DB_VERSION);
+    }
+
+    /**
+     * Check if database needs upgrade and run migrations
+     */
+    public function maybe_upgrade(): void {
+        $current_version = get_option('deploy_forge_db_version', '1.0');
+
+        if (version_compare($current_version, self::DB_VERSION, '<')) {
+            $this->run_migrations($current_version);
+        }
+    }
+
+    /**
+     * Run database migrations from current version
+     */
+    private function run_migrations(string $from_version): void {
+        global $wpdb;
+
+        // Migration to 1.1: Add Deploy Forge integration columns
+        if (version_compare($from_version, '1.1', '<')) {
+            $columns_to_add = [
+                'remote_deployment_id' => 'varchar(100)',
+                'deployment_method' => 'varchar(50)',
+                'artifact_id' => 'varchar(100)',
+                'artifact_name' => 'varchar(255)',
+                'artifact_size' => 'bigint(20) unsigned',
+                'artifact_download_url' => 'varchar(500)',
+            ];
+
+            foreach ($columns_to_add as $column => $type) {
+                $column_exists = $wpdb->get_results(
+                    $wpdb->prepare(
+                        "SHOW COLUMNS FROM {$this->table_name} LIKE %s",
+                        $column
+                    )
+                );
+
+                if (empty($column_exists)) {
+                    $wpdb->query("ALTER TABLE {$this->table_name} ADD COLUMN {$column} {$type}");
+                }
+            }
+
+            // Add index for remote_deployment_id if it doesn't exist
+            $index_exists = $wpdb->get_results(
+                "SHOW INDEX FROM {$this->table_name} WHERE Key_name = 'remote_deployment_id'"
+            );
+
+            if (empty($index_exists)) {
+                $wpdb->query("ALTER TABLE {$this->table_name} ADD INDEX remote_deployment_id (remote_deployment_id)");
+            }
+        }
+
+        // Update version after migrations
         update_option('deploy_forge_db_version', self::DB_VERSION);
     }
 
@@ -75,31 +137,35 @@ class Deploy_Forge_Database {
 
         $data = wp_parse_args($data, $defaults);
 
+        // Build format array dynamically based on data keys
+        $format = $this->get_format_array($data);
+
         $result = $wpdb->insert(
             $this->table_name,
             $data,
-            [
-                '%s', // commit_hash
-                '%s', // commit_message
-                '%s', // commit_author
-                '%s', // commit_date
-                '%s', // deployed_at
-                '%s', // status
-                '%s', // build_url
-                '%s', // build_logs
-                '%s', // deployment_logs
-                '%s', // trigger_type
-                '%d', // triggered_by_user_id
-                '%d', // workflow_run_id
-                '%s', // artifact_url
-                '%s', // backup_path
-                '%s', // error_message
-                '%s', // created_at
-                '%s', // updated_at
-            ]
+            $format
         );
 
         return $result ? $wpdb->insert_id : false;
+    }
+
+    /**
+     * Get format array for wpdb based on data keys
+     */
+    private function get_format_array(array $data): array {
+        $int_columns = [
+            'id',
+            'triggered_by_user_id',
+            'workflow_run_id',
+            'artifact_size',
+        ];
+
+        $format = [];
+        foreach (array_keys($data) as $key) {
+            $format[] = in_array($key, $int_columns, true) ? '%d' : '%s';
+        }
+
+        return $format;
     }
 
     /**

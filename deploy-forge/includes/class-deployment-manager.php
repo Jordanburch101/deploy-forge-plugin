@@ -97,8 +97,16 @@ class Deploy_Forge_Deployment_Manager
             'deployment_id' => $deployment_id,
         ]);
 
-        // Check deployment method
-        $deployment_method = $this->settings->get('deployment_method', 'github_actions');
+        // Check deployment method - prefer connection data over settings
+        $connection_data = $this->settings->get_connection_data();
+        $deployment_method = !empty($connection_data['deployment_method'])
+            ? $connection_data['deployment_method']
+            : $this->settings->get('deployment_method', 'github_actions');
+
+        $this->logger->log_deployment_step($deployment_id, 'Deployment Method', 'determined', [
+            'deployment_method' => $deployment_method,
+            'from_connection_data' => !empty($connection_data['deployment_method']),
+        ]);
 
         if ($deployment_method === 'direct_clone') {
             // Direct clone - skip GitHub Actions, download and deploy immediately
@@ -137,8 +145,28 @@ class Deploy_Forge_Deployment_Manager
      */
     private function trigger_github_build(int $deployment_id, string $commit_hash): bool
     {
-        $workflow_name = $this->settings->get('github_workflow_name');
+        // Get workflow name - prefer connection data over settings
+        $connection_data = $this->settings->get_connection_data();
+        $workflow_path = $connection_data['workflow_path'] ?? '';
+        $workflow_name = !empty($workflow_path)
+            ? basename($workflow_path)
+            : $this->settings->get('github_workflow_name');
+
         $branch = $this->settings->get('github_branch');
+
+        // Check if workflow is configured
+        if (empty($workflow_name)) {
+            $this->logger->error('Deployment', "Deployment #$deployment_id has no workflow configured");
+            $this->log_deployment($deployment_id, 'Failed to trigger workflow: No workflow file configured. Please configure a workflow in Deploy Forge settings.');
+            return false;
+        }
+
+        $this->logger->log('Deployment', "Triggering workflow", [
+            'deployment_id' => $deployment_id,
+            'workflow_name' => $workflow_name,
+            'workflow_path' => $workflow_path,
+            'branch' => $branch,
+        ]);
 
         // Trigger workflow
         $result = $this->github_api->trigger_workflow($workflow_name, $branch);
@@ -398,48 +426,71 @@ class Deploy_Forge_Deployment_Manager
         $this->log_deployment($deployment_id, 'Build completed successfully. Starting deployment...');
 
         try {
-            // Get artifacts
-            $this->logger->log_deployment_step($deployment_id, 'Fetch Artifacts', 'started', [
-                'workflow_run_id' => $deployment->workflow_run_id,
-            ]);
+            // Check if we already have artifact info from the webhook
+            $artifact_id = $deployment->artifact_id ?? null;
+            $artifact_download_url = $deployment->artifact_download_url ?? null;
 
-            $artifacts_result = $this->github_api->get_workflow_artifacts($deployment->workflow_run_id);
-
-            if (!$artifacts_result['success'] || empty($artifacts_result['data'])) {
-                $this->logger->error('Deployment', "Deployment #$deployment_id no artifacts found", $artifacts_result);
-                $this->database->update_deployment($deployment_id, [
-                    'status' => 'failed',
-                    'error_message' => __('No artifacts found for successful build.', 'deploy-forge'),
+            if (!empty($artifact_id)) {
+                // Use artifact info from webhook
+                $this->logger->log_deployment_step($deployment_id, 'Using Webhook Artifact', 'success', [
+                    'artifact_id' => $artifact_id,
+                    'artifact_name' => $deployment->artifact_name ?? 'unknown',
+                    'artifact_download_url' => $artifact_download_url,
                 ]);
-                $this->database->release_deployment_lock();
-                return;
-            }
-
-            // Get first artifact (assuming single artifact)
-            $artifact = $artifacts_result['data'][0];
-
-            // Handle both array and object formats
-            $artifact_name = is_array($artifact) ? ($artifact['name'] ?? 'unknown') : ($artifact->name ?? 'unknown');
-            $artifact_id = is_array($artifact) ? ($artifact['id'] ?? null) : ($artifact->id ?? null);
-
-            $this->logger->log_deployment_step($deployment_id, 'Artifacts Found', 'success', [
-                'artifact_count' => count($artifacts_result['data']),
-                'artifact_name' => $artifact_name,
-                'artifact_id' => $artifact_id,
-            ]);
-
-            if (!$artifact_id) {
-                $this->logger->error('Deployment', "Deployment #$deployment_id artifact has no ID", ['artifact' => $artifact]);
-                $this->database->update_deployment($deployment_id, [
-                    'status' => 'failed',
-                    'error_message' => __('Artifact ID not found.', 'deploy-forge'),
+            } else {
+                // Fallback: Fetch artifacts from GitHub using workflow_run_id
+                $this->logger->log_deployment_step($deployment_id, 'Fetch Artifacts', 'started', [
+                    'workflow_run_id' => $deployment->workflow_run_id,
                 ]);
-                $this->database->release_deployment_lock();
-                return;
+
+                if (empty($deployment->workflow_run_id)) {
+                    $this->logger->error('Deployment', "Deployment #$deployment_id has no workflow_run_id or artifact_id");
+                    $this->database->update_deployment($deployment_id, [
+                        'status' => 'failed',
+                        'error_message' => __('No workflow run ID or artifact information available.', 'deploy-forge'),
+                    ]);
+                    $this->database->release_deployment_lock();
+                    return;
+                }
+
+                $artifacts_result = $this->github_api->get_workflow_artifacts($deployment->workflow_run_id);
+
+                if (!$artifacts_result['success'] || empty($artifacts_result['data'])) {
+                    $this->logger->error('Deployment', "Deployment #$deployment_id no artifacts found", $artifacts_result);
+                    $this->database->update_deployment($deployment_id, [
+                        'status' => 'failed',
+                        'error_message' => __('No artifacts found for successful build.', 'deploy-forge'),
+                    ]);
+                    $this->database->release_deployment_lock();
+                    return;
+                }
+
+                // Get first artifact (assuming single artifact)
+                $artifact = $artifacts_result['data'][0];
+
+                // Handle both array and object formats
+                $artifact_name = is_array($artifact) ? ($artifact['name'] ?? 'unknown') : ($artifact->name ?? 'unknown');
+                $artifact_id = is_array($artifact) ? ($artifact['id'] ?? null) : ($artifact->id ?? null);
+
+                $this->logger->log_deployment_step($deployment_id, 'Artifacts Found', 'success', [
+                    'artifact_count' => count($artifacts_result['data']),
+                    'artifact_name' => $artifact_name,
+                    'artifact_id' => $artifact_id,
+                ]);
+
+                if (!$artifact_id) {
+                    $this->logger->error('Deployment', "Deployment #$deployment_id artifact has no ID", ['artifact' => $artifact]);
+                    $this->database->update_deployment($deployment_id, [
+                        'status' => 'failed',
+                        'error_message' => __('Artifact ID not found.', 'deploy-forge'),
+                    ]);
+                    $this->database->release_deployment_lock();
+                    return;
+                }
             }
 
             // Download and deploy
-            $this->download_and_deploy($deployment_id, $artifact_id);
+            $this->download_and_deploy($deployment_id, $artifact_id, $artifact_download_url);
         } catch (Exception $e) {
             // Catch any exceptions and update deployment status
             $this->logger->error('Deployment', "Deployment #$deployment_id threw exception", [
@@ -456,8 +507,12 @@ class Deploy_Forge_Deployment_Manager
 
     /**
      * Download artifact and deploy theme
+     *
+     * @param int $deployment_id
+     * @param int|string $artifact_id
+     * @param string|null $artifact_download_url Optional URL path from webhook (e.g., /api/plugin/github/artifacts/123/download)
      */
-    private function download_and_deploy(int $deployment_id, int $artifact_id): void
+    private function download_and_deploy(int $deployment_id, int|string $artifact_id, ?string $artifact_download_url = null): void
     {
         // Create temp directory
         $temp_dir = $this->get_temp_directory();
@@ -465,14 +520,15 @@ class Deploy_Forge_Deployment_Manager
 
         $this->logger->log_deployment_step($deployment_id, 'Download Artifact', 'started', [
             'artifact_id' => $artifact_id,
+            'artifact_download_url' => $artifact_download_url,
             'temp_dir' => $temp_dir,
             'artifact_zip' => $artifact_zip,
         ]);
 
         $this->log_deployment($deployment_id, 'Downloading artifact from GitHub...');
 
-        // Download artifact
-        $download_result = $this->github_api->download_artifact($artifact_id, $artifact_zip);
+        // Download artifact - use URL from webhook if provided, otherwise use artifact ID
+        $download_result = $this->github_api->download_artifact($artifact_id, $artifact_zip, $artifact_download_url);
 
         if (is_wp_error($download_result)) {
             $this->logger->error('Deployment', "Deployment #$deployment_id artifact download failed", $download_result);
@@ -705,12 +761,46 @@ class Deploy_Forge_Deployment_Manager
             }
         }
 
-        // Extract artifact directly to themes folder (preserves directory structure)
-        $themes_base_path = WP_CONTENT_DIR . '/themes';
+        // Get target theme path from settings
+        $target_theme_path = $this->settings->get_theme_path();
+
+        $this->logger->log_deployment_step($deployment_id, 'Find Theme Directory', 'started', [
+            'extract_dir' => $temp_extract_dir,
+            'target_theme_path' => $target_theme_path,
+        ]);
+
+        // Find the actual theme directory within extracted content
+        // GitHub zipballs create folders like "owner-repo-commitsha/"
+        // We need to find the directory containing theme files
+        $source_theme_dir = $this->find_theme_directory($temp_extract_dir);
+
+        if (!$source_theme_dir) {
+            // If no theme files found, use the first subdirectory (GitHub zipball structure)
+            $extracted_items = scandir($temp_extract_dir);
+            $extracted_items = array_diff($extracted_items, ['.', '..']);
+
+            foreach ($extracted_items as $item) {
+                $item_path = $temp_extract_dir . '/' . $item;
+                if (is_dir($item_path)) {
+                    $source_theme_dir = $item_path;
+                    break;
+                }
+            }
+        }
+
+        // Fallback to temp_extract_dir if nothing found
+        if (!$source_theme_dir) {
+            $source_theme_dir = $temp_extract_dir;
+        }
+
+        $this->logger->log_deployment_step($deployment_id, 'Theme Directory Found', 'success', [
+            'source_theme_dir' => $source_theme_dir,
+            'target_theme_path' => $target_theme_path,
+        ]);
 
         $this->logger->log_deployment_step($deployment_id, 'Copy to Themes Directory', 'started', [
-            'source' => $temp_extract_dir,
-            'destination' => $themes_base_path,
+            'source' => $source_theme_dir,
+            'destination' => $target_theme_path,
         ]);
 
         $this->log_deployment($deployment_id, 'Deploying theme files...');
@@ -718,14 +808,14 @@ class Deploy_Forge_Deployment_Manager
         // Count files to be copied for logging
         $file_count = 0;
         $dir_count = 0;
-        if (is_dir($temp_extract_dir)) {
+        if (is_dir($source_theme_dir)) {
             /**
              * @var \RecursiveIteratorIterator $iterator
              * @noinspection PhpUndefinedClassInspection
              */
             $iterator = new RecursiveIteratorIterator(
                 /** @noinspection PhpUndefinedClassInspection */
-                new RecursiveDirectoryIterator($temp_extract_dir, RecursiveDirectoryIterator::SKIP_DOTS),
+                new RecursiveDirectoryIterator($source_theme_dir, RecursiveDirectoryIterator::SKIP_DOTS),
                 RecursiveIteratorIterator::SELF_FIRST
             );
             foreach ($iterator as $item) {
@@ -742,12 +832,30 @@ class Deploy_Forge_Deployment_Manager
             'directory_count' => $dir_count,
         ]);
 
-        // Copy entire extracted structure to themes directory
-        // This preserves whatever directory structure the artifact has
+        // Remove existing theme directory contents before copying
+        // This ensures a clean deployment
+        if (is_dir($target_theme_path)) {
+            $this->logger->log_deployment_step($deployment_id, 'Clearing Existing Theme', 'in_progress');
+            $this->recursive_delete($target_theme_path);
+        }
+
+        // Create target theme directory
+        if (!is_dir($target_theme_path)) {
+            if (!mkdir($target_theme_path, 0755, true)) {
+                $this->logger->error('Deployment', "Failed to create theme directory: {$target_theme_path}");
+                $this->database->update_deployment($deployment_id, [
+                    'status' => 'failed',
+                    'error_message' => __('Failed to create theme directory.', 'deploy-forge'),
+                ]);
+                return;
+            }
+        }
+
+        // Copy theme files to target directory
         // Increase timeout for large theme deployments
         @set_time_limit(300);
 
-        $copy_result = $this->recursive_copy($temp_extract_dir, $themes_base_path);
+        $copy_result = $this->recursive_copy($source_theme_dir, $target_theme_path);
 
         if (!$copy_result) {
             $this->logger->error('Deployment', "Deployment #$deployment_id file copy failed");
@@ -938,7 +1046,7 @@ class Deploy_Forge_Deployment_Manager
 
     /**
      * Approve a pending deployment (manual approval workflow)
-     * Updates the existing pending deployment and triggers the workflow
+     * Updates the existing pending deployment and triggers the appropriate deployment method
      */
     public function approve_pending_deployment(int $deployment_id, int $user_id): bool
     {
@@ -956,6 +1064,7 @@ class Deploy_Forge_Deployment_Manager
 
         $this->logger->log_deployment_step($deployment_id, 'Approve Deployment', 'initiated', [
             'approved_by_user_id' => $user_id,
+            'deployment_method' => $deployment->deployment_method ?? 'github_actions',
         ]);
 
         // Update deployment to be triggered by the user who approved it
@@ -964,7 +1073,23 @@ class Deploy_Forge_Deployment_Manager
             'triggered_by_user_id' => $user_id,
         ]);
 
-        // Trigger GitHub Actions workflow
+        // Check deployment method - direct_clone doesn't need a workflow
+        $deployment_method = $deployment->deployment_method ?? 'github_actions';
+
+        if ($deployment_method === 'direct_clone') {
+            // For direct clone, start the clone deployment immediately
+            $this->logger->log_deployment_step($deployment_id, 'Direct Clone Approved', 'started');
+
+            $remote_deployment_id = $deployment->remote_deployment_id ?? '';
+
+            // Process the clone deployment
+            $this->process_clone_deployment($deployment_id, $remote_deployment_id);
+
+            $this->logger->log_deployment_step($deployment_id, 'Deployment Approved', 'success');
+            return true;
+        }
+
+        // For github_actions method, trigger the workflow
         $workflow_result = $this->trigger_github_build($deployment_id, $deployment->commit_hash);
 
         if (!$workflow_result) {
@@ -1209,5 +1334,111 @@ class Deploy_Forge_Deployment_Manager
         }
 
         return rmdir($dir);
+    }
+
+    /**
+     * Process a direct clone deployment
+     * Downloads the repository directly from GitHub (no workflow/artifact)
+     */
+    public function process_clone_deployment(int $deployment_id, string $remote_deployment_id): void
+    {
+        $deployment = $this->database->get_deployment($deployment_id);
+
+        if (!$deployment) {
+            $this->logger->error('Deployment', "Clone deployment #$deployment_id not found in database");
+            return;
+        }
+
+        // Skip if already deployed
+        if ($deployment->status === 'success') {
+            $this->logger->log('Deployment', "Clone deployment #$deployment_id already completed, skipping");
+            return;
+        }
+
+        // Skip if deployment failed (don't retry)
+        if ($deployment->status === 'failed') {
+            $this->logger->log('Deployment', "Clone deployment #$deployment_id previously failed, skipping");
+            return;
+        }
+
+        // Check deployment lock to prevent concurrent processing
+        $locked_deployment = $this->database->get_deployment_lock();
+        if ($locked_deployment && $locked_deployment !== $deployment_id) {
+            $this->logger->log('Deployment', "Clone deployment #$deployment_id skipped - another deployment (#$locked_deployment) is processing");
+            // Reschedule for later
+            wp_schedule_single_event(time() + 60, 'deploy_forge_process_clone_deployment', [$deployment_id, $remote_deployment_id]);
+            return;
+        }
+
+        // Set lock for this deployment
+        $this->database->set_deployment_lock($deployment_id, 300);
+
+        // Update status to deploying
+        $this->database->update_deployment($deployment_id, [
+            'status' => 'deploying',
+        ]);
+
+        $this->logger->log_deployment_step($deployment_id, 'Process Clone Deployment', 'started');
+        $this->log_deployment($deployment_id, 'Starting direct clone deployment...');
+
+        try {
+            // Create temp directory for download
+            $temp_dir = $this->get_temp_directory();
+            $repo_zip = $temp_dir . '/repo-' . $deployment_id . '.zip';
+
+            $this->logger->log_deployment_step($deployment_id, 'Download Repository', 'started');
+            $this->log_deployment($deployment_id, 'Downloading repository from GitHub...');
+
+            // Get the branch/ref to download
+            $ref = $this->settings->get('github_branch') ?: 'main';
+
+            // Download the repository
+            $download_result = $this->github_api->download_repository($ref, $repo_zip);
+
+            if (is_wp_error($download_result)) {
+                $this->logger->error('Deployment', "Clone deployment #$deployment_id download failed", [
+                    'error' => $download_result->get_error_message(),
+                ]);
+                $this->database->update_deployment($deployment_id, [
+                    'status' => 'failed',
+                    'error_message' => $download_result->get_error_message(),
+                ]);
+                $this->log_deployment($deployment_id, 'Download failed: ' . $download_result->get_error_message());
+                $this->database->release_deployment_lock();
+                return;
+            }
+
+            $this->logger->log_deployment_step($deployment_id, 'Repository Downloaded', 'success', [
+                'file_size' => file_exists($repo_zip) ? filesize($repo_zip) : 0,
+            ]);
+            $this->log_deployment($deployment_id, 'Repository downloaded successfully.');
+
+            // Create backup if enabled
+            if ($this->settings->get('create_backups')) {
+                $this->logger->log_deployment_step($deployment_id, 'Create Backup', 'started');
+                $backup_path = $this->backup_current_theme($deployment_id);
+                if ($backup_path) {
+                    $this->database->update_deployment($deployment_id, ['backup_path' => $backup_path]);
+                    $this->log_deployment($deployment_id, 'Backup created: ' . $backup_path);
+                    $this->logger->log_deployment_step($deployment_id, 'Backup Created', 'success', [
+                        'backup_path' => $backup_path,
+                    ]);
+                }
+            }
+
+            // Extract and deploy (reuse existing method)
+            $this->extract_and_deploy($deployment_id, $repo_zip);
+
+        } catch (Exception $e) {
+            $this->logger->error('Deployment', "Clone deployment #$deployment_id threw exception", [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            $this->database->update_deployment($deployment_id, [
+                'status' => 'failed',
+                'error_message' => sprintf(__('Clone deployment failed: %s', 'deploy-forge'), $e->getMessage()),
+            ]);
+            $this->database->release_deployment_lock();
+        }
     }
 }

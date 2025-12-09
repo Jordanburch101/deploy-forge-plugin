@@ -66,8 +66,15 @@ class Deploy_Forge_Webhook_Handler
     public function handle_webhook(WP_REST_Request $request): WP_REST_Response
     {
         $signature = $request->get_header('x-hub-signature-256');
-        $event = $request->get_header('x-github-event');
         $content_type = $request->get_header('content-type');
+
+        // Check for Deploy Forge event header first, then fall back to GitHub event header
+        $deploy_forge_event = $request->get_header('x-deploy-forge-event');
+        $github_event = $request->get_header('x-github-event');
+        $event = $deploy_forge_event ?: $github_event;
+
+        // Check for Deploy Forge forwarded webhook header
+        $is_forwarded = $request->get_header('x-deploy-forge-forwarded') === 'true';
 
         // Get request data - try multiple methods to get the payload
         // Try php://input first (most reliable with nginx)
@@ -115,13 +122,16 @@ class Deploy_Forge_Webhook_Handler
         // Log webhook receipt with payload info
         $this->logger->log('Webhook', 'Webhook received', [
             'event' => $event,
+            'deploy_forge_event' => $deploy_forge_event,
+            'github_event' => $github_event,
+            'is_forwarded' => $is_forwarded,
             'payload_length' => strlen($payload),
             'has_signature' => !empty($signature),
             'content_type' => $request->get_header('content-type'),
         ]);
 
         // Log webhook receipt
-        $this->log_webhook_receipt($event);
+        $this->log_webhook_receipt($event ?? 'unknown');
 
         // Verify webhook signature (skip if payload is empty - likely a test)
         // For form-encoded webhooks, GitHub signs the raw form data, not the extracted JSON
@@ -129,9 +139,6 @@ class Deploy_Forge_Webhook_Handler
 
         // Get webhook secret - ALWAYS required for security
         $webhook_secret = $this->settings->get_webhook_secret();
-
-        // Check for Deploy Forge forwarded webhook header
-        $is_forwarded = $request->get_header('x-deploy-forge-forwarded') === 'true';
 
         // DEBUG: Log webhook info
         $this->logger->log('Webhook', 'Webhook secret and forwarding info', [
@@ -206,7 +213,12 @@ class Deploy_Forge_Webhook_Handler
             'data_keys' => array_keys($data),
         ]);
 
-        // Handle different event types
+        // Handle Deploy Forge custom events (from Vercel backend)
+        if ($deploy_forge_event) {
+            return $this->handle_deploy_forge_event($deploy_forge_event, $data);
+        }
+
+        // Handle legacy GitHub events (direct webhooks)
         switch ($event) {
             case 'push':
                 return $this->handle_push_event($data);
@@ -226,6 +238,440 @@ class Deploy_Forge_Webhook_Handler
                     'message' => sprintf(__('Unsupported event type: %s', 'deploy-forge'), $event),
                 ], 400);
         }
+    }
+
+    /**
+     * Handle Deploy Forge custom events from the Vercel backend
+     * These events are processed and enriched by the Deploy Forge service
+     */
+    private function handle_deploy_forge_event(string $event, array $data): WP_REST_Response
+    {
+        $this->logger->log('Webhook', 'Handling Deploy Forge event', [
+            'event' => $event,
+            'deployment_id' => $data['deploymentId'] ?? null,
+            'commit_sha' => $data['commitSha'] ?? null,
+        ]);
+
+        switch ($event) {
+            case 'deploy_forge:new_commit':
+                return $this->handle_new_commit_event($data);
+
+            case 'deploy_forge:workflow_running':
+                return $this->handle_workflow_running_event($data);
+
+            case 'deploy_forge:artifact_ready':
+                return $this->handle_artifact_ready_event($data);
+
+            case 'deploy_forge:workflow_failed':
+                return $this->handle_workflow_failed_event($data);
+
+            case 'deploy_forge:clone_ready':
+                return $this->handle_clone_ready_event($data);
+
+            case 'ping':
+                return new WP_REST_Response([
+                    'success' => true,
+                    'message' => __('Deploy Forge ping received successfully!', 'deploy-forge'),
+                ], 200);
+
+            default:
+                $this->logger->log('Webhook', "Unknown Deploy Forge event: {$event}");
+                return new WP_REST_Response([
+                    'success' => false,
+                    'message' => sprintf(__('Unknown Deploy Forge event: %s', 'deploy-forge'), $event),
+                ], 400);
+        }
+    }
+
+    /**
+     * Handle deploy_forge:new_commit event
+     * Called when a new commit is pushed and a deployment is created on the backend
+     */
+    private function handle_new_commit_event(array $data): WP_REST_Response
+    {
+        $deployment_id = $data['deploymentId'] ?? '';
+        $commit_sha = $data['commitSha'] ?? '';
+        $commit_message = $data['commitMessage'] ?? '';
+        $commit_author = $data['commitAuthor'] ?? '';
+        $branch = $data['branch'] ?? '';
+        $deployment_method = $data['deploymentMethod'] ?? '';
+        $workflow_path = $data['workflowPath'] ?? '';
+
+        $this->logger->log('Webhook', 'New commit event received', [
+            'deployment_id' => $deployment_id,
+            'commit_sha' => $commit_sha,
+            'branch' => $branch,
+            'deployment_method' => $deployment_method,
+            'workflow_path' => $workflow_path,
+        ]);
+
+        // Sync deployment method and workflow path to connection data if provided
+        // This ensures "Deploy Now" uses the correct settings
+        $connection_data = $this->settings->get_connection_data();
+        $needs_update = false;
+
+        if (!empty($deployment_method) && $connection_data['deployment_method'] !== $deployment_method) {
+            $connection_data['deployment_method'] = $deployment_method;
+            $needs_update = true;
+        }
+
+        if (!empty($workflow_path) && ($connection_data['workflow_path'] ?? '') !== $workflow_path) {
+            $connection_data['workflow_path'] = $workflow_path;
+            $needs_update = true;
+        }
+
+        if ($needs_update) {
+            $this->settings->set_connection_data($connection_data);
+            $this->logger->log('Webhook', 'Synced settings from webhook', [
+                'deployment_method' => $deployment_method,
+                'workflow_path' => $workflow_path,
+            ]);
+        }
+
+        // Check if auto-deploy is enabled
+        if (!$this->settings->get('auto_deploy_enabled')) {
+            return new WP_REST_Response([
+                'success' => true,
+                'message' => __('Auto-deploy is disabled. Deployment acknowledged but not started.', 'deploy-forge'),
+                'deployment_id' => $deployment_id,
+            ], 200);
+        }
+
+        // Check if this is the configured branch
+        $configured_branch = $this->settings->get('github_branch');
+        if (!empty($configured_branch) && $branch !== $configured_branch) {
+            return new WP_REST_Response([
+                'success' => true,
+                'message' => sprintf(
+                    __('Ignoring push to branch %s (configured: %s)', 'deploy-forge'),
+                    $branch,
+                    $configured_branch
+                ),
+            ], 200);
+        }
+
+        // Store the remote deployment ID for tracking
+        $database = deploy_forge()->database;
+
+        // Create or update local deployment record linked to remote deployment
+        $local_deployment_id = $database->insert_deployment([
+            'commit_hash' => $commit_sha,
+            'commit_message' => $commit_message,
+            'commit_author' => $commit_author,
+            'commit_date' => current_time('mysql'),
+            'status' => 'pending',
+            'trigger_type' => 'webhook',
+            'triggered_by_user_id' => 0,
+            'remote_deployment_id' => $deployment_id,
+            'deployment_method' => $deployment_method,
+        ]);
+
+        $this->logger->log('Webhook', 'Created local deployment record', [
+            'local_id' => $local_deployment_id,
+            'remote_id' => $deployment_id,
+        ]);
+
+        // Check if manual approval is required
+        $require_manual_approval = $this->settings->get('require_manual_approval');
+
+        if ($require_manual_approval) {
+            $this->logger->log('Webhook', 'Manual approval required - deployment pending', [
+                'deployment_id' => $local_deployment_id,
+            ]);
+            return new WP_REST_Response([
+                'success' => true,
+                'message' => __('Deployment created. Waiting for manual approval.', 'deploy-forge'),
+                'deployment_id' => $local_deployment_id,
+                'remote_deployment_id' => $deployment_id,
+                'requires_approval' => true,
+            ], 200);
+        }
+
+        // Auto-deploy is enabled and no manual approval required
+        // For direct_clone, start deployment immediately
+        if ($deployment_method === 'direct_clone') {
+            $this->logger->log('Webhook', 'Auto-deploying with direct_clone method', [
+                'deployment_id' => $local_deployment_id,
+            ]);
+
+            $response_data = [
+                'success' => true,
+                'message' => __('New commit received. Starting direct clone deployment.', 'deploy-forge'),
+                'deployment_id' => $local_deployment_id,
+                'remote_deployment_id' => $deployment_id,
+            ];
+
+            // Process direct clone deployment asynchronously
+            $this->send_early_response_and_process_clone_async($local_deployment_id, $deployment_id, $response_data);
+
+            return new WP_REST_Response($response_data, 200);
+        }
+
+        // For github_actions, just acknowledge - the backend will send artifact_ready when done
+        return new WP_REST_Response([
+            'success' => true,
+            'message' => __('New commit acknowledged. Waiting for build to complete.', 'deploy-forge'),
+            'deployment_id' => $local_deployment_id,
+            'remote_deployment_id' => $deployment_id,
+        ], 200);
+    }
+
+    /**
+     * Handle deploy_forge:workflow_running event
+     * Called when GitHub Actions workflow starts running
+     */
+    private function handle_workflow_running_event(array $data): WP_REST_Response
+    {
+        $deployment_id = $data['deploymentId'] ?? '';
+        $workflow_run_id = $data['workflowRunId'] ?? '';
+
+        $this->logger->log('Webhook', 'Workflow running event received', [
+            'deployment_id' => $deployment_id,
+            'workflow_run_id' => $workflow_run_id,
+        ]);
+
+        // Update local deployment status
+        $deployment = $this->find_deployment_by_remote_id($deployment_id);
+        if ($deployment) {
+            $database = deploy_forge()->database;
+            $database->update_deployment($deployment->id, [
+                'status' => 'building',
+                'workflow_run_id' => $workflow_run_id,
+            ]);
+        }
+
+        return new WP_REST_Response([
+            'success' => true,
+            'message' => __('Workflow running status acknowledged.', 'deploy-forge'),
+            'deployment_id' => $deployment_id,
+        ], 200);
+    }
+
+    /**
+     * Handle deploy_forge:artifact_ready event
+     * Called when GitHub Actions workflow completes successfully and artifact is available
+     */
+    private function handle_artifact_ready_event(array $data): WP_REST_Response
+    {
+        $deployment_id = $data['deploymentId'] ?? '';
+        $artifact = $data['artifact'] ?? null;
+        $commit_sha = $data['commitSha'] ?? '';
+
+        $this->logger->log('Webhook', 'Artifact ready event received', [
+            'deployment_id' => $deployment_id,
+            'artifact' => $artifact,
+            'commit_sha' => $commit_sha,
+        ]);
+
+        // Find local deployment
+        $deployment = $this->find_deployment_by_remote_id($deployment_id);
+        if (!$deployment) {
+            // Try to find by commit hash as fallback
+            $deployment = $this->find_deployment_by_commit($commit_sha);
+        }
+
+        if (!$deployment) {
+            $this->logger->error('Webhook', 'No local deployment found for artifact_ready event', [
+                'deployment_id' => $deployment_id,
+                'commit_sha' => $commit_sha,
+            ]);
+            return new WP_REST_Response([
+                'success' => false,
+                'message' => __('No deployment found for this artifact.', 'deploy-forge'),
+            ], 404);
+        }
+
+        $database = deploy_forge()->database;
+
+        // Update deployment with artifact info
+        $database->update_deployment($deployment->id, [
+            'status' => 'queued',
+            'remote_deployment_id' => $deployment_id,
+            'artifact_id' => $artifact['id'] ?? null,
+            'artifact_name' => $artifact['name'] ?? null,
+            'artifact_size' => $artifact['sizeInBytes'] ?? null,
+            'artifact_download_url' => $artifact['downloadUrl'] ?? null,
+        ]);
+
+        $this->logger->log('Webhook', "Artifact ready, queueing deployment #{$deployment->id}");
+
+        // Process the deployment
+        $response_data = [
+            'success' => true,
+            'message' => __('Artifact ready. Deployment queued for processing.', 'deploy-forge'),
+            'deployment_id' => $deployment->id,
+        ];
+
+        // Try to send early response and process async
+        $this->send_early_response_and_process_async($deployment->id, $response_data);
+
+        return new WP_REST_Response($response_data, 200);
+    }
+
+    /**
+     * Handle deploy_forge:workflow_failed event
+     * Called when GitHub Actions workflow fails
+     */
+    private function handle_workflow_failed_event(array $data): WP_REST_Response
+    {
+        $deployment_id = $data['deploymentId'] ?? '';
+        $error = $data['error'] ?? '';
+        $conclusion = $data['workflowConclusion'] ?? '';
+
+        $this->logger->log('Webhook', 'Workflow failed event received', [
+            'deployment_id' => $deployment_id,
+            'error' => $error,
+            'conclusion' => $conclusion,
+        ]);
+
+        // Update local deployment status
+        $deployment = $this->find_deployment_by_remote_id($deployment_id);
+        if ($deployment) {
+            $database = deploy_forge()->database;
+            $database->update_deployment($deployment->id, [
+                'status' => 'failed',
+                'error_message' => $error ?: sprintf(__('Workflow failed with conclusion: %s', 'deploy-forge'), $conclusion),
+            ]);
+        }
+
+        return new WP_REST_Response([
+            'success' => true,
+            'message' => __('Workflow failure acknowledged.', 'deploy-forge'),
+            'deployment_id' => $deployment_id,
+        ], 200);
+    }
+
+    /**
+     * Handle deploy_forge:clone_ready event
+     * Called when a clone/direct download is ready (for non-workflow deployments)
+     * Note: The clone URL is not included in this webhook - it's returned from the acknowledge API call
+     */
+    private function handle_clone_ready_event(array $data): WP_REST_Response
+    {
+        $deployment_id = $data['deploymentId'] ?? '';
+        $commit_sha = $data['commitSha'] ?? '';
+        $branch = $data['branch'] ?? '';
+
+        $this->logger->log('Webhook', 'Clone ready event received', [
+            'deployment_id' => $deployment_id,
+            'commit_sha' => $commit_sha,
+            'branch' => $branch,
+        ]);
+
+        // Find local deployment
+        $deployment = $this->find_deployment_by_remote_id($deployment_id);
+        if (!$deployment) {
+            $deployment = $this->find_deployment_by_commit($commit_sha);
+        }
+
+        if (!$deployment) {
+            $this->logger->error('Webhook', 'No local deployment found for clone_ready event');
+            return new WP_REST_Response([
+                'success' => false,
+                'message' => __('No deployment found.', 'deploy-forge'),
+            ], 404);
+        }
+
+        $database = deploy_forge()->database;
+        $database->update_deployment($deployment->id, [
+            'status' => 'queued',
+            'remote_deployment_id' => $deployment_id,
+            'deployment_method' => 'direct_clone',
+        ]);
+
+        $response_data = [
+            'success' => true,
+            'message' => __('Clone ready. Deployment queued for processing.', 'deploy-forge'),
+            'deployment_id' => $deployment->id,
+        ];
+
+        // Process direct clone deployment asynchronously
+        $this->send_early_response_and_process_clone_async($deployment->id, $deployment_id, $response_data);
+
+        return new WP_REST_Response($response_data, 200);
+    }
+
+    /**
+     * Send early HTTP response and process clone deployment asynchronously
+     */
+    private function send_early_response_and_process_clone_async(int $local_deployment_id, string $remote_deployment_id, array $response_data): void
+    {
+        $this->logger->log('Webhook', "Attempting async clone processing for deployment #{$local_deployment_id}");
+
+        // Check if we can use fastcgi for immediate async processing
+        if (function_exists('fastcgi_finish_request')) {
+            $this->logger->log('Webhook', 'Using fastcgi_finish_request for async clone processing');
+
+            // Send the HTTP response immediately
+            status_header(200);
+            header('Content-Type: application/json');
+            echo wp_json_encode($response_data);
+
+            // Flush output buffers
+            if (ob_get_level() > 0) {
+                ob_end_flush();
+            }
+            flush();
+
+            // Close connection to client (FastCGI-specific)
+            fastcgi_finish_request();
+
+            // Now we can do heavy work without keeping the webhook waiting
+            @set_time_limit(300);
+            @ignore_user_abort(true);
+
+            // Process the clone deployment
+            $this->logger->log('Webhook', "Processing clone deployment #{$local_deployment_id} after early response");
+            $this->deployment_manager->process_clone_deployment($local_deployment_id, $remote_deployment_id);
+
+            exit;
+        } else {
+            // Fallback to WP-Cron
+            $this->logger->log('Webhook', 'fastcgi_finish_request not available, using WP-Cron fallback for clone');
+
+            // Schedule the clone deployment to be processed by WP-Cron
+            wp_schedule_single_event(time(), 'deploy_forge_process_clone_deployment', [$local_deployment_id, $remote_deployment_id]);
+        }
+    }
+
+    /**
+     * Find deployment by remote deployment ID
+     */
+    private function find_deployment_by_remote_id(string $remote_id): ?object
+    {
+        if (empty($remote_id)) {
+            return null;
+        }
+
+        global $wpdb;
+        $table_name = $wpdb->prefix . 'github_deployments';
+
+        return $wpdb->get_row(
+            $wpdb->prepare(
+                "SELECT * FROM {$table_name} WHERE remote_deployment_id = %s ORDER BY id DESC LIMIT 1",
+                $remote_id
+            )
+        );
+    }
+
+    /**
+     * Find deployment by commit hash
+     */
+    private function find_deployment_by_commit(string $commit_sha): ?object
+    {
+        if (empty($commit_sha)) {
+            return null;
+        }
+
+        global $wpdb;
+        $table_name = $wpdb->prefix . 'github_deployments';
+
+        return $wpdb->get_row(
+            $wpdb->prepare(
+                "SELECT * FROM {$table_name} WHERE commit_hash = %s AND status IN ('pending', 'building') ORDER BY id DESC LIMIT 1",
+                $commit_sha
+            )
+        );
     }
 
     /**

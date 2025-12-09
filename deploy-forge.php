@@ -165,6 +165,7 @@ class Deploy_Forge
 
         // Register WP-Cron handler for async deployment processing
         add_action('deploy_forge_process_queued_deployment', [$this, 'process_queued_deployment']);
+        add_action('deploy_forge_process_clone_deployment', [$this, 'process_clone_deployment'], 10, 2);
 
         // Admin notices for update system
         if (is_admin()) {
@@ -189,6 +190,7 @@ class Deploy_Forge
         // Clear scheduled cron jobs
         wp_clear_scheduled_hook('deploy_forge_check_build_status');
         wp_clear_scheduled_hook('deploy_forge_process_queued_deployment');
+        wp_clear_scheduled_hook('deploy_forge_process_clone_deployment');
 
         // Release any locks
         $this->database->release_deployment_lock();
@@ -221,6 +223,15 @@ class Deploy_Forge
             // Always release the lock when done (or on error)
             $this->database->release_deployment_lock();
         }
+    }
+
+    /**
+     * Process clone deployment (WP-Cron callback)
+     * Called when webhook uses WP-Cron fallback for direct clone deployments
+     */
+    public function process_clone_deployment(int $deployment_id, string $remote_deployment_id): void
+    {
+        $this->deployment_manager->process_clone_deployment($deployment_id, $remote_deployment_id);
     }
 
     /**

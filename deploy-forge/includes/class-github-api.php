@@ -284,8 +284,12 @@ class Deploy_Forge_GitHub_API
 
     /**
      * Download artifact via Deploy Forge backend
+     *
+     * @param int|string $artifact_id
+     * @param string $destination
+     * @param string|null $artifact_url Optional URL path from webhook (e.g., /api/plugin/github/artifacts/123/download)
      */
-    public function download_artifact(int $artifact_id, string $destination): bool|WP_Error
+    public function download_artifact(int|string $artifact_id, string $destination, ?string $artifact_url = null): bool|WP_Error
     {
         $api_key = $this->settings->get_api_key();
         if (empty($api_key)) {
@@ -294,11 +298,19 @@ class Deploy_Forge_GitHub_API
 
         $this->logger->log('GitHub_API', "Downloading artifact #$artifact_id to $destination");
 
-        // Use Deploy Forge artifact download endpoint
+        // Use URL from webhook if provided, otherwise build from artifact ID
         $backend_url = $this->settings->get_backend_url();
-        $download_url = $backend_url . '/api/plugin/github/artifacts/' . $artifact_id . '/download';
+        if (!empty($artifact_url)) {
+            // artifact_url is a path like "/api/plugin/github/artifacts/123/download"
+            $download_url = $backend_url . $artifact_url;
+        } else {
+            $download_url = $backend_url . '/api/plugin/github/artifacts/' . $artifact_id . '/download';
+        }
 
-        $this->logger->log('GitHub_API', "Requesting artifact from Deploy Forge backend");
+        $this->logger->log('GitHub_API', "Requesting artifact from Deploy Forge backend", [
+            'download_url' => $download_url,
+            'using_webhook_url' => !empty($artifact_url),
+        ]);
 
         // Download artifact through Deploy Forge proxy
         $download_args = [
@@ -554,6 +566,20 @@ class Deploy_Forge_GitHub_API
         // Prepare proxy request
         $proxy_url = $backend_url . '/api/plugin/github/proxy';
 
+        // For GET requests, append data as query parameters to the endpoint
+        // GET/HEAD/OPTIONS requests cannot have a body
+        $request_endpoint = $endpoint;
+        $request_data = null;
+
+        if ($method === 'GET' && !empty($data)) {
+            // Append query parameters to endpoint
+            $query_string = http_build_query($data);
+            $request_endpoint = $endpoint . (strpos($endpoint, '?') !== false ? '&' : '?') . $query_string;
+        } elseif ($method !== 'GET' && !empty($data)) {
+            // For POST/PUT/PATCH/DELETE, include data in body
+            $request_data = $data;
+        }
+
         $args = [
             'method' => 'POST',
             'headers' => [
@@ -562,14 +588,14 @@ class Deploy_Forge_GitHub_API
             ],
             'body' => wp_json_encode([
                 'method' => $method,
-                'endpoint' => $endpoint,
-                'data' => $data,
+                'endpoint' => $request_endpoint,
+                'data' => $request_data,
             ]),
             'timeout' => 30,
         ];
 
         // Log request
-        $this->logger->log_api_request($method, $endpoint, $data ?: [], ['via_proxy' => true]);
+        $this->logger->log_api_request($method, $request_endpoint, $data ?: [], ['via_proxy' => true]);
 
         $response = wp_remote_post($proxy_url, $args);
 
