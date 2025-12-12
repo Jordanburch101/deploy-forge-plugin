@@ -241,6 +241,52 @@ class Deploy_Forge_Webhook_Handler
     }
 
     /**
+     * Validate that the webhook payload's repository matches the configured repository
+     * This prevents attackers from deploying malicious code if they somehow forge a valid signature
+     *
+     * @param array $data The webhook payload
+     * @return bool|WP_REST_Response True if valid, or WP_REST_Response with error if invalid
+     */
+    private function validate_repository(array $data)
+    {
+        $payload_repo = $data['repoFullName'] ?? null;
+
+        // If no repo in payload, allow for backward compatibility (old backend versions)
+        // but log a warning
+        if (empty($payload_repo)) {
+            $this->logger->log('Webhook', 'Warning: No repository in webhook payload - skipping validation for backward compatibility');
+            return true;
+        }
+
+        $connection_data = $this->settings->get_connection_data();
+        $configured_repo = '';
+
+        if (!empty($connection_data['repo_owner']) && !empty($connection_data['repo_name'])) {
+            $configured_repo = $connection_data['repo_owner'] . '/' . $connection_data['repo_name'];
+        }
+
+        // If no repo configured locally, allow (site may not be fully set up)
+        if (empty($configured_repo)) {
+            $this->logger->log('Webhook', 'Warning: No repository configured locally - skipping validation');
+            return true;
+        }
+
+        // Case-insensitive comparison (GitHub repos are case-insensitive)
+        if (strcasecmp($payload_repo, $configured_repo) !== 0) {
+            $this->logger->error('Webhook', 'Repository mismatch - rejecting webhook', [
+                'payload_repo' => $payload_repo,
+                'configured_repo' => $configured_repo,
+            ]);
+            return new WP_REST_Response([
+                'success' => false,
+                'message' => __('Repository mismatch. This webhook is for a different repository.', 'deploy-forge'),
+            ], 403);
+        }
+
+        return true;
+    }
+
+    /**
      * Handle Deploy Forge custom events from the Vercel backend
      * These events are processed and enriched by the Deploy Forge service
      */
@@ -251,6 +297,20 @@ class Deploy_Forge_Webhook_Handler
             'deployment_id' => $data['deploymentId'] ?? null,
             'commit_sha' => $data['commitSha'] ?? null,
         ]);
+
+        // Validate repository for events that trigger deployments
+        $deployment_events = [
+            'deploy_forge:new_commit',
+            'deploy_forge:artifact_ready',
+            'deploy_forge:clone_ready',
+        ];
+
+        if (in_array($event, $deployment_events, true)) {
+            $validation = $this->validate_repository($data);
+            if ($validation instanceof WP_REST_Response) {
+                return $validation;
+            }
+        }
 
         switch ($event) {
             case 'deploy_forge:new_commit':
@@ -328,15 +388,6 @@ class Deploy_Forge_Webhook_Handler
             ]);
         }
 
-        // Check if auto-deploy is enabled
-        if (!$this->settings->get('auto_deploy_enabled')) {
-            return new WP_REST_Response([
-                'success' => true,
-                'message' => __('Auto-deploy is disabled. Deployment acknowledged but not started.', 'deploy-forge'),
-                'deployment_id' => $deployment_id,
-            ], 200);
-        }
-
         // Check if this is the configured branch
         $configured_branch = $this->settings->get('github_branch');
         if (!empty($configured_branch) && $branch !== $configured_branch) {
@@ -372,7 +423,12 @@ class Deploy_Forge_Webhook_Handler
         ]);
 
         // Check if manual approval is required
-        $require_manual_approval = $this->settings->get('require_manual_approval');
+        $require_manual_approval = $this->settings->get('require_manual_approval', false);
+
+        $this->logger->log('Webhook', 'Checking manual approval setting', [
+            'require_manual_approval' => $require_manual_approval,
+            'deployment_method' => $deployment_method,
+        ]);
 
         if ($require_manual_approval) {
             $this->logger->log('Webhook', 'Manual approval required - deployment pending', [
@@ -407,10 +463,41 @@ class Deploy_Forge_Webhook_Handler
             return new WP_REST_Response($response_data, 200);
         }
 
-        // For github_actions, just acknowledge - the backend will send artifact_ready when done
+        // For github_actions, trigger the workflow and wait for artifact_ready
+        $this->logger->log('Webhook', 'Triggering GitHub Actions workflow', [
+            'deployment_id' => $local_deployment_id,
+            'commit_sha' => $commit_sha,
+        ]);
+
+        // Trigger the GitHub Actions workflow
+        $trigger_result = $this->deployment_manager->trigger_github_build($local_deployment_id, $commit_sha);
+
+        if (!$trigger_result) {
+            $this->logger->error('Webhook', 'Failed to trigger GitHub Actions workflow', [
+                'deployment_id' => $local_deployment_id,
+            ]);
+
+            $database->update_deployment($local_deployment_id, [
+                'status' => 'failed',
+                'error_message' => __('Failed to trigger GitHub Actions workflow.', 'deploy-forge'),
+            ]);
+
+            return new WP_REST_Response([
+                'success' => false,
+                'message' => __('Failed to trigger GitHub Actions workflow.', 'deploy-forge'),
+                'deployment_id' => $local_deployment_id,
+            ], 500);
+        }
+
+        // Workflow triggered successfully - status is set to 'building' by trigger_github_build
+        $this->logger->log('Webhook', 'GitHub Actions workflow triggered - waiting for build', [
+            'deployment_id' => $local_deployment_id,
+            'status' => 'building',
+        ]);
+
         return new WP_REST_Response([
             'success' => true,
-            'message' => __('New commit acknowledged. Waiting for build to complete.', 'deploy-forge'),
+            'message' => __('GitHub Actions workflow triggered. Waiting for build to complete.', 'deploy-forge'),
             'deployment_id' => $local_deployment_id,
             'remote_deployment_id' => $deployment_id,
         ], 200);
@@ -675,18 +762,10 @@ class Deploy_Forge_Webhook_Handler
     }
 
     /**
-     * Handle push event
+     * Handle push event (legacy - direct GitHub webhooks)
      */
     private function handle_push_event(array $data): WP_REST_Response
     {
-        // Check if auto-deploy is enabled
-        if (!$this->settings->get('auto_deploy_enabled')) {
-            return new WP_REST_Response([
-                'success' => false,
-                'message' => __('Auto-deploy is disabled.', 'deploy-forge'),
-            ], 200);
-        }
-
         // Extract branch from ref (refs/heads/main -> main)
         $ref = $data['ref'] ?? '';
         $branch = str_replace('refs/heads/', '', $ref);

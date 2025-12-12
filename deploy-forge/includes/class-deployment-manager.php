@@ -143,7 +143,7 @@ class Deploy_Forge_Deployment_Manager
     /**
      * Trigger GitHub Actions workflow
      */
-    private function trigger_github_build(int $deployment_id, string $commit_hash): bool
+    public function trigger_github_build(int $deployment_id, ?string $commit_hash = null): bool
     {
         // Get workflow name - prefer connection data over settings
         $connection_data = $this->settings->get_connection_data();

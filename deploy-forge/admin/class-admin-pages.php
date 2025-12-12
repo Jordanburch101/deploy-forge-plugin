@@ -222,7 +222,6 @@ class Deploy_Forge_Admin_Pages extends Deploy_Forge_Ajax_Handler_Base
                 echo '<div class="notice notice-error"><p>' . esc_html__('Security verification failed. Please try again.', 'deploy-forge') . '</p></div>';
             } else {
                 $settings = [
-                    'auto_deploy_enabled' => isset($_POST['auto_deploy_enabled']),
                     'require_manual_approval' => isset($_POST['require_manual_approval']),
                     'create_backups' => isset($_POST['create_backups']),
                     'notification_email' => $_POST['notification_email'] ?? '',

@@ -83,11 +83,11 @@ if (!defined('ABSPATH')) {
                 $spinner.addClass('is-active');
 
                 $.ajax({
-                    url: githubDeployAdmin.ajaxUrl,
+                    url: deployForgeAdmin.ajaxUrl,
                     type: 'POST',
                     data: {
                         action: 'deploy_forge_get_logs',
-                        nonce: githubDeployAdmin.nonce,
+                        nonce: deployForgeAdmin.nonce,
                         lines: lines
                     },
                     success: function(response) {
@@ -123,11 +123,11 @@ if (!defined('ABSPATH')) {
                 $spinner.addClass('is-active');
 
                 $.ajax({
-                    url: githubDeployAdmin.ajaxUrl,
+                    url: deployForgeAdmin.ajaxUrl,
                     type: 'POST',
                     data: {
                         action: 'deploy_forge_clear_logs',
-                        nonce: githubDeployAdmin.nonce
+                        nonce: deployForgeAdmin.nonce
                     },
                     success: function(response) {
                         if (response.success) {

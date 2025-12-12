@@ -100,21 +100,15 @@ if (!defined('ABSPATH')) {
 
             <table class="form-table">
                 <tr>
-                    <th scope="row"><?php esc_html_e('Auto Deploy', 'deploy-forge'); ?></th>
-                    <td>
-                        <label>
-                            <input type="checkbox" name="auto_deploy_enabled" value="1" <?php checked($current_settings['auto_deploy_enabled']); ?>>
-                            <?php esc_html_e('Automatically deploy when code is pushed to the configured branch', 'deploy-forge'); ?>
-                        </label>
-                    </td>
-                </tr>
-                <tr>
                     <th scope="row"><?php esc_html_e('Manual Approval', 'deploy-forge'); ?></th>
                     <td>
                         <label>
                             <input type="checkbox" name="require_manual_approval" value="1" <?php checked($current_settings['require_manual_approval']); ?>>
-                            <?php esc_html_e('Require manual approval before deploying (only when auto-deploy is enabled)', 'deploy-forge'); ?>
+                            <?php esc_html_e('Require manual approval before deploying', 'deploy-forge'); ?>
                         </label>
+                        <p class="description">
+                            <?php esc_html_e('When checked, new commits will show as pending and require approval. When unchecked, deployments happen automatically.', 'deploy-forge'); ?>
+                        </p>
                     </td>
                 </tr>
                 <tr>
