@@ -571,13 +571,14 @@ class Deploy_Forge_Webhook_Handler
         $database = deploy_forge()->database;
 
         // Update deployment with artifact info
+        // Use downloadUrlEndpoint for direct download from GitHub CDN (bypasses Vercel bandwidth)
         $database->update_deployment($deployment->id, [
             'status' => 'queued',
             'remote_deployment_id' => $deployment_id,
             'artifact_id' => $artifact['id'] ?? null,
             'artifact_name' => $artifact['name'] ?? null,
             'artifact_size' => $artifact['sizeInBytes'] ?? null,
-            'artifact_download_url' => $artifact['downloadUrl'] ?? null,
+            'artifact_download_url' => $artifact['downloadUrlEndpoint'] ?? $artifact['downloadUrl'] ?? null,
         ]);
 
         $this->logger->log('Webhook', "Artifact ready, queueing deployment #{$deployment->id}");

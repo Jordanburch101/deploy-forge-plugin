@@ -1,6 +1,6 @@
 # Changelog
 
-**Last Updated:** 2025-12-01
+**Last Updated:** 2025-12-15
 
 This file tracks all significant changes, features, and planned enhancements for Deploy Forge by Jordan Burch.
 
@@ -22,6 +22,38 @@ Each entry should include:
 ## [Unreleased] - Planned Features
 
 _No unreleased changes_
+
+---
+
+## [1.0.2] - 2025-12-15
+
+### Enhanced
+
+**Direct Download from GitHub CDN**
+
+- Type: Enhancement / Performance
+- Description: Updated artifact download to use direct GitHub CDN URLs instead of proxying through Vercel
+- Problem: Previously, artifact downloads were proxied through the Vercel backend, consuming bandwidth
+- Solution: Two-step download process that bypasses Vercel:
+  1. Request a short-lived signed URL from `/api/plugin/github/artifacts/:id/download-url`
+  2. Download directly from GitHub CDN using the signed URL
+- Technical Changes:
+  - `class-github-api.php`: Rewrote `download_artifact()` to use direct URL endpoint
+  - `class-webhook-handler.php`: Now stores `downloadUrlEndpoint` instead of `downloadUrl` from webhooks
+  - `class-deployment-manager.php`: Updated variable names and documentation for clarity
+- Benefits:
+  - Reduced Vercel bandwidth usage
+  - Faster downloads (direct from CDN)
+  - Lower hosting costs
+  - Improved reliability (GitHub CDN is highly available)
+- Backward Compatibility:
+  - Falls back to building the endpoint URL from artifact ID if webhook doesn't provide it
+  - Graceful degradation if direct URL fetch fails
+- Files Modified:
+  - `deploy-forge/includes/class-github-api.php`
+  - `deploy-forge/includes/class-webhook-handler.php`
+  - `deploy-forge/includes/class-deployment-manager.php`
+- Related: Website `/api/plugin/github/artifacts/:id/download-url` endpoint
 
 ---
 

@@ -283,13 +283,17 @@ class Deploy_Forge_GitHub_API
     }
 
     /**
-     * Download artifact via Deploy Forge backend
+     * Download artifact via Deploy Forge backend using direct download URL
+     *
+     * This method uses a two-step process to minimize bandwidth usage:
+     * 1. Request a direct download URL from the backend (short-lived signed URL from GitHub CDN)
+     * 2. Download directly from GitHub CDN, bypassing Vercel bandwidth
      *
      * @param int|string $artifact_id
      * @param string $destination
-     * @param string|null $artifact_url Optional URL path from webhook (e.g., /api/plugin/github/artifacts/123/download)
+     * @param string|null $direct_url_endpoint Optional URL path for direct download endpoint (e.g., /api/plugin/github/artifacts/123/download-url)
      */
-    public function download_artifact(int|string $artifact_id, string $destination, ?string $artifact_url = null): bool|WP_Error
+    public function download_artifact(int|string $artifact_id, string $destination, ?string $direct_url_endpoint = null): bool|WP_Error
     {
         $api_key = $this->settings->get_api_key();
         if (empty($api_key)) {
@@ -298,47 +302,83 @@ class Deploy_Forge_GitHub_API
 
         $this->logger->log('GitHub_API', "Downloading artifact #$artifact_id to $destination");
 
-        // Use URL from webhook if provided, otherwise build from artifact ID
+        // Get backend URL
         $backend_url = $this->settings->get_backend_url();
-        if (!empty($artifact_url)) {
-            // artifact_url is a path like "/api/plugin/github/artifacts/123/download"
-            $download_url = $backend_url . $artifact_url;
+
+        // Step 1: Get the direct download URL from Deploy Forge backend
+        // This returns a short-lived signed URL from GitHub CDN
+        if (!empty($direct_url_endpoint)) {
+            $url_endpoint = $backend_url . $direct_url_endpoint;
         } else {
-            $download_url = $backend_url . '/api/plugin/github/artifacts/' . $artifact_id . '/download';
+            $url_endpoint = $backend_url . '/api/plugin/github/artifacts/' . $artifact_id . '/download-url';
         }
 
-        $this->logger->log('GitHub_API', "Requesting artifact from Deploy Forge backend", [
-            'download_url' => $download_url,
-            'using_webhook_url' => !empty($artifact_url),
+        $this->logger->log('GitHub_API', "Requesting direct download URL from Deploy Forge backend", [
+            'url_endpoint' => $url_endpoint,
+            'using_webhook_endpoint' => !empty($direct_url_endpoint),
         ]);
 
-        // Download artifact through Deploy Forge proxy
-        $download_args = [
+        $url_response = wp_remote_get($url_endpoint, [
             'headers' => [
                 'X-API-Key' => $api_key,
             ],
+            'timeout' => 30,
+        ]);
+
+        if (is_wp_error($url_response)) {
+            $this->logger->error('GitHub_API', "Failed to get direct download URL", $url_response);
+            return $url_response;
+        }
+
+        $url_status = wp_remote_retrieve_response_code($url_response);
+        $url_body = wp_remote_retrieve_body($url_response);
+        $url_data = json_decode($url_body, true);
+
+        if ($url_status !== 200 || empty($url_data['success']) || empty($url_data['downloadUrl'])) {
+            $error_message = $url_data['error'] ?? 'Failed to get direct download URL';
+            $this->logger->error('GitHub_API', "Failed to get direct download URL", [
+                'status_code' => $url_status,
+                'error' => $error_message,
+            ]);
+            return new WP_Error('url_failed', $error_message);
+        }
+
+        $direct_download_url = $url_data['downloadUrl'];
+        $expires_in = $url_data['expiresInSeconds'] ?? 55;
+
+        $this->logger->log('GitHub_API', "Got direct download URL", [
+            'expires_in_seconds' => $expires_in,
+            'artifact_name' => $url_data['artifact']['name'] ?? 'unknown',
+            'artifact_size' => $url_data['artifact']['sizeInBytes'] ?? 0,
+        ]);
+
+        // Step 2: Download directly from GitHub CDN using the signed URL
+        // This bypasses Vercel bandwidth entirely
+        $this->logger->log('GitHub_API', "Downloading artifact directly from GitHub CDN");
+
+        $download_args = [
             'timeout' => 300,
             'stream' => true,
             'filename' => $destination,
         ];
 
-        $download_response = wp_remote_get($download_url, $download_args);
+        $download_response = wp_remote_get($direct_download_url, $download_args);
 
         if (is_wp_error($download_response)) {
-            $this->logger->error('GitHub_API', "Artifact download failed", $download_response);
+            $this->logger->error('GitHub_API', "Direct artifact download failed", $download_response);
             return $download_response;
         }
 
         $download_status = wp_remote_retrieve_response_code($download_response);
 
-        $this->logger->log('GitHub_API', "Artifact download response", [
+        $this->logger->log('GitHub_API', "Direct artifact download response", [
             'status_code' => $download_status,
             'file_exists' => file_exists($destination),
             'file_size' => file_exists($destination) ? filesize($destination) : 0,
         ]);
 
         if ($download_status === 200 && file_exists($destination) && filesize($destination) > 0) {
-            $this->logger->log('GitHub_API', "Artifact download successful!");
+            $this->logger->log('GitHub_API', "Artifact download successful (direct from GitHub CDN)!");
             return true;
         }
 

@@ -428,14 +428,15 @@ class Deploy_Forge_Deployment_Manager
         try {
             // Check if we already have artifact info from the webhook
             $artifact_id = $deployment->artifact_id ?? null;
-            $artifact_download_url = $deployment->artifact_download_url ?? null;
+            // Direct URL endpoint for downloading artifact from GitHub CDN (bypasses Vercel bandwidth)
+            $direct_url_endpoint = $deployment->artifact_download_url ?? null;
 
             if (!empty($artifact_id)) {
                 // Use artifact info from webhook
                 $this->logger->log_deployment_step($deployment_id, 'Using Webhook Artifact', 'success', [
                     'artifact_id' => $artifact_id,
                     'artifact_name' => $deployment->artifact_name ?? 'unknown',
-                    'artifact_download_url' => $artifact_download_url,
+                    'direct_url_endpoint' => $direct_url_endpoint,
                 ]);
             } else {
                 // Fallback: Fetch artifacts from GitHub using workflow_run_id
@@ -490,7 +491,7 @@ class Deploy_Forge_Deployment_Manager
             }
 
             // Download and deploy
-            $this->download_and_deploy($deployment_id, $artifact_id, $artifact_download_url);
+            $this->download_and_deploy($deployment_id, $artifact_id, $direct_url_endpoint);
         } catch (Exception $e) {
             // Catch any exceptions and update deployment status
             $this->logger->error('Deployment', "Deployment #$deployment_id threw exception", [
@@ -510,9 +511,11 @@ class Deploy_Forge_Deployment_Manager
      *
      * @param int $deployment_id
      * @param int|string $artifact_id
-     * @param string|null $artifact_download_url Optional URL path from webhook (e.g., /api/plugin/github/artifacts/123/download)
+     * @param string|null $direct_url_endpoint Optional URL path for direct download endpoint from webhook
+     *                                          (e.g., /api/plugin/github/artifacts/123/download-url)
+     *                                          This endpoint returns a signed URL for direct download from GitHub CDN
      */
-    private function download_and_deploy(int $deployment_id, int|string $artifact_id, ?string $artifact_download_url = null): void
+    private function download_and_deploy(int $deployment_id, int|string $artifact_id, ?string $direct_url_endpoint = null): void
     {
         // Create temp directory
         $temp_dir = $this->get_temp_directory();
@@ -520,15 +523,15 @@ class Deploy_Forge_Deployment_Manager
 
         $this->logger->log_deployment_step($deployment_id, 'Download Artifact', 'started', [
             'artifact_id' => $artifact_id,
-            'artifact_download_url' => $artifact_download_url,
+            'direct_url_endpoint' => $direct_url_endpoint,
             'temp_dir' => $temp_dir,
             'artifact_zip' => $artifact_zip,
         ]);
 
         $this->log_deployment($deployment_id, 'Downloading artifact from GitHub...');
 
-        // Download artifact - use URL from webhook if provided, otherwise use artifact ID
-        $download_result = $this->github_api->download_artifact($artifact_id, $artifact_zip, $artifact_download_url);
+        // Download artifact - use direct URL endpoint from webhook if provided, otherwise use artifact ID
+        $download_result = $this->github_api->download_artifact($artifact_id, $artifact_zip, $direct_url_endpoint);
 
         if (is_wp_error($download_result)) {
             $this->logger->error('Deployment', "Deployment #$deployment_id artifact download failed", $download_result);
