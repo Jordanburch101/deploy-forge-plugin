@@ -1051,6 +1051,87 @@ class Deploy_Forge_GitHub_API
     }
 
     /**
+     * Trigger a deployment via Deploy Forge API
+     *
+     * This creates a deployment record on the Deploy Forge website and optionally
+     * triggers the GitHub workflow. Used for manual deployments initiated from WordPress.
+     *
+     * @param string|null $ref Branch or ref to deploy (defaults to configured branch)
+     * @param string|null $commit_sha Specific commit SHA to deploy
+     * @return array Result with deployment info or error
+     */
+    public function trigger_remote_deployment(?string $ref = null, ?string $commit_sha = null): array
+    {
+        $api_key = $this->settings->get_api_key();
+
+        if (empty($api_key)) {
+            $this->logger->log('GitHub_API', 'Cannot trigger remote deployment: not connected to Deploy Forge');
+            return [
+                'success' => false,
+                'message' => __('Not connected to Deploy Forge', 'deploy-forge'),
+            ];
+        }
+
+        $backend_url = $this->settings->get_backend_url();
+        $endpoint = $backend_url . '/api/plugin/deployments/trigger';
+
+        $body = [];
+
+        if ($ref) {
+            $body['ref'] = $ref;
+        }
+
+        if ($commit_sha) {
+            $body['commitSha'] = $commit_sha;
+        }
+
+        $this->logger->log('GitHub_API', 'Triggering remote deployment via Deploy Forge API', [
+            'ref' => $ref,
+            'commit_sha' => $commit_sha,
+        ]);
+
+        $response = wp_remote_post($endpoint, [
+            'headers' => [
+                'Content-Type' => 'application/json',
+                'X-API-Key' => $api_key,
+            ],
+            'body' => wp_json_encode($body),
+            'timeout' => 30,
+        ]);
+
+        if (is_wp_error($response)) {
+            $this->logger->error('GitHub_API', 'Failed to trigger remote deployment', $response);
+            return [
+                'success' => false,
+                'message' => $response->get_error_message(),
+            ];
+        }
+
+        $status_code = wp_remote_retrieve_response_code($response);
+        $response_body = wp_remote_retrieve_body($response);
+        $parsed_body = json_decode($response_body, true);
+
+        $this->logger->log('GitHub_API', 'Remote deployment trigger response', [
+            'status_code' => $status_code,
+            'response' => $parsed_body,
+        ]);
+
+        if ($status_code >= 400 || empty($parsed_body['success'])) {
+            $error = $parsed_body['error'] ?? 'Failed to trigger deployment';
+            return [
+                'success' => false,
+                'message' => $error,
+            ];
+        }
+
+        return [
+            'success' => true,
+            'message' => $parsed_body['message'] ?? 'Deployment triggered',
+            'deployment' => $parsed_body['deployment'] ?? null,
+        ];
+    }
+
+    /**
      * Get branches for current repository
      *
      * @return array Success status and branch list

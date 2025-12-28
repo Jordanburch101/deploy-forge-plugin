@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.22] - 2025-12-28
+
+### Fixed
+- **Manual deployments now tracked in Deploy Forge dashboard**: Manual deployments (both GitHub Actions and Direct Clone) now create deployment records on the Deploy Forge website
+  - Added `trigger_remote_deployment()` method to call `/api/plugin/deployments/trigger` endpoint
+  - Manual deployments now sync with Deploy Forge before triggering locally
+  - Remote deployment ID is stored and linked to local deployment record
+  - Fixes "No deployment found for workflow run" errors for manual deployments
+
 ## [1.0.21] - 2025-12-28
 
 ### Added

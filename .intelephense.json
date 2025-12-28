@@ -1,16 +1,8 @@
 {
-  "stubs": [
-    "Core",
-    "SPL",
-    "standard",
-    "zip",
-    "wordpress"
-  ],
-  "diagnostics": {
-    "undefinedTypes": false,
-    "undefinedConstants": false,
-    "undefinedClassConstants": false
-  }
+	"stubs": ["Core", "SPL", "standard", "zip", "wordpress"],
+	"diagnostics": {
+		"undefinedTypes": false,
+		"undefinedConstants": false,
+		"undefinedClassConstants": false
+	}
 }
-
-

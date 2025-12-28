@@ -4,7 +4,7 @@
  * Plugin Name: Deploy Forge
  * Plugin URI: https://github.com/jordanburch101/deploy-forge
  * Description: Automates theme deployment from GitHub repositories via Deploy Forge platform
- * Version: 1.0.21
+ * Version: 1.0.22
  * Author: Jordan Burch
  * Author URI: https://jordanburch.dev
  * License: GPL v2 or later
@@ -22,7 +22,7 @@ if (!defined('ABSPATH')) {
 }
 
 // Define plugin constants
-define('DEPLOY_FORGE_VERSION', '1.0.21');
+define('DEPLOY_FORGE_VERSION', '1.0.22');
 define('DEPLOY_FORGE_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('DEPLOY_FORGE_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('DEPLOY_FORGE_PLUGIN_BASENAME', plugin_basename(__FILE__));

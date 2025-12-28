@@ -77,7 +77,42 @@ class Deploy_Forge_Deployment_Manager
             }
         }
 
-        // Create deployment record
+        // Check deployment method - prefer connection data over settings
+        $connection_data = $this->settings->get_connection_data();
+        $deployment_method = !empty($connection_data['deployment_method'])
+            ? $connection_data['deployment_method']
+            : $this->settings->get('deployment_method', 'github_actions');
+
+        // For manual deployments, trigger via Deploy Forge API to create remote record
+        $remote_deployment_id = null;
+        if ($trigger_type === 'manual') {
+            $this->logger->log_deployment_step(0, 'Remote Trigger', 'initiating', [
+                'deployment_method' => $deployment_method,
+            ]);
+
+            $branch = $this->settings->get('github_branch', 'main');
+            $remote_result = $this->github_api->trigger_remote_deployment($branch, $commit_hash);
+
+            if (!$remote_result['success']) {
+                $this->logger->error('Deployment', 'Failed to trigger remote deployment', [
+                    'error' => $remote_result['message'],
+                ]);
+                return [
+                    'error' => 'remote_trigger_failed',
+                    'message' => $remote_result['message'],
+                ];
+            }
+
+            $remote_deployment_id = $remote_result['deployment']['id'] ?? null;
+            $remote_status = $remote_result['deployment']['status'] ?? 'pending';
+
+            $this->logger->log_deployment_step(0, 'Remote Deployment', 'created', [
+                'remote_deployment_id' => $remote_deployment_id,
+                'remote_status' => $remote_status,
+            ]);
+        }
+
+        // Create local deployment record
         $deployment_id = $this->database->insert_deployment([
             'commit_hash' => $commit_hash,
             'commit_message' => $commit_data['commit_message'] ?? '',
@@ -86,6 +121,8 @@ class Deploy_Forge_Deployment_Manager
             'status' => 'pending',
             'trigger_type' => $trigger_type,
             'triggered_by_user_id' => $user_id,
+            'remote_deployment_id' => $remote_deployment_id,
+            'deployment_method' => $deployment_method,
         ]);
 
         if (!$deployment_id) {
@@ -95,13 +132,8 @@ class Deploy_Forge_Deployment_Manager
 
         $this->logger->log_deployment_step($deployment_id, 'Database Record', 'created', [
             'deployment_id' => $deployment_id,
+            'remote_deployment_id' => $remote_deployment_id,
         ]);
-
-        // Check deployment method - prefer connection data over settings
-        $connection_data = $this->settings->get_connection_data();
-        $deployment_method = !empty($connection_data['deployment_method'])
-            ? $connection_data['deployment_method']
-            : $this->settings->get('deployment_method', 'github_actions');
 
         $this->logger->log_deployment_step($deployment_id, 'Deployment Method', 'determined', [
             'deployment_method' => $deployment_method,
@@ -115,10 +147,12 @@ class Deploy_Forge_Deployment_Manager
 
             if (!$direct_result) {
                 $this->logger->error('Deployment', "Deployment #$deployment_id direct clone failed");
+                $error_message = __('Failed to deploy via direct clone.', 'deploy-forge');
                 $this->database->update_deployment($deployment_id, [
                     'status' => 'failed',
-                    'error_message' => __('Failed to deploy via direct clone.', 'deploy-forge'),
+                    'error_message' => $error_message,
                 ]);
+                $this->report_status_to_backend($deployment_id, false, $error_message);
                 return false;
             }
 
@@ -126,13 +160,26 @@ class Deploy_Forge_Deployment_Manager
         }
 
         // GitHub Actions workflow (default)
+        // For manual deployments, the API already triggered the workflow, so just update local status
+        if ($trigger_type === 'manual' && $remote_deployment_id) {
+            $this->logger->log_deployment_step($deployment_id, 'Workflow Triggered', 'via_api', [
+                'remote_deployment_id' => $remote_deployment_id,
+            ]);
+            $this->database->update_deployment($deployment_id, [
+                'status' => 'building',
+            ]);
+            return $deployment_id;
+        }
+
+        // For non-manual (webhook) deployments, trigger locally
         $workflow_result = $this->trigger_github_build($deployment_id, $commit_hash);
 
         if (!$workflow_result) {
             $this->logger->error('Deployment', "Deployment #$deployment_id failed to trigger workflow");
+            $error_message = __('Failed to trigger GitHub Actions workflow.', 'deploy-forge');
             $this->database->update_deployment($deployment_id, [
                 'status' => 'failed',
-                'error_message' => __('Failed to trigger GitHub Actions workflow.', 'deploy-forge'),
+                'error_message' => $error_message,
             ]);
             return false;
         }
