@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.21] - 2025-12-28
+
+### Added
+- **Deployment Status Callback**: Plugin now reports deployment outcomes (success/failure) back to Deploy Forge API
+  - New `report_deployment_status()` method in `Deploy_Forge_GitHub_API` class
+  - New `report_status_to_backend()` helper in `Deploy_Forge_Deployment_Manager` class
+  - Calls `/api/plugin/deployments/complete` endpoint after deployments finish
+  - Includes error messages and deployment logs for failed deployments
+  - Works for both GitHub Actions and Direct Clone deployment methods
+
+### Fixed
+- Dashboard now shows accurate deployment status instead of being stuck on intermediate states (pending, ready, cloning)
+
 ## [1.0.0] - 2025-12-05
 
 ### 🚀 MAJOR RELEASE - Deploy Forge Platform Integration

@@ -952,6 +952,105 @@ class Deploy_Forge_GitHub_API
     }
 
     /**
+     * Report deployment status back to Deploy Forge API
+     *
+     * This allows WordPress to sync deployment outcomes (success/failure)
+     * back to the Deploy Forge dashboard.
+     *
+     * @param string $remote_deployment_id The Deploy Forge deployment ID
+     * @param bool $success Whether the deployment succeeded
+     * @param string|null $error_message Error message if failed
+     * @param string|null $logs Deployment logs
+     * @return array Result with success status
+     */
+    public function report_deployment_status(
+        string $remote_deployment_id,
+        bool $success,
+        ?string $error_message = null,
+        ?string $logs = null
+    ): array {
+        $api_key = $this->settings->get_api_key();
+
+        if (empty($api_key)) {
+            $this->logger->log('GitHub_API', 'Cannot report deployment status: not connected to Deploy Forge');
+            return [
+                'success' => false,
+                'message' => __('Not connected to Deploy Forge', 'deploy-forge'),
+            ];
+        }
+
+        if (empty($remote_deployment_id)) {
+            $this->logger->log('GitHub_API', 'Cannot report deployment status: no remote deployment ID');
+            return [
+                'success' => false,
+                'message' => __('No remote deployment ID available', 'deploy-forge'),
+            ];
+        }
+
+        $backend_url = $this->settings->get_backend_url();
+        $endpoint = $backend_url . '/api/plugin/deployments/complete';
+
+        $body = [
+            'deploymentId' => $remote_deployment_id,
+            'success' => $success,
+        ];
+
+        if ($error_message) {
+            $body['errorMessage'] = $error_message;
+        }
+
+        if ($logs) {
+            $body['logs'] = $logs;
+        }
+
+        $this->logger->log('GitHub_API', 'Reporting deployment status to Deploy Forge', [
+            'remote_deployment_id' => $remote_deployment_id,
+            'success' => $success,
+            'has_error_message' => !empty($error_message),
+            'has_logs' => !empty($logs),
+        ]);
+
+        $response = wp_remote_post($endpoint, [
+            'headers' => [
+                'Content-Type' => 'application/json',
+                'X-API-Key' => $api_key,
+            ],
+            'body' => wp_json_encode($body),
+            'timeout' => 30,
+        ]);
+
+        if (is_wp_error($response)) {
+            $this->logger->error('GitHub_API', 'Failed to report deployment status', $response);
+            return [
+                'success' => false,
+                'message' => $response->get_error_message(),
+            ];
+        }
+
+        $status_code = wp_remote_retrieve_response_code($response);
+        $response_body = wp_remote_retrieve_body($response);
+        $parsed_body = json_decode($response_body, true);
+
+        $this->logger->log('GitHub_API', 'Deployment status report response', [
+            'status_code' => $status_code,
+            'response' => $parsed_body,
+        ]);
+
+        if ($status_code >= 400 || empty($parsed_body['success'])) {
+            $error = $parsed_body['error'] ?? 'Unknown error';
+            return [
+                'success' => false,
+                'message' => $error,
+            ];
+        }
+
+        return [
+            'success' => true,
+            'message' => $parsed_body['message'] ?? 'Status reported successfully',
+        ];
+    }
+
+    /**
      * Get branches for current repository
      *
      * @return array Success status and branch list

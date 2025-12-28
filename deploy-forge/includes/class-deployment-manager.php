@@ -215,12 +215,14 @@ class Deploy_Forge_Deployment_Manager
         $download_result = $this->github_api->download_repository($commit_hash, $repo_zip);
 
         if (is_wp_error($download_result)) {
+            $error_message = $download_result->get_error_message();
             $this->logger->error('Deployment', "Deployment #$deployment_id repository download failed", $download_result);
             $this->database->update_deployment($deployment_id, [
                 'status' => 'failed',
-                'error_message' => $download_result->get_error_message(),
+                'error_message' => $error_message,
             ]);
-            $this->log_deployment($deployment_id, 'Download failed: ' . $download_result->get_error_message());
+            $this->log_deployment($deployment_id, 'Download failed: ' . $error_message);
+            $this->report_status_to_backend($deployment_id, false, $error_message);
             return false;
         }
 
@@ -494,14 +496,16 @@ class Deploy_Forge_Deployment_Manager
             $this->download_and_deploy($deployment_id, $artifact_id, $direct_url_endpoint);
         } catch (Exception $e) {
             // Catch any exceptions and update deployment status
+            $error_message = sprintf(__('Deployment failed: %s', 'deploy-forge'), $e->getMessage());
             $this->logger->error('Deployment', "Deployment #$deployment_id threw exception", [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ]);
             $this->database->update_deployment($deployment_id, [
                 'status' => 'failed',
-                'error_message' => sprintf(__('Deployment failed: %s', 'deploy-forge'), $e->getMessage()),
+                'error_message' => $error_message,
             ]);
+            $this->report_status_to_backend($deployment_id, false, $error_message);
             $this->database->release_deployment_lock();
         }
     }
@@ -534,12 +538,14 @@ class Deploy_Forge_Deployment_Manager
         $download_result = $this->github_api->download_artifact($artifact_id, $artifact_zip, $direct_url_endpoint);
 
         if (is_wp_error($download_result)) {
+            $error_message = $download_result->get_error_message();
             $this->logger->error('Deployment', "Deployment #$deployment_id artifact download failed", $download_result);
             $this->database->update_deployment($deployment_id, [
                 'status' => 'failed',
-                'error_message' => $download_result->get_error_message(),
+                'error_message' => $error_message,
             ]);
-            $this->log_deployment($deployment_id, 'Download failed: ' . $download_result->get_error_message());
+            $this->log_deployment($deployment_id, 'Download failed: ' . $error_message);
+            $this->report_status_to_backend($deployment_id, false, $error_message);
             return;
         }
 
@@ -631,13 +637,15 @@ class Deploy_Forge_Deployment_Manager
         $zip_open_result = $zip->open($artifact_zip);
 
         if ($zip_open_result !== true) {
+            $error_message = sprintf(__('Failed to open ZIP file (error code: %d).', 'deploy-forge'), $zip_open_result);
             $this->logger->error('Deployment', "Failed to open ZIP file", [
                 'error_code' => $zip_open_result,
             ]);
             $this->database->update_deployment($deployment_id, [
                 'status' => 'failed',
-                'error_message' => sprintf(__('Failed to open ZIP file (error code: %d).', 'deploy-forge'), $zip_open_result),
+                'error_message' => $error_message,
             ]);
+            $this->report_status_to_backend($deployment_id, false, $error_message);
             return;
         }
 
@@ -645,11 +653,13 @@ class Deploy_Forge_Deployment_Manager
         $zip->close();
 
         if (!$extract_result) {
+            $error_message = __('Failed to extract ZIP file.', 'deploy-forge');
             $this->logger->error('Deployment', "Failed to extract ZIP file");
             $this->database->update_deployment($deployment_id, [
                 'status' => 'failed',
-                'error_message' => __('Failed to extract ZIP file.', 'deploy-forge'),
+                'error_message' => $error_message,
             ]);
+            $this->report_status_to_backend($deployment_id, false, $error_message);
             return;
         }
 
@@ -861,12 +871,14 @@ class Deploy_Forge_Deployment_Manager
         $copy_result = $this->recursive_copy($source_theme_dir, $target_theme_path);
 
         if (!$copy_result) {
+            $error_message = __('Failed to copy files to theme directory.', 'deploy-forge');
             $this->logger->error('Deployment', "Deployment #$deployment_id file copy failed");
             $this->database->update_deployment($deployment_id, [
                 'status' => 'failed',
-                'error_message' => __('Failed to copy files to theme directory.', 'deploy-forge'),
+                'error_message' => $error_message,
             ]);
             $this->log_deployment($deployment_id, 'Deployment failed: Unable to copy files.');
+            $this->report_status_to_backend($deployment_id, false, $error_message);
             return;
         }
 
@@ -892,6 +904,9 @@ class Deploy_Forge_Deployment_Manager
 
         $this->logger->log_deployment_step($deployment_id, 'Deployment Complete', 'SUCCESS!');
         $this->log_deployment($deployment_id, 'Deployment completed successfully!');
+
+        // Report success status back to Deploy Forge API
+        $this->report_status_to_backend($deployment_id, true);
 
         // Trigger action hook
         do_action('deploy_forge_completed', $deployment_id);
@@ -1242,6 +1257,61 @@ class Deploy_Forge_Deployment_Manager
     }
 
     /**
+     * Report deployment status back to Deploy Forge API
+     *
+     * This syncs the deployment outcome (success/failure) back to the
+     * Deploy Forge dashboard so users can see real-time status.
+     *
+     * @param int $deployment_id Local deployment ID
+     * @param bool $success Whether deployment succeeded
+     * @param string|null $error_message Error message if failed
+     */
+    private function report_status_to_backend(int $deployment_id, bool $success, ?string $error_message = null): void
+    {
+        $deployment = $this->database->get_deployment($deployment_id);
+
+        if (!$deployment) {
+            $this->logger->log('Deployment', "Cannot report status: deployment #$deployment_id not found");
+            return;
+        }
+
+        $remote_deployment_id = $deployment->remote_deployment_id ?? '';
+
+        if (empty($remote_deployment_id)) {
+            $this->logger->log('Deployment', "Cannot report status: no remote deployment ID for #$deployment_id");
+            return;
+        }
+
+        // Get deployment logs to send back
+        $logs = $deployment->deployment_logs ?? null;
+
+        $this->logger->log('Deployment', "Reporting deployment status to Deploy Forge", [
+            'deployment_id' => $deployment_id,
+            'remote_deployment_id' => $remote_deployment_id,
+            'success' => $success,
+        ]);
+
+        $result = $this->github_api->report_deployment_status(
+            $remote_deployment_id,
+            $success,
+            $error_message,
+            $logs
+        );
+
+        if ($result['success']) {
+            $this->logger->log('Deployment', "Successfully reported status to Deploy Forge", [
+                'deployment_id' => $deployment_id,
+                'message' => $result['message'],
+            ]);
+        } else {
+            $this->logger->error('Deployment', "Failed to report status to Deploy Forge", [
+                'deployment_id' => $deployment_id,
+                'error' => $result['message'],
+            ]);
+        }
+    }
+
+    /**
      * Log deployment message
      */
     private function log_deployment(int $deployment_id, string $message): void
@@ -1399,14 +1469,16 @@ class Deploy_Forge_Deployment_Manager
             $download_result = $this->github_api->download_repository($ref, $repo_zip);
 
             if (is_wp_error($download_result)) {
+                $error_message = $download_result->get_error_message();
                 $this->logger->error('Deployment', "Clone deployment #$deployment_id download failed", [
-                    'error' => $download_result->get_error_message(),
+                    'error' => $error_message,
                 ]);
                 $this->database->update_deployment($deployment_id, [
                     'status' => 'failed',
-                    'error_message' => $download_result->get_error_message(),
+                    'error_message' => $error_message,
                 ]);
-                $this->log_deployment($deployment_id, 'Download failed: ' . $download_result->get_error_message());
+                $this->log_deployment($deployment_id, 'Download failed: ' . $error_message);
+                $this->report_status_to_backend($deployment_id, false, $error_message);
                 $this->database->release_deployment_lock();
                 return;
             }
@@ -1433,14 +1505,16 @@ class Deploy_Forge_Deployment_Manager
             $this->extract_and_deploy($deployment_id, $repo_zip);
 
         } catch (Exception $e) {
+            $error_message = sprintf(__('Clone deployment failed: %s', 'deploy-forge'), $e->getMessage());
             $this->logger->error('Deployment', "Clone deployment #$deployment_id threw exception", [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ]);
             $this->database->update_deployment($deployment_id, [
                 'status' => 'failed',
-                'error_message' => sprintf(__('Clone deployment failed: %s', 'deploy-forge'), $e->getMessage()),
+                'error_message' => $error_message,
             ]);
+            $this->report_status_to_backend($deployment_id, false, $error_message);
             $this->database->release_deployment_lock();
         }
     }
