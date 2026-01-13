@@ -30,6 +30,7 @@ class Deploy_Forge_Admin_Pages extends Deploy_Forge_Ajax_Handler_Base
 
         add_action('admin_menu', [$this, 'add_admin_menu']);
         add_action('admin_enqueue_scripts', [$this, 'enqueue_admin_assets']);
+        add_action('admin_head', [$this, 'admin_menu_icon_styles']);
         add_action('admin_init', [$this, 'register_settings']);
 
         // AJAX handlers
@@ -70,7 +71,7 @@ class Deploy_Forge_Admin_Pages extends Deploy_Forge_Ajax_Handler_Base
             'manage_options',
             'deploy-forge',
             [$this, 'render_dashboard_page'],
-            'dashicons-update',
+            plugins_url('admin/images/deploy-forge-menu-icon.png', dirname(__FILE__)),
             80
         );
 
@@ -109,6 +110,22 @@ class Deploy_Forge_Admin_Pages extends Deploy_Forge_Ajax_Handler_Base
             'deploy-forge-logs',
             [$this, 'render_logs_page']
         );
+    }
+
+    /**
+     * Output inline styles for admin menu icon
+     * This runs on all admin pages to ensure the icon is always fully visible
+     */
+    public function admin_menu_icon_styles(): void
+    {
+        ?>
+        <style>
+            #adminmenu .toplevel_page_deploy-forge .wp-menu-image img {
+                opacity: 1;
+                padding-top: 6px;
+            }
+        </style>
+        <?php
     }
 
     /**
@@ -239,7 +256,6 @@ class Deploy_Forge_Admin_Pages extends Deploy_Forge_Ajax_Handler_Base
         }
 
         $current_settings = $this->settings->get_all();
-        $webhook_url = $this->settings->get_webhook_url();
         $is_connected = $this->settings->is_connected();
         $connection_data = $this->settings->get_connection_data();
         $settings = $this->settings; // Make settings object available to template

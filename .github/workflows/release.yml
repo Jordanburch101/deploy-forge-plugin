@@ -38,8 +38,8 @@ jobs:
 
       - name: Verify version in plugin file
         run: |
-          echo "Checking version in deploy-forge.php..."
-          FILE_VERSION=$(grep -oP "Version:\s*\K[0-9]+\.[0-9]+\.[0-9]+" deploy-forge.php)
+          echo "Checking version in deploy-forge/deploy-forge.php..."
+          FILE_VERSION=$(grep -oP "Version:\s*\K[0-9]+\.[0-9]+\.[0-9]+" deploy-forge/deploy-forge.php)
           TAG_VERSION="${{ steps.validate.outputs.version }}"
 
           echo "  Plugin file version: $FILE_VERSION"
@@ -49,11 +49,11 @@ jobs:
             echo ""
             echo "❌ Error: Version mismatch detected!"
             echo ""
-            echo "  The version in deploy-forge.php ($FILE_VERSION) does not match"
+            echo "  The version in deploy-forge/deploy-forge.php ($FILE_VERSION) does not match"
             echo "  the git tag version ($TAG_VERSION)."
             echo ""
-            echo "  Please update the version in deploy-forge.php and try again:"
-            echo "  1. Edit deploy-forge.php"
+            echo "  Please update the version in deploy-forge/deploy-forge.php and try again:"
+            echo "  1. Edit deploy-forge/deploy-forge.php"
             echo "  2. Change 'Version: $FILE_VERSION' to 'Version: $TAG_VERSION'"
             echo "  3. Commit: git commit -am \"Update version to $TAG_VERSION\""
             echo "  4. Move tag: git tag -f ${{ steps.validate.outputs.tag }}"
@@ -67,13 +67,8 @@ jobs:
       - name: Build plugin ZIP
         run: |
           echo "Building plugin ZIP..."
-          chmod +x build-plugin.sh
-
-          # Modify build script to use version from tag instead of hardcoded
-          # Replace the VERSION line in the build script temporarily
-          sed -i "s/VERSION=\".*\"/VERSION=\"${{ steps.validate.outputs.version }}\"/" build-plugin.sh
-
-          ./build-plugin.sh
+          chmod +x build.sh
+          ./build.sh
 
           echo ""
           echo "📦 Build output:"

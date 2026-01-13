@@ -6,433 +6,435 @@
 @import url("shared-styles.css");
 
 /* ==========================================================================
-   Welcome Banner - Vercel-inspired Dark Theme
+   Welcome Banner - Deploy Forge Website Theme
    ========================================================================== */
 
 .deploy-forge-welcome-banner {
-	background: linear-gradient(135deg, #000000 0%, #0a0a0a 100%);
-	border: 1px solid #333333;
-	border-radius: 2px;
-	padding: 0;
-	margin: 20px 0 30px;
-	box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
-	overflow: hidden;
+  background: linear-gradient(135deg, #000000 0%, #09090b 50%, #0a0a0a 100%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 0;
+  margin: 20px 0 30px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.05);
+  overflow: hidden;
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 
 .deploy-forge-welcome-content {
-	padding: 32px 40px;
-	position: relative;
+  padding: 36px 44px;
+  position: relative;
 }
 
 .deploy-forge-welcome-title {
-	font-size: 28px;
-	font-weight: 600;
-	color: #ffffff;
-	margin: 0 0 12px;
-	line-height: 1.2;
+  font-size: 30px;
+  font-weight: 700;
+  color: #ffffff;
+  margin: 0 0 14px;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
 }
 
 .deploy-forge-welcome-description {
-	font-size: 16px;
-	color: #a1a1a1;
-	line-height: 1.6;
-	margin: 0 0 24px;
-	max-width: 700px;
+  font-size: 16px;
+  font-weight: 300;
+  color: #a1a1aa;
+  line-height: 1.7;
+  margin: 0 0 28px;
+  max-width: 700px;
 }
 
 .deploy-forge-welcome-button {
-	display: inline-flex;
-	align-items: center;
-	gap: 8px;
-	padding: 12px 24px;
-	background: #ffffff;
-	color: #000000;
-	font-size: 14px;
-	font-weight: 500;
-	border-radius: 2px;
-	border: 1px solid #ffffff;
-	text-decoration: none;
-	transition: all 0.2s ease;
-	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 28px;
+  background: #00ff94;
+  color: #000000;
+  font-size: 14px;
+  font-weight: 600;
+  border-radius: 8px;
+  border: none;
+  text-decoration: none;
+  transition: all 0.3s ease-out;
+  box-shadow: 0 4px 14px rgba(0, 255, 148, 0.25), 0 0 0 1px rgba(0, 255, 148, 0.1);
 }
 
 .deploy-forge-welcome-button:hover {
-	background: #e6e6e6;
-	border-color: #e6e6e6;
-	color: #000000;
-	transform: translateY(-1px);
-	box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  background: #00ff94;
+  color: #000000;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 255, 148, 0.35), 0 0 0 1px rgba(0, 255, 148, 0.2);
 }
 
 .deploy-forge-welcome-button:focus {
-	outline: 2px solid #ffffff;
-	outline-offset: 2px;
+  outline: 2px solid #00ff94;
+  outline-offset: 2px;
 }
 
 .deploy-forge-welcome-button .dashicons {
-	font-size: 20px;
-	width: 20px;
-	height: 20px;
-	margin: 0;
+  font-size: 18px;
+  width: 18px;
+  height: 18px;
+  margin: 0;
 }
 
 /* Connection & Controls Header */
 .deploy-forge-header {
-	background: #fff;
-	border: 1px solid #c3c4c7;
-	border-radius: 4px;
-	padding: 0;
-	margin: 20px 0;
-	box-shadow: 0 1px 1px rgba(0, 0, 0, 0.04);
+  background: #fff;
+  border: 1px solid #c3c4c7;
+  border-radius: 4px;
+  padding: 0;
+  margin: 20px 0;
+  box-shadow: 0 1px 1px rgba(0, 0, 0, 0.04);
 }
 
 .deploy-forge-header-content {
-	padding: 20px;
+  padding: 20px;
 }
 
 .deploy-forge-header h2 {
-	margin: 0 0 15px;
-	font-size: 18px;
-	font-weight: 600;
+  margin: 0 0 15px;
+  font-size: 18px;
+  font-weight: 600;
 }
 
 .deploy-forge-header-body {
-	display: flex;
-	justify-content: space-between;
-	align-items: flex-start;
-	gap: 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 20px;
 }
 
 .deploy-forge-connection-info {
-	flex: 1;
+  flex: 1;
 }
 
 .deploy-forge-connection-info p {
-	margin: 8px 0;
-	line-height: 1.6;
+  margin: 8px 0;
+  line-height: 1.6;
 }
 
 .deploy-forge-header-actions {
-	flex-shrink: 0;
+  flex-shrink: 0;
 }
 
 .deploy-forge-header-actions .button-large {
-	padding: 8px 24px !important;
-	height: auto !important;
-	font-size: 14px !important;
-	min-width: 140px;
+  padding: 8px 24px !important;
+  height: auto !important;
+  font-size: 14px !important;
+  min-width: 140px;
 }
 
 /* Connection Status */
 .status-connected {
-	color: #00a32a;
-	font-weight: 600;
+  color: #00a32a;
+  font-weight: 600;
 }
 
 .status-connected .dashicons {
-	color: #00a32a;
+  color: #00a32a;
 }
 
 .status-disconnected {
-	color: #d63638;
-	font-weight: 600;
+  color: #d63638;
+  font-weight: 600;
 }
 
 .status-disconnected .dashicons {
-	color: #d63638;
+  color: #d63638;
 }
 
 /* Stats Section */
 .deploy-forge-stats-section {
-	background: #fff;
-	border: 1px solid #c3c4c7;
-	border-radius: 4px;
-	padding: 20px;
-	margin: 20px 0;
-	box-shadow: 0 1px 1px rgba(0, 0, 0, 0.04);
+  background: #fff;
+  border: 1px solid #c3c4c7;
+  border-radius: 4px;
+  padding: 20px;
+  margin: 20px 0;
+  box-shadow: 0 1px 1px rgba(0, 0, 0, 0.04);
 }
 
 .deploy-forge-stats-section h2 {
-	margin: 0 0 15px;
-	font-size: 18px;
-	font-weight: 600;
+  margin: 0 0 15px;
+  font-size: 18px;
+  font-weight: 600;
 }
 
 .deploy-forge-stats {
-	display: grid;
-	grid-template-columns: repeat(4, 1fr);
-	gap: 15px;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 15px;
 }
 
 .stat-item {
-	display: block;
-	text-align: center;
-	padding: 20px 15px;
-	background: #f6f7f7;
-	border: 1px solid #e5e5e5;
-	border-radius: 4px;
-	text-decoration: none;
-	color: inherit;
-	transition: all 0.2s ease;
+  display: block;
+  text-align: center;
+  padding: 20px 15px;
+  background: #f6f7f7;
+  border: 1px solid #e5e5e5;
+  border-radius: 4px;
+  text-decoration: none;
+  color: inherit;
+  transition: all 0.2s ease;
 }
 
 .stat-item.stat-clickable {
-	cursor: pointer;
+  cursor: pointer;
 }
 
 .stat-item.stat-clickable:hover {
-	background: #fff;
-	border-color: #2271b1;
-	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-	transform: translateY(-2px);
+  background: #fff;
+  border-color: #2271b1;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transform: translateY(-2px);
 }
 
 .stat-number {
-	font-size: 36px;
-	font-weight: 700;
-	line-height: 1;
-	color: #1d2327;
-	margin-bottom: 8px;
+  font-size: 36px;
+  font-weight: 700;
+  line-height: 1;
+  color: #1d2327;
+  margin-bottom: 8px;
 }
 
 .stat-label {
-	font-size: 14px;
-	font-weight: 600;
-	color: #646970;
-	margin: 8px 0 4px;
-	text-transform: capitalize;
+  font-size: 14px;
+  font-weight: 600;
+  color: #646970;
+  margin: 8px 0 4px;
+  text-transform: capitalize;
 }
 
 .stat-action {
-	font-size: 12px;
-	color: #8c8f94;
-	margin-top: 4px;
+  font-size: 12px;
+  color: #8c8f94;
+  margin-top: 4px;
 }
 
 .stat-success .stat-number {
-	color: #00a32a;
+  color: #00a32a;
 }
 
 .stat-failed .stat-number {
-	color: #d63638;
+  color: #d63638;
 }
 
 .stat-pending .stat-number {
-	color: #dba617;
+  color: #dba617;
 }
 
 /* Deployment Status Badges - now in shared-styles.css */
 
 /* Latest Deployment Summary */
 .deploy-forge-latest-summary {
-	background: #fff;
-	border: 1px solid #c3c4c7;
-	border-radius: 4px;
-	padding: 20px;
-	margin: 20px 0;
-	box-shadow: 0 1px 1px rgba(0, 0, 0, 0.04);
+  background: #fff;
+  border: 1px solid #c3c4c7;
+  border-radius: 4px;
+  padding: 20px;
+  margin: 20px 0;
+  box-shadow: 0 1px 1px rgba(0, 0, 0, 0.04);
 }
 
 .deploy-forge-latest-summary h2 {
-	margin: 0 0 15px;
-	font-size: 18px;
-	font-weight: 600;
+  margin: 0 0 15px;
+  font-size: 18px;
+  font-weight: 600;
 }
 
 .deploy-forge-summary-content {
-	display: flex;
-	justify-content: space-between;
-	gap: 30px;
+  display: flex;
+  justify-content: space-between;
+  gap: 30px;
 }
 
 .deploy-forge-summary-details {
-	flex: 1;
+  flex: 1;
 }
 
 .deploy-forge-summary-details p {
-	margin: 10px 0;
-	line-height: 1.6;
+  margin: 10px 0;
+  line-height: 1.6;
 }
 
 .deploy-forge-summary-meta {
-	flex-shrink: 0;
-	text-align: right;
-	min-width: 200px;
+  flex-shrink: 0;
+  text-align: right;
+  min-width: 200px;
 }
 
 .deploy-forge-summary-status {
-	margin-bottom: 15px;
+  margin-bottom: 15px;
 }
 
 .deploy-forge-summary-meta p {
-	margin: 10px 0;
-	line-height: 1.6;
+  margin: 10px 0;
+  line-height: 1.6;
 }
 
 /* Recent Deployments */
 .deploy-forge-recent {
-	margin-top: 20px;
-	background: #fff;
-	border: 1px solid #c3c4c7;
-	border-radius: 4px;
-	padding: 20px;
-	box-shadow: 0 1px 1px rgba(0, 0, 0, 0.04);
+  margin-top: 20px;
+  background: #fff;
+  border: 1px solid #c3c4c7;
+  border-radius: 4px;
+  padding: 20px;
+  box-shadow: 0 1px 1px rgba(0, 0, 0, 0.04);
 }
 
 .deploy-forge-recent h2 {
-	margin: 0 0 15px;
-	font-size: 18px;
-	font-weight: 600;
+  margin: 0 0 15px;
+  font-size: 18px;
+  font-weight: 600;
 }
 
 /* Table Controls */
 .deploy-forge-table-controls {
-	display: flex;
-	gap: 15px;
-	margin-bottom: 15px;
+  display: flex;
+  gap: 15px;
+  margin-bottom: 15px;
 }
 
 .deploy-forge-search-input {
-	flex: 1;
-	max-width: 400px;
-	padding: 8px 12px;
-	border: 1px solid #c3c4c7;
-	border-radius: 4px;
-	font-size: 14px;
+  flex: 1;
+  max-width: 400px;
+  padding: 8px 12px;
+  border: 1px solid #c3c4c7;
+  border-radius: 4px;
+  font-size: 14px;
 }
 
 .deploy-forge-search-input:focus {
-	border-color: #2271b1;
-	outline: none;
-	box-shadow: 0 0 0 1px #2271b1;
+  border-color: #2271b1;
+  outline: none;
+  box-shadow: 0 0 0 1px #2271b1;
 }
 
 .deploy-forge-status-filter {
-	padding: 8px 32px 8px 12px;
-	border: 1px solid #c3c4c7;
-	border-radius: 4px;
-	font-size: 14px;
-	background: #fff;
-	cursor: pointer;
+  padding: 8px 32px 8px 12px;
+  border: 1px solid #c3c4c7;
+  border-radius: 4px;
+  font-size: 14px;
+  background: #fff;
+  cursor: pointer;
 }
 
 .deploy-forge-status-filter:focus {
-	border-color: #2271b1;
-	outline: none;
-	box-shadow: 0 0 0 1px #2271b1;
+  border-color: #2271b1;
+  outline: none;
+  box-shadow: 0 0 0 1px #2271b1;
 }
 
 /* Buttons - hero button styles now in shared-styles.css */
 
 #deploy-now-btn:disabled {
-	opacity: 0.5;
-	cursor: not-allowed;
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 /* Loading States - now in shared-styles.css */
 
 /* Settings Page */
 .deploy-forge-settings .form-table th {
-	width: 220px;
+  width: 220px;
 }
 
 .deploy-forge-settings code {
-	background: #f0f0f1;
-	padding: 2px 6px;
-	border-radius: 3px;
+  background: #f0f0f1;
+  padding: 2px 6px;
+  border-radius: 3px;
 }
 
 /* Connection Result */
 #connection-result .notice {
-	margin: 0;
+  margin: 0;
 }
 
 /* History Page */
 .deploy-forge-history .wp-list-table {
-	margin-top: 20px;
+  margin-top: 20px;
 }
 
 .deploy-forge-history .wp-list-table th,
 .deploy-forge-history .wp-list-table td {
-	vertical-align: middle;
+  vertical-align: middle;
 }
 
 .deploy-forge-history .dashicons-external {
-	font-size: 16px;
-	text-decoration: none;
-	color: #2271b1;
+  font-size: 16px;
+  text-decoration: none;
+  color: #2271b1;
 }
 
 .deploy-forge-history .dashicons-external:hover {
-	color: #135e96;
+  color: #135e96;
 }
 
 /* Modal Styles - now in shared-styles.css */
 
 /* Responsive Design */
 @media screen and (max-width: 782px) {
-	.deploy-forge-header-body {
-		flex-direction: column;
-	}
+  .deploy-forge-header-body {
+    flex-direction: column;
+  }
 
-	.deploy-forge-header-actions {
-		width: 100%;
-	}
+  .deploy-forge-header-actions {
+    width: 100%;
+  }
 
-	.deploy-forge-header-actions .button-large {
-		width: 100%;
-	}
+  .deploy-forge-header-actions .button-large {
+    width: 100%;
+  }
 
-	.deploy-forge-stats {
-		grid-template-columns: repeat(2, 1fr);
-	}
+  .deploy-forge-stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
 
-	.deploy-forge-summary-content {
-		flex-direction: column;
-	}
+  .deploy-forge-summary-content {
+    flex-direction: column;
+  }
 
-	.deploy-forge-summary-meta {
-		text-align: left;
-	}
+  .deploy-forge-summary-meta {
+    text-align: left;
+  }
 
-	.deploy-forge-table-controls {
-		flex-direction: column;
-	}
+  .deploy-forge-table-controls {
+    flex-direction: column;
+  }
 
-	.deploy-forge-search-input {
-		max-width: 100%;
-	}
+  .deploy-forge-search-input {
+    max-width: 100%;
+  }
 
-	.deploy-forge-history .wp-list-table {
-		font-size: 13px;
-	}
+  .deploy-forge-history .wp-list-table {
+    font-size: 13px;
+  }
 
-	.deploy-forge-history .wp-list-table th,
-	.deploy-forge-history .wp-list-table td {
-		padding: 8px 5px;
-	}
+  .deploy-forge-history .wp-list-table th,
+  .deploy-forge-history .wp-list-table td {
+    padding: 8px 5px;
+  }
 }
 
 @media screen and (max-width: 480px) {
-	.deploy-forge-stats {
-		grid-template-columns: 1fr;
-	}
+  .deploy-forge-stats {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* Notices */
 .deploy-forge-notice {
-	margin: 15px 0;
+  margin: 15px 0;
 }
 
 /* Code blocks in modal - now in shared-styles.css */
 
 /* Action buttons */
 .deploy-forge-actions {
-	margin-top: 15px;
+  margin-top: 15px;
 }
 
 .deploy-forge-actions .button {
-	margin-right: 10px;
+  margin-right: 10px;
 }
 
 /* Success/Error Messages - now in shared-styles.css */
@@ -440,115 +442,116 @@
 /* Repository Selector Styles */
 .repo-selector-wrapper,
 .workflow-selector-wrapper {
-	display: flex;
-	align-items: center;
-	gap: 10px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .repo-selector-wrapper select,
 .workflow-selector-wrapper select {
-	flex: 1;
-	max-width: 400px;
+  flex: 1;
+  max-width: 400px;
 }
 
 #load-repos-btn .dashicons {
-	vertical-align: middle;
-	margin-right: 5px;
+  vertical-align: middle;
+  margin-right: 5px;
 }
 
 .manual-entry-toggle {
-	background: #f6f7f7;
-	padding: 15px;
-	border-radius: 4px;
-	margin: 20px 0;
-	border: 1px solid #c3c4c7;
+  background: #f6f7f7;
+  padding: 15px;
+  border-radius: 4px;
+  margin: 20px 0;
+  border: 1px solid #c3c4c7;
 }
 
 .manual-entry-toggle summary {
-	font-weight: 600;
-	cursor: pointer;
-	user-select: none;
+  font-weight: 600;
+  cursor: pointer;
+  user-select: none;
 }
 
 .manual-entry-toggle summary:hover {
-	color: #2271b1;
+  color: #2271b1;
 }
 
 .manual-entry-toggle[open] summary {
-	margin-bottom: 15px;
-	padding-bottom: 10px;
-	border-bottom: 1px solid #c3c4c7;
+  margin-bottom: 15px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #c3c4c7;
 }
 
 /* Spinner positioning */
 .spinner.is-active {
-	visibility: visible;
+  visibility: visible;
 }
 
 /* Repository icons in select */
 #repo-selector option {
-	padding: 5px;
+  padding: 5px;
 }
 
 /* Success messages */
 .notice.is-dismissible {
-	position: relative;
+  position: relative;
 }
 
 /* Disconnect GitHub Button */
-#disconnect-github-btn {
-	display: inline-flex;
-	align-items: center;
-	gap: 5px;
+#disconnect-github-btn,
+#disconnect-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
 }
 
 #refresh-status-btn {
-	display: inline-flex;
-	align-items: center;
-	gap: 5px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
 }
 
 /* Bind Repository Button */
 #bind-repo-btn {
-	display: inline-flex;
-	align-items: center;
-	gap: 5px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
 }
 
 /* Load Workflows Button */
 #load-workflows-btn {
-	display: inline-flex;
-	align-items: center;
-	gap: 5px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
 }
 
 /* Reset All Data Button */
 #reset-all-data-btn {
-	display: inline-flex;
-	align-items: center;
-	gap: 5px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
 }
 
 /* Cancel Deployment Button */
 .cancel-deployment-btn {
-	color: #d63638;
-	border-color: #d63638;
-	transition: all 0.2s;
+  color: #d63638;
+  border-color: #d63638;
+  transition: all 0.2s;
 }
 
 .cancel-deployment-btn:hover {
-	color: #fff;
-	background: #d63638;
-	border-color: #d63638;
+  color: #fff;
+  background: #d63638;
+  border-color: #d63638;
 }
 
 .cancel-deployment-btn .dashicons {
-	font-size: 14px;
-	vertical-align: middle;
-	margin-right: 3px;
+  font-size: 14px;
+  vertical-align: middle;
+  margin-right: 3px;
 }
 
 .cancel-deployment-btn:disabled {
-	opacity: 0.5;
-	cursor: not-allowed;
+  opacity: 0.5;
+  cursor: not-allowed;
 }

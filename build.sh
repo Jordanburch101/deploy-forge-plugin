@@ -1,8 +1,8 @@
 #!/bin/bash
 
 #####################################################################
-# WordPress Plugin Build Script
-# Creates a production-ready ZIP file for deployment
+# Deploy Forge - Unified Build Script
+# Creates a production-ready ZIP file for WordPress installation
 #####################################################################
 
 set -e  # Exit on error
@@ -16,15 +16,13 @@ NC='\033[0m' # No Color
 
 # Configuration
 PLUGIN_SLUG="deploy-forge"
-MAIN_FILE="deploy-forge.php"
-VERSION=$(grep "Version:" ${MAIN_FILE} | awk '{print $3}')
+MAIN_FILE="${PLUGIN_SLUG}/${PLUGIN_SLUG}.php"
+VERSION=$(grep "Version:" ${MAIN_FILE} | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
 BUILD_DIR="build"
 DIST_DIR="dist"
-PLUGIN_DIR="${PLUGIN_SLUG}"
 
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${BLUE}  WordPress Plugin Build Script${NC}"
-echo -e "${BLUE}  Plugin: ${PLUGIN_SLUG}${NC}"
+echo -e "${BLUE}  Deploy Forge - Build Script${NC}"
 echo -e "${BLUE}  Version: ${VERSION}${NC}"
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
@@ -40,7 +38,7 @@ echo ""
 
 # Step 2: Run PHP syntax check
 echo -e "${YELLOW}→${NC} Running PHP syntax check..."
-PHP_FILES=$(find ${PLUGIN_DIR} -name "*.php")
+PHP_FILES=$(find ${PLUGIN_SLUG} -name "*.php")
 PHP_ERRORS=0
 
 for file in $PHP_FILES; do
@@ -57,13 +55,9 @@ fi
 echo -e "${GREEN}✓${NC} All PHP files validated"
 echo ""
 
-# Step 3: Copy plugin files
+# Step 3: Copy plugin folder to build directory
 echo -e "${YELLOW}→${NC} Copying plugin files to build directory..."
-mkdir -p ${BUILD_DIR}/${PLUGIN_SLUG}
-# Copy the main plugin file to the root of the plugin directory
-cp ${MAIN_FILE} ${BUILD_DIR}/${PLUGIN_SLUG}/
-# Copy all subdirectories (includes, admin, templates)
-cp -r ${PLUGIN_DIR}/* ${BUILD_DIR}/${PLUGIN_SLUG}/
+cp -r ${PLUGIN_SLUG} ${BUILD_DIR}/
 echo -e "${GREEN}✓${NC} Files copied"
 echo ""
 
@@ -84,17 +78,15 @@ rm -f package-lock.json
 rm -rf node_modules
 rm -rf .git
 rm -rf .github
+rm -rf .vscode
 rm -f LINT-REPORT.md
 rm -f CODE-QUALITY-SUMMARY.md
 rm -f lint-check.sh
 rm -f TESTING-GUIDE.md
-rm -f OAUTH-IMPLEMENTATION-PLAN.md
-rm -f MULTI-SITE-ARCHITECTURE.md
-rm -f REPO-SELECTOR-SUMMARY.md
 
-# Optional: Keep or remove these
-# rm -f REPO-SELECTOR-GUIDE.md  # User guide - keep for now
-# rm -f README.md                # Keep for documentation
+# Remove any log files
+find . -name "*.log" -delete
+find . -name ".gitkeep" -delete
 
 cd ../../
 
@@ -108,7 +100,7 @@ ZIP_NAME="${PLUGIN_SLUG}-${VERSION}.zip"
 cd ${BUILD_DIR}
 
 # Create ZIP with no .DS_Store files
-zip -r "../${DIST_DIR}/${ZIP_NAME}" ${PLUGIN_SLUG} -x "*.DS_Store" -x "__MACOSX" > /dev/null
+zip -rq "../${DIST_DIR}/${ZIP_NAME}" ${PLUGIN_SLUG} -x "*.DS_Store" -x "__MACOSX"
 
 cd ..
 
@@ -120,13 +112,23 @@ echo ""
 echo -e "${YELLOW}→${NC} Generating checksums..."
 cd ${DIST_DIR}
 
-# MD5
-MD5_HASH=$(md5 -q ${ZIP_NAME} 2>/dev/null || md5sum ${ZIP_NAME} 2>/dev/null | awk '{print $1}')
-echo "$MD5_HASH  ${ZIP_NAME}" > ${ZIP_NAME}.md5
+# MD5 - handle both macOS and Linux
+if command -v md5sum &> /dev/null; then
+    md5sum "${ZIP_NAME}" > "${ZIP_NAME}.md5"
+    MD5_HASH=$(md5sum "${ZIP_NAME}" | awk '{print $1}')
+else
+    MD5_HASH=$(md5 -q "${ZIP_NAME}")
+    echo "${MD5_HASH}  ${ZIP_NAME}" > "${ZIP_NAME}.md5"
+fi
 
-# SHA256
-SHA256_HASH=$(shasum -a 256 ${ZIP_NAME} | awk '{print $1}')
-echo "$SHA256_HASH  ${ZIP_NAME}" > ${ZIP_NAME}.sha256
+# SHA256 - handle both macOS and Linux
+if command -v sha256sum &> /dev/null; then
+    sha256sum "${ZIP_NAME}" > "${ZIP_NAME}.sha256"
+    SHA256_HASH=$(sha256sum "${ZIP_NAME}" | awk '{print $1}')
+else
+    SHA256_HASH=$(shasum -a 256 "${ZIP_NAME}" | awk '{print $1}')
+    echo "${SHA256_HASH}  ${ZIP_NAME}" > "${ZIP_NAME}.sha256"
+fi
 
 cd ..
 
@@ -148,7 +150,7 @@ FILE_COUNT=$(unzip -l ${DIST_DIR}/${ZIP_NAME} | tail -1 | awk '{print $2}')
 echo -e "${GREEN}✓${NC} Total files in archive: ${FILE_COUNT}"
 echo ""
 
-# Step 9: Clean up build directory (optional)
+# Step 9: Clean up build directory
 echo -e "${YELLOW}→${NC} Cleaning up temporary files..."
 rm -rf ${BUILD_DIR}
 echo -e "${GREEN}✓${NC} Build directory cleaned"
@@ -156,7 +158,7 @@ echo ""
 
 # Success summary
 echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${GREEN}  ✓ Build complete!${NC}"
+echo -e "${GREEN}  Build complete!${NC}"
 echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
 echo -e "${BLUE}Package:${NC}     ${DIST_DIR}/${ZIP_NAME}"
@@ -169,12 +171,4 @@ echo "  1. Upload ${ZIP_NAME} to your WordPress site"
 echo "  2. Go to Plugins → Add New → Upload Plugin"
 echo "  3. Choose the ZIP file and click 'Install Now'"
 echo "  4. Activate the plugin"
-echo ""
-echo -e "${YELLOW}Alternative (via SSH):${NC}"
-echo "  scp ${DIST_DIR}/${ZIP_NAME} user@server:/tmp/"
-echo "  ssh user@server"
-echo "  cd /path/to/wordpress/wp-content/plugins/"
-echo "  unzip /tmp/${ZIP_NAME}"
-echo ""
-echo -e "${GREEN}Happy Deploying! 🚀${NC}"
 echo ""

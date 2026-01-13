@@ -17,12 +17,13 @@ if (!defined('ABSPATH')) {
             <div class="deploy-forge-welcome-content">
                 <h2 class="deploy-forge-welcome-title"><?php esc_html_e('Welcome to Deploy Forge', 'deploy-forge'); ?></h2>
                 <p class="deploy-forge-welcome-description">
-                    <?php esc_html_e('Get started by running the setup wizard to connect your GitHub repository and configure automatic deployments.', 'deploy-forge'); ?>
+                    <?php esc_html_e('Connect your WordPress site to the Deploy Forge platform to enable automatic theme deployments from GitHub.', 'deploy-forge'); ?>
                 </p>
-                <a href="<?php echo esc_url(admin_url('admin.php?page=deploy-forge-wizard')); ?>" class="deploy-forge-welcome-button">
-                    <span class="dashicons dashicons-admin-settings"></span>
-                    <?php esc_html_e('Start Setup Wizard', 'deploy-forge'); ?>
-                </a>
+                <button type="button" id="connect-btn" class="deploy-forge-welcome-button">
+                    <span class="dashicons dashicons-plus-alt"></span>
+                    <?php esc_html_e('Connect to Deploy Forge', 'deploy-forge'); ?>
+                </button>
+                <span id="connect-loading" class="spinner" style="float: none; margin: 0 10px;"></span>
             </div>
         </div>
     <?php endif; ?>

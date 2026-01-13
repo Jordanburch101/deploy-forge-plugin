@@ -140,19 +140,6 @@ if (!defined('ABSPATH')) {
                 </tr>
             </table>
 
-            <h2><?php esc_html_e('Webhook Configuration', 'deploy-forge'); ?></h2>
-            <table class="form-table">
-                <tr>
-                    <th scope="row"><?php esc_html_e('Webhook URL', 'deploy-forge'); ?></th>
-                    <td>
-                        <input type="text" value="<?php echo esc_attr($webhook_url); ?>" class="large-text code" readonly onclick="this.select()">
-                        <p class="description">
-                            <?php esc_html_e('This URL is automatically configured by Deploy Forge platform. No manual setup required.', 'deploy-forge'); ?>
-                        </p>
-                    </td>
-                </tr>
-            </table>
-
             <p class="submit">
                 <button type="submit" name="deploy_forge_save_settings" class="button button-primary">
                     <?php esc_html_e('Save Settings', 'deploy-forge'); ?>
