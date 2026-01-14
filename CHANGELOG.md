@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.31] - 2026-01-14
+
+### Fixed
+- **Respect Build Folder Structure**: Plugin now preserves the exact folder structure from build artifacts
+  - Previously, the plugin would search for `style.css`/`functions.php` and flatten the structure
+  - Now looks for directory matching theme slug first, preserving intentional subfolder structures (e.g., `/theme` folder)
+  - Fixes issue where builds with nested theme folders (like `fiordland-lobsters/theme/`) were incorrectly flattened
+  - Maintains backwards compatibility with existing deployment structures
+
 ## [1.0.3] - 2026-01-14
 
 ### Changed

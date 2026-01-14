@@ -823,34 +823,71 @@ class Deploy_Forge_Deployment_Manager
 
         // Get target theme path from settings
         $target_theme_path = $this->settings->get_theme_path();
+        $theme_slug = basename($target_theme_path);
 
         $this->logger->log_deployment_step($deployment_id, 'Find Theme Directory', 'started', [
             'extract_dir' => $temp_extract_dir,
             'target_theme_path' => $target_theme_path,
+            'theme_slug' => $theme_slug,
         ]);
 
-        // Find the actual theme directory within extracted content
-        // GitHub zipballs create folders like "owner-repo-commitsha/"
-        // We need to find the directory containing theme files
-        $source_theme_dir = $this->find_theme_directory($temp_extract_dir);
+        // Strategy: Respect the build structure provided by the developer
+        // 1. First, look for a directory matching the theme slug (preserves any intentional folder structure)
+        // 2. If not found, search for theme files (style.css/functions.php) - for backwards compatibility
+        // 3. Fallback to first subdirectory (GitHub zipball structure)
+        // 4. Final fallback to extract directory itself
 
+        $source_theme_dir = null;
+
+        // Step 1: Look for directory matching theme slug
+        $extracted_items = scandir($temp_extract_dir);
+        $extracted_items = array_diff($extracted_items, ['.', '..']);
+
+        foreach ($extracted_items as $item) {
+            $item_path = $temp_extract_dir . '/' . $item;
+            if (is_dir($item_path) && $item === $theme_slug) {
+                $source_theme_dir = $item_path;
+                $this->logger->log('Deployment', 'Found directory matching theme slug', [
+                    'directory' => $source_theme_dir,
+                    'method' => 'theme_slug_match',
+                ]);
+                break;
+            }
+        }
+
+        // Step 2: If no match found, search for theme files (backwards compatibility)
         if (!$source_theme_dir) {
-            // If no theme files found, use the first subdirectory (GitHub zipball structure)
-            $extracted_items = scandir($temp_extract_dir);
-            $extracted_items = array_diff($extracted_items, ['.', '..']);
+            $source_theme_dir = $this->find_theme_directory($temp_extract_dir);
+            if ($source_theme_dir) {
+                $this->logger->log('Deployment', 'Found theme files using search', [
+                    'directory' => $source_theme_dir,
+                    'method' => 'theme_files_search',
+                ]);
+            }
+        }
 
+        // Step 3: Fallback to first subdirectory (GitHub zipball structure)
+        if (!$source_theme_dir) {
             foreach ($extracted_items as $item) {
                 $item_path = $temp_extract_dir . '/' . $item;
                 if (is_dir($item_path)) {
                     $source_theme_dir = $item_path;
+                    $this->logger->log('Deployment', 'Using first subdirectory', [
+                        'directory' => $source_theme_dir,
+                        'method' => 'first_subdir',
+                    ]);
                     break;
                 }
             }
         }
 
-        // Fallback to temp_extract_dir if nothing found
+        // Step 4: Final fallback to extract directory itself
         if (!$source_theme_dir) {
             $source_theme_dir = $temp_extract_dir;
+            $this->logger->log('Deployment', 'Using extract directory as source', [
+                'directory' => $source_theme_dir,
+                'method' => 'extract_dir_fallback',
+            ]);
         }
 
         $this->logger->log_deployment_step($deployment_id, 'Theme Directory Found', 'success', [
