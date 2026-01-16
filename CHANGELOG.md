@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.32] - 2026-01-16
+
+### Fixed
+- **Deployment failures now properly reported to Deploy Forge dashboard**: Fixed bug where artifact-related errors (no artifacts found, missing artifact ID, missing workflow run ID) would update local WordPress status to "failed" but never notify the Deploy Forge platform
+  - Added `report_status_to_backend()` call for "No workflow run ID or artifact information" error
+  - Added `report_status_to_backend()` call for "No artifacts found for successful build" error
+  - Added `report_status_to_backend()` call for "Artifact ID not found" error
+  - Dashboard now shows accurate failure status instead of being stuck on "artifact_ready"
+
 ## [1.0.31] - 2026-01-14
 
 ### Fixed

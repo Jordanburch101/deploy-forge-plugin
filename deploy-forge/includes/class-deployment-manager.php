@@ -494,11 +494,13 @@ class Deploy_Forge_Deployment_Manager
                 ]);
 
                 if (empty($deployment->workflow_run_id)) {
+                    $error_message = __('No workflow run ID or artifact information available.', 'deploy-forge');
                     $this->logger->error('Deployment', "Deployment #$deployment_id has no workflow_run_id or artifact_id");
                     $this->database->update_deployment($deployment_id, [
                         'status' => 'failed',
-                        'error_message' => __('No workflow run ID or artifact information available.', 'deploy-forge'),
+                        'error_message' => $error_message,
                     ]);
+                    $this->report_status_to_backend($deployment_id, false, $error_message);
                     $this->database->release_deployment_lock();
                     return;
                 }
@@ -506,11 +508,13 @@ class Deploy_Forge_Deployment_Manager
                 $artifacts_result = $this->github_api->get_workflow_artifacts($deployment->workflow_run_id);
 
                 if (!$artifacts_result['success'] || empty($artifacts_result['data'])) {
+                    $error_message = __('No artifacts found for successful build.', 'deploy-forge');
                     $this->logger->error('Deployment', "Deployment #$deployment_id no artifacts found", $artifacts_result);
                     $this->database->update_deployment($deployment_id, [
                         'status' => 'failed',
-                        'error_message' => __('No artifacts found for successful build.', 'deploy-forge'),
+                        'error_message' => $error_message,
                     ]);
+                    $this->report_status_to_backend($deployment_id, false, $error_message);
                     $this->database->release_deployment_lock();
                     return;
                 }
@@ -529,11 +533,13 @@ class Deploy_Forge_Deployment_Manager
                 ]);
 
                 if (!$artifact_id) {
+                    $error_message = __('Artifact ID not found.', 'deploy-forge');
                     $this->logger->error('Deployment', "Deployment #$deployment_id artifact has no ID", ['artifact' => $artifact]);
                     $this->database->update_deployment($deployment_id, [
                         'status' => 'failed',
-                        'error_message' => __('Artifact ID not found.', 'deploy-forge'),
+                        'error_message' => $error_message,
                     ]);
+                    $this->report_status_to_backend($deployment_id, false, $error_message);
                     $this->database->release_deployment_lock();
                     return;
                 }
