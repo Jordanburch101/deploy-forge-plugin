@@ -542,15 +542,33 @@ class Deploy_Forge_Deployment_Manager {
 						'conclusion' => $conclusion,
 					)
 				);
+
+				// Translators: %s is the GitHub Actions build conclusion status (e.g., "failure", "cancelled").
+				$error_message = sprintf( __( 'Build failed with conclusion: %s', 'deploy-forge' ), $conclusion );
+
 				$this->database->update_deployment(
 					$deployment_id,
 					array(
 						'status'        => 'failed',
-						// Translators: %s is the GitHub Actions build conclusion status (e.g., "failure", "cancelled").
-						'error_message' => sprintf( __( 'Build failed with conclusion: %s', 'deploy-forge' ), $conclusion ),
+						'error_message' => $error_message,
 					)
 				);
-				$this->log_deployment( $deployment_id, 'Build failed: ' . $conclusion );
+
+				$this->log_deployment(
+					$deployment_id,
+					sprintf(
+						'GitHub Actions build failed with conclusion: %s. Check the build URL for details.',
+						$conclusion
+					)
+				);
+
+				// Report build failure to platform with context.
+				$additional_context = array(
+					'failure_point'    => 'github_build',
+					'build_conclusion' => $conclusion,
+					'build_status'     => $status,
+				);
+				$this->report_status_to_backend( $deployment_id, false, $error_message, $additional_context );
 			}
 		}
 	}
@@ -737,6 +755,20 @@ class Deploy_Forge_Deployment_Manager {
 				if ( ! $artifacts_result['success'] || empty( $artifacts_result['data'] ) ) {
 					$error_message = __( 'No artifacts found for successful build.', 'deploy-forge' );
 					$this->logger->error( 'Deployment', "Deployment #$deployment_id no artifacts found", $artifacts_result );
+
+					// Build detailed log message for debugging.
+					$api_status = $artifacts_result['success'] ? 'API call succeeded but returned empty artifacts' : 'API call failed';
+					$api_error  = $artifacts_result['message'] ?? 'No error message';
+					$this->log_deployment(
+						$deployment_id,
+						sprintf(
+							'Artifact check failed for workflow run %d: %s. API response: %s',
+							$deployment->workflow_run_id,
+							$api_status,
+							$api_error
+						)
+					);
+
 					$this->database->update_deployment(
 						$deployment_id,
 						array(
@@ -744,7 +776,16 @@ class Deploy_Forge_Deployment_Manager {
 							'error_message' => $error_message,
 						)
 					);
-					$this->report_status_to_backend( $deployment_id, false, $error_message );
+
+					// Pass additional context about why artifacts weren't found.
+					$additional_context = array(
+						'failure_point'     => 'artifact_check',
+						'api_success'       => $artifacts_result['success'] ?? false,
+						'api_message'       => $artifacts_result['message'] ?? null,
+						'artifacts_count'   => is_array( $artifacts_result['data'] ?? null ) ? count( $artifacts_result['data'] ) : 0,
+						'expected_artifact' => $this->settings->get_option( 'artifact_name', 'theme-build' ),
+					);
+					$this->report_status_to_backend( $deployment_id, false, $error_message, $additional_context );
 					$this->database->release_deployment_lock();
 					return;
 				}
@@ -845,6 +886,7 @@ class Deploy_Forge_Deployment_Manager {
 
 		if ( is_wp_error( $download_result ) ) {
 			$error_message = $download_result->get_error_message();
+			$error_code    = $download_result->get_error_code();
 			$this->logger->error( 'Deployment', "Deployment #$deployment_id artifact download failed", $download_result );
 			$this->database->update_deployment(
 				$deployment_id,
@@ -853,8 +895,18 @@ class Deploy_Forge_Deployment_Manager {
 					'error_message' => $error_message,
 				)
 			);
-			$this->log_deployment( $deployment_id, 'Download failed: ' . $error_message );
-			$this->report_status_to_backend( $deployment_id, false, $error_message );
+			$this->log_deployment(
+				$deployment_id,
+				sprintf( 'Download failed [%s]: %s (artifact_id: %s)', $error_code, $error_message, $artifact_id )
+			);
+
+			$additional_context = array(
+				'failure_point'       => 'artifact_download',
+				'error_code'          => $error_code,
+				'artifact_id'         => $artifact_id,
+				'direct_url_endpoint' => $direct_url_endpoint,
+			);
+			$this->report_status_to_backend( $deployment_id, false, $error_message, $additional_context );
 			return;
 		}
 
@@ -973,10 +1025,25 @@ class Deploy_Forge_Deployment_Manager {
 		 * @var \ZipArchive $zip
 		 * @noinspection PhpUndefinedClassInspection
 		 */
-		$zip             = new ZipArchive();
+		$zip = new ZipArchive();
+
 		$zip_open_result = $zip->open( $artifact_zip );
 
 		if ( true !== $zip_open_result ) {
+			// Map ZipArchive error codes to human-readable messages.
+			$zip_errors     = array(
+				ZipArchive::ER_EXISTS => 'File already exists',
+				ZipArchive::ER_INCONS => 'Inconsistent ZIP archive',
+				ZipArchive::ER_INVAL  => 'Invalid argument',
+				ZipArchive::ER_MEMORY => 'Memory allocation failure',
+				ZipArchive::ER_NOENT  => 'File not found',
+				ZipArchive::ER_NOZIP  => 'Not a ZIP archive',
+				ZipArchive::ER_OPEN   => 'Cannot open file',
+				ZipArchive::ER_READ   => 'Read error',
+				ZipArchive::ER_SEEK   => 'Seek error',
+			);
+			$zip_error_text = $zip_errors[ $zip_open_result ] ?? 'Unknown error';
+
 			// Translators: %d is the ZipArchive error code.
 			$error_message = sprintf( __( 'Failed to open ZIP file (error code: %d).', 'deploy-forge' ), $zip_open_result );
 			$this->logger->error(
@@ -986,6 +1053,22 @@ class Deploy_Forge_Deployment_Manager {
 					'error_code' => $zip_open_result,
 				)
 			);
+
+			// Get file info for debugging.
+			$file_exists = file_exists( $artifact_zip );
+			$file_size   = $file_exists ? filesize( $artifact_zip ) : 0;
+
+			$this->log_deployment(
+				$deployment_id,
+				sprintf(
+					'ZIP open failed: %s (code %d). File exists: %s, Size: %d bytes',
+					$zip_error_text,
+					$zip_open_result,
+					$file_exists ? 'yes' : 'no',
+					$file_size
+				)
+			);
+
 			$this->database->update_deployment(
 				$deployment_id,
 				array(
@@ -993,7 +1076,15 @@ class Deploy_Forge_Deployment_Manager {
 					'error_message' => $error_message,
 				)
 			);
-			$this->report_status_to_backend( $deployment_id, false, $error_message );
+
+			$additional_context = array(
+				'failure_point'   => 'zip_open',
+				'zip_error_code'  => $zip_open_result,
+				'zip_error_text'  => $zip_error_text,
+				'file_exists'     => $file_exists,
+				'file_size_bytes' => $file_size,
+			);
+			$this->report_status_to_backend( $deployment_id, false, $error_message, $additional_context );
 			return;
 		}
 
@@ -1003,6 +1094,21 @@ class Deploy_Forge_Deployment_Manager {
 		if ( ! $extract_result ) {
 			$error_message = __( 'Failed to extract ZIP file.', 'deploy-forge' );
 			$this->logger->error( 'Deployment', 'Failed to extract ZIP file' );
+
+			// Check destination directory permissions.
+			$dir_exists   = is_dir( $temp_extract_dir );
+			$dir_writable = $dir_exists && wp_is_writable( $temp_extract_dir );
+
+			$this->log_deployment(
+				$deployment_id,
+				sprintf(
+					'ZIP extraction failed to %s. Directory exists: %s, Writable: %s',
+					$temp_extract_dir,
+					$dir_exists ? 'yes' : 'no',
+					$dir_writable ? 'yes' : 'no'
+				)
+			);
+
 			$this->database->update_deployment(
 				$deployment_id,
 				array(
@@ -1010,7 +1116,15 @@ class Deploy_Forge_Deployment_Manager {
 					'error_message' => $error_message,
 				)
 			);
-			$this->report_status_to_backend( $deployment_id, false, $error_message );
+
+			$additional_context = array(
+				'failure_point'      => 'zip_extract',
+				'extract_dir'        => $temp_extract_dir,
+				'dir_exists'         => $dir_exists,
+				'dir_writable'       => $dir_writable,
+				'disk_free_space_mb' => function_exists( 'disk_free_space' ) ? round( disk_free_space( sys_get_temp_dir() ) / 1024 / 1024, 2 ) : null,
+			);
+			$this->report_status_to_backend( $deployment_id, false, $error_message, $additional_context );
 			return;
 		}
 
@@ -1335,6 +1449,25 @@ class Deploy_Forge_Deployment_Manager {
 		if ( ! $copy_result ) {
 			$error_message = __( 'Failed to copy files to theme directory.', 'deploy-forge' );
 			$this->logger->error( 'Deployment', "Deployment #$deployment_id file copy failed" );
+
+			// Gather directory info for debugging.
+			$source_exists   = is_dir( $source_theme_dir );
+			$target_exists   = is_dir( $target_theme_path );
+			$target_writable = wp_is_writable( dirname( $target_theme_path ) );
+			$source_files    = $source_exists ? count( scandir( $source_theme_dir ) ) - 2 : 0;
+
+			$this->log_deployment(
+				$deployment_id,
+				sprintf(
+					'File copy failed from %s to %s. Source exists: %s (%d files), Target dir writable: %s',
+					$source_theme_dir,
+					$target_theme_path,
+					$source_exists ? 'yes' : 'no',
+					$source_files,
+					$target_writable ? 'yes' : 'no'
+				)
+			);
+
 			$this->database->update_deployment(
 				$deployment_id,
 				array(
@@ -1342,8 +1475,18 @@ class Deploy_Forge_Deployment_Manager {
 					'error_message' => $error_message,
 				)
 			);
-			$this->log_deployment( $deployment_id, 'Deployment failed: Unable to copy files.' );
-			$this->report_status_to_backend( $deployment_id, false, $error_message );
+
+			$additional_context = array(
+				'failure_point'      => 'file_copy',
+				'source_dir'         => $source_theme_dir,
+				'target_dir'         => $target_theme_path,
+				'source_exists'      => $source_exists,
+				'source_file_count'  => $source_files,
+				'target_exists'      => $target_exists,
+				'target_writable'    => $target_writable,
+				'disk_free_space_mb' => function_exists( 'disk_free_space' ) ? round( disk_free_space( dirname( $target_theme_path ) ) / 1024 / 1024, 2 ) : null,
+			);
+			$this->report_status_to_backend( $deployment_id, false, $error_message, $additional_context );
 			return;
 		}
 
@@ -1814,12 +1957,13 @@ class Deploy_Forge_Deployment_Manager {
 	 *
 	 * @since 1.0.0
 	 *
-	 * @param int         $deployment_id Local deployment ID.
-	 * @param bool        $success       Whether deployment succeeded.
-	 * @param string|null $error_message Error message if failed.
+	 * @param int         $deployment_id    Local deployment ID.
+	 * @param bool        $success          Whether deployment succeeded.
+	 * @param string|null $error_message    Error message if failed.
+	 * @param array|null  $additional_context Extra debugging context for this specific failure.
 	 * @return void
 	 */
-	private function report_status_to_backend( int $deployment_id, bool $success, ?string $error_message = null ): void {
+	private function report_status_to_backend( int $deployment_id, bool $success, ?string $error_message = null, ?array $additional_context = null ): void {
 		$deployment = $this->database->get_deployment( $deployment_id );
 
 		if ( ! $deployment ) {
@@ -1837,6 +1981,9 @@ class Deploy_Forge_Deployment_Manager {
 		// Get deployment logs to send back.
 		$logs = $deployment->deployment_logs ?? null;
 
+		// Build context from deployment record and additional context.
+		$context = $this->build_deployment_context( $deployment, $additional_context );
+
 		$this->logger->log(
 			'Deployment',
 			'Reporting deployment status to Deploy Forge',
@@ -1844,6 +1991,7 @@ class Deploy_Forge_Deployment_Manager {
 				'deployment_id'        => $deployment_id,
 				'remote_deployment_id' => $remote_deployment_id,
 				'success'              => $success,
+				'has_context'          => ! empty( $context ),
 			)
 		);
 
@@ -1851,7 +1999,8 @@ class Deploy_Forge_Deployment_Manager {
 			$remote_deployment_id,
 			$success,
 			$error_message,
-			$logs
+			$logs,
+			$context
 		);
 
 		if ( $result['success'] ) {
@@ -1873,6 +2022,66 @@ class Deploy_Forge_Deployment_Manager {
 				)
 			);
 		}
+	}
+
+	/**
+	 * Build debugging context from deployment record.
+	 *
+	 * Gathers relevant information from the deployment that can help
+	 * users debug failures in the Deploy Forge dashboard.
+	 *
+	 * @since 1.0.0
+	 *
+	 * @param object     $deployment         The deployment record.
+	 * @param array|null $additional_context Extra context specific to this failure.
+	 * @return array The combined context array.
+	 */
+	private function build_deployment_context( object $deployment, ?array $additional_context = null ): array {
+		$context = array();
+
+		// Basic deployment info.
+		if ( ! empty( $deployment->deployment_method ) ) {
+			$context['deployment_method'] = $deployment->deployment_method;
+		}
+		if ( ! empty( $deployment->trigger_type ) ) {
+			$context['trigger_type'] = $deployment->trigger_type;
+		}
+
+		// GitHub Actions info.
+		if ( ! empty( $deployment->workflow_run_id ) ) {
+			$context['workflow_run_id'] = $deployment->workflow_run_id;
+		}
+		if ( ! empty( $deployment->build_url ) ) {
+			$context['build_url'] = $deployment->build_url;
+		}
+
+		// Artifact info.
+		if ( ! empty( $deployment->artifact_id ) ) {
+			$context['artifact_id'] = $deployment->artifact_id;
+		}
+		if ( ! empty( $deployment->artifact_name ) ) {
+			$context['artifact_name'] = $deployment->artifact_name;
+		}
+		if ( ! empty( $deployment->artifact_size ) ) {
+			$context['artifact_size'] = $deployment->artifact_size;
+		}
+
+		// Commit info.
+		if ( ! empty( $deployment->commit_hash ) ) {
+			$context['commit_hash'] = $deployment->commit_hash;
+		}
+
+		// Environment info.
+		$context['plugin_version'] = defined( 'DEPLOY_FORGE_VERSION' ) ? DEPLOY_FORGE_VERSION : 'unknown';
+		$context['php_version']    = PHP_VERSION;
+		$context['wp_version']     = get_bloginfo( 'version' );
+
+		// Merge in additional context specific to this failure.
+		if ( $additional_context ) {
+			$context = array_merge( $context, $additional_context );
+		}
+
+		return $context;
 	}
 
 	/**

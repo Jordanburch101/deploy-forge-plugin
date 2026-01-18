@@ -1175,13 +1175,15 @@ class Deploy_Forge_GitHub_API {
 	 * @param bool        $success              Whether the deployment succeeded.
 	 * @param string|null $error_message        Error message if failed.
 	 * @param string|null $logs                 Deployment logs.
+	 * @param array|null  $context              Additional debugging context.
 	 * @return array Result with success status.
 	 */
 	public function report_deployment_status(
 		string $remote_deployment_id,
 		bool $success,
 		?string $error_message = null,
-		?string $logs = null
+		?string $logs = null,
+		?array $context = null
 	): array {
 		$api_key = $this->settings->get_api_key();
 
@@ -1217,6 +1219,10 @@ class Deploy_Forge_GitHub_API {
 			$body['logs'] = $logs;
 		}
 
+		if ( $context ) {
+			$body['context'] = $context;
+		}
+
 		$this->logger->log(
 			'GitHub_API',
 			'Reporting deployment status to Deploy Forge',
@@ -1225,6 +1231,7 @@ class Deploy_Forge_GitHub_API {
 				'success'              => $success,
 				'has_error_message'    => ! empty( $error_message ),
 				'has_logs'             => ! empty( $logs ),
+				'has_context'          => ! empty( $context ),
 			)
 		);
 

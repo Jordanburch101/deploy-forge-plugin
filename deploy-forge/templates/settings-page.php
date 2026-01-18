@@ -126,15 +126,6 @@ if ( ! defined( 'ABSPATH' ) ) {
 					</td>
 				</tr>
 				<tr>
-					<th scope="row">
-						<label for="notification_email"><?php esc_html_e( 'Notification Email', 'deploy-forge' ); ?></label>
-					</th>
-					<td>
-						<input type="email" name="notification_email" id="notification_email" value="<?php echo esc_attr( $current_settings['notification_email'] ); ?>" class="regular-text">
-						<p class="description"><?php esc_html_e( 'Receive deployment notifications at this email address', 'deploy-forge' ); ?></p>
-					</td>
-				</tr>
-				<tr>
 					<th scope="row"><?php esc_html_e( 'Debug Mode', 'deploy-forge' ); ?></th>
 					<td>
 						<label>

@@ -102,7 +102,6 @@ class Deploy_Forge_Settings {
 			'deployment_method'       => 'github_actions',
 			'require_manual_approval' => false,
 			'create_backups'          => true,
-			'notification_email'      => get_option( 'admin_email' ),
 			'debug_mode'              => false,
 		);
 
@@ -153,7 +152,6 @@ class Deploy_Forge_Settings {
 				: 'github_actions',
 			'require_manual_approval' => (bool) ( $settings['require_manual_approval'] ?? true ),
 			'create_backups'          => (bool) ( $settings['create_backups'] ?? true ),
-			'notification_email'      => sanitize_email( $settings['notification_email'] ?? get_option( 'admin_email' ) ),
 			'debug_mode'              => (bool) ( $settings['debug_mode'] ?? false ),
 		);
 

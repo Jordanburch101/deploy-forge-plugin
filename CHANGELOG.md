@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.42] - 2026-01-18
+
+### Added
+- **Enhanced deployment error reporting**: Deployment failures now send rich debugging context to Deploy Forge platform
+  - Added `context` field to `/api/plugin/deployments/complete` API payload
+  - Base context includes: `deployment_method`, `trigger_type`, `workflow_run_id`, `build_url`, `artifact_id`, `artifact_name`, `artifact_size`, `commit_hash`, `plugin_version`, `php_version`, `wp_version`
+  - Failure-specific context added for each error type:
+    - `artifact_check`: API success status, API message, artifacts count, expected artifact name
+    - `artifact_download`: Error code, artifact ID, direct URL endpoint
+    - `zip_open`: ZipArchive error code with human-readable message, file existence, file size
+    - `zip_extract`: Extract directory path, directory permissions, disk free space
+    - `file_copy`: Source/target directories, file counts, write permissions, disk free space
+    - `github_build`: Build conclusion status, build status
+  - Detailed log messages added before each failure with actionable debugging info
+
+### Changed
+- `report_deployment_status()` now accepts optional `$context` array parameter
+- `report_status_to_backend()` now accepts optional `$additional_context` parameter and auto-gathers deployment metadata
+- GitHub build failures now report to platform (previously only updated local database)
+- Removed unused `notification_email` setting from settings page and backend
+
 ## [1.0.41] - 2026-01-18
 
 ### Added

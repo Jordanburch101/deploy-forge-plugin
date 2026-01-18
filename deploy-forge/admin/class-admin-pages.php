@@ -355,7 +355,6 @@ class Deploy_Forge_Admin_Pages extends Deploy_Forge_Ajax_Handler_Base {
 				$new_settings = array(
 					'require_manual_approval' => isset( $_POST['require_manual_approval'] ),
 					'create_backups'          => isset( $_POST['create_backups'] ),
-					'notification_email'      => isset( $_POST['notification_email'] ) ? sanitize_email( wp_unslash( $_POST['notification_email'] ) ) : '',
 					'debug_mode'              => isset( $_POST['debug_mode'] ),
 				);
 
