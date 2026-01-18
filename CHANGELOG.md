@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.41] - 2026-01-18
+
+### Added
+- **CI/CD Test Integration**: Release workflow now runs tests before building
+  - Added PHP 8.2 setup step using `shivammathur/setup-php@v2`
+  - Added Composer dependency installation
+  - Added PHPCS coding standards check
+  - Added PHPUnit test execution
+  - Release will fail if tests or linting fail
+
+### Fixed
+- Fixed Intelephense type errors in `GitHubApiTest.php` by adding `@var` annotations
+- Added explicit test directory exclusion to `phpcs.xml.dist`
+
 ## [1.0.4] - 2026-01-17
 
 ### Added

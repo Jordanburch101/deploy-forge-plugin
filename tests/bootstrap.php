@@ -30,7 +30,7 @@ if ( ! defined( 'DAY_IN_SECONDS' ) ) {
 
 // Define plugin constants.
 if ( ! defined( 'DEPLOY_FORGE_VERSION' ) ) {
-	define( 'DEPLOY_FORGE_VERSION', '1.0.4' );
+	define( 'DEPLOY_FORGE_VERSION', '1.0.41' );
 }
 
 if ( ! defined( 'DEPLOY_FORGE_PLUGIN_DIR' ) ) {

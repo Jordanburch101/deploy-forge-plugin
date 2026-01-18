@@ -112,7 +112,8 @@ class GitHubApiTest extends TestCase {
 	 * @return void
 	 */
 	public function test_request_adds_auth_header(): void {
-		$captured_args = null;
+		/** @var array<string, mixed> $captured_args */
+		$captured_args = array();
 
 		Functions\when( 'wp_remote_post' )->alias(
 			function ( $url, $args ) use ( &$captured_args ) {
@@ -131,7 +132,7 @@ class GitHubApiTest extends TestCase {
 
 		$this->api->test_connection();
 
-		$this->assertNotNull( $captured_args, 'Request should have been made' );
+		$this->assertNotEmpty( $captured_args, 'Request should have been made' );
 		$this->assertArrayHasKey( 'headers', $captured_args );
 		$this->assertArrayHasKey( 'X-API-Key', $captured_args['headers'] );
 		$this->assertEquals( 'test-api-key', $captured_args['headers']['X-API-Key'] );
@@ -307,7 +308,8 @@ class GitHubApiTest extends TestCase {
 	 * @return void
 	 */
 	public function test_trigger_workflow_sends_correct_payload(): void {
-		$captured_body = null;
+		/** @var array<string, mixed> $captured_body */
+		$captured_body = array();
 
 		Functions\when( 'wp_remote_post' )->alias(
 			function ( $url, $args ) use ( &$captured_body ) {
@@ -327,7 +329,7 @@ class GitHubApiTest extends TestCase {
 		$result = $this->api->trigger_workflow( 'deploy.yml', 'main' );
 
 		$this->assertTrue( $result['success'], 'Should succeed' );
-		$this->assertNotNull( $captured_body, 'Request body should be captured' );
+		$this->assertNotEmpty( $captured_body, 'Request body should be captured' );
 		$this->assertEquals( 'POST', $captured_body['method'] );
 		$this->assertStringContainsString( 'deploy.yml', $captured_body['endpoint'] );
 		$this->assertEquals( 'main', $captured_body['data']['ref'] );
@@ -339,7 +341,8 @@ class GitHubApiTest extends TestCase {
 	 * @return void
 	 */
 	public function test_trigger_workflow_uses_default_branch(): void {
-		$captured_body = null;
+		/** @var array<string, mixed> $captured_body */
+		$captured_body = array();
 
 		Functions\when( 'wp_remote_post' )->alias(
 			function ( $url, $args ) use ( &$captured_body ) {
@@ -358,7 +361,7 @@ class GitHubApiTest extends TestCase {
 
 		$this->api->trigger_workflow( 'deploy.yml' );
 
-		$this->assertNotNull( $captured_body );
+		$this->assertNotEmpty( $captured_body );
 		$this->assertEquals( 'main', $captured_body['data']['ref'], 'Should use default branch from settings' );
 	}
 
@@ -495,7 +498,8 @@ class GitHubApiTest extends TestCase {
 	 * @return void
 	 */
 	public function test_report_deployment_status_sends_outcome(): void {
-		$captured_body = null;
+		/** @var array<string, mixed> $captured_body */
+		$captured_body = array();
 
 		Functions\when( 'wp_remote_post' )->alias(
 			function ( $url, $args ) use ( &$captured_body ) {
@@ -520,7 +524,7 @@ class GitHubApiTest extends TestCase {
 		);
 
 		$this->assertTrue( $result['success'], 'Should succeed' );
-		$this->assertNotNull( $captured_body );
+		$this->assertNotEmpty( $captured_body );
 		$this->assertEquals( 'deploy-123', $captured_body['deploymentId'] );
 		$this->assertTrue( $captured_body['success'] );
 		$this->assertEquals( 'Deployment completed successfully', $captured_body['logs'] );
@@ -532,7 +536,8 @@ class GitHubApiTest extends TestCase {
 	 * @return void
 	 */
 	public function test_report_deployment_status_sends_failure(): void {
-		$captured_body = null;
+		/** @var array<string, mixed> $captured_body */
+		$captured_body = array();
 
 		Functions\when( 'wp_remote_post' )->alias(
 			function ( $url, $args ) use ( &$captured_body ) {
@@ -666,7 +671,8 @@ class GitHubApiTest extends TestCase {
 	 * @return void
 	 */
 	public function test_cancel_workflow_run_sends_request(): void {
-		$captured_body = null;
+		/** @var array<string, mixed> $captured_body */
+		$captured_body = array();
 
 		Functions\when( 'wp_remote_post' )->alias(
 			function ( $url, $args ) use ( &$captured_body ) {

@@ -9,6 +9,9 @@
 	<exclude-pattern>/vendor/*</exclude-pattern>
 	<exclude-pattern>/node_modules/*</exclude-pattern>
 
+	<!-- Exclude tests directory - PHPUnit tests follow PSR-4 conventions, not WPCS -->
+	<exclude-pattern>/tests/*</exclude-pattern>
+
 	<!-- Exclude JavaScript files - use ESLint for JS linting instead -->
 	<exclude-pattern>*.js</exclude-pattern>
 
