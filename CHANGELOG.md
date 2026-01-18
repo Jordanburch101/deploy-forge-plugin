@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.43] - 2026-01-18
+
+### Fixed
+- Fixed fatal error in artifact_check context building that prevented error reporting to platform
+  - Changed `$this->settings->get_option()` to `$this->settings->get()` (method didn't exist)
+
 ## [1.0.42] - 2026-01-18
 
 ### Added

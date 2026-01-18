@@ -783,7 +783,7 @@ class Deploy_Forge_Deployment_Manager {
 						'api_success'       => $artifacts_result['success'] ?? false,
 						'api_message'       => $artifacts_result['message'] ?? null,
 						'artifacts_count'   => is_array( $artifacts_result['data'] ?? null ) ? count( $artifacts_result['data'] ) : 0,
-						'expected_artifact' => $this->settings->get_option( 'artifact_name', 'theme-build' ),
+						'expected_artifact' => $this->settings->get( 'artifact_name', 'theme-build' ),
 					);
 					$this->report_status_to_backend( $deployment_id, false, $error_message, $additional_context );
 					$this->database->release_deployment_lock();
