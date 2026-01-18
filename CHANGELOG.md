@@ -7,6 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.4] - 2026-01-17
+
+### Added
+- **Comprehensive Unit Test Suite**: 197 tests with 455 assertions covering security-critical paths and core functionality
+  - `WebhookHandlerTest.php` - 16 tests for HMAC-SHA256 signature verification, timing-safe comparison
+  - `ConnectionHandlerTest.php` - 19 tests for OAuth flow security, nonce validation, token exchange
+  - `AjaxHandlerBaseTest.php` - 29 tests for CSRF prevention, authorization, input sanitization
+  - `GitHubApiTest.php` - 18 tests for API authentication, error handling, workflow operations
+  - `DeploymentManagerTest.php` - 18 tests for deployment workflow, status transitions
+  - `DatabaseTest.php` - 22 tests for CRUD operations
+  - `DebugLoggerTest.php` - 25 tests for logging functionality, sensitive data redaction
+  - `UpdateCheckerTest.php` - 19 tests for plugin update checking
+- PHPUnit 10.5 test infrastructure with Brain Monkey for WordPress function mocking
+- Mock classes for `WP_Error`, `WP_REST_Request`, `WP_REST_Response` in test bootstrap
+- Composer scripts: `composer test` for running test suite
+
+### Changed
+- **WordPress Coding Standards Compliance**: Full WPCS 3.0 compliance for WordPress.org plugin repository submission
+  - Added `phpcs.xml.dist` configuration file with WordPress ruleset
+  - Updated all PHP files with proper PHPDoc blocks (`@param`, `@return`, `@since` tags)
+  - Added file headers with `@package Deploy_Forge` to all files
+  - Converted to WordPress spacing conventions (spaces inside parentheses)
+  - Implemented Yoda conditions throughout codebase
+  - Added translators comments for all i18n strings with placeholders
+  - Added `/* global */` declarations and JSDoc to JavaScript files
+  - Updated CSS files with proper file headers
+
+### Fixed
+- Replaced `unlink()` with `wp_delete_file()` in debug logger
+- Fixed `count()` in loop condition in debug logger
+- Added `wp_unslash()` before sanitization in AJAX handler
+
 ## [1.0.32] - 2026-01-16
 
 ### Fixed

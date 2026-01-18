@@ -19,16 +19,22 @@
 		"bcmath",
 		"Core",
 		"ctype",
+		"curl",
 		"date",
 		"filter",
 		"hash",
 		"json",
 		"mbstring",
+		"mysqli",
 		"pcre",
+		"sodium",
 		"SPL",
 		"standard",
+		"wordpress",
 		"zip",
 		"acf-pro"
 	],
-	"intelephense.environment.includePaths": ["vendor/php-stubs/wordpress-stubs"]
+	"intelephense.environment.includePaths": [
+		"vendor/php-stubs/wordpress-stubs"
+	]
 }

@@ -2,3 +2,7 @@
 /build
 /vendor
 composer.lock
+
+# PHPUnit
+.phpunit.cache
+/coverage

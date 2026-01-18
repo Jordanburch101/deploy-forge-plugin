@@ -1,1343 +1,1478 @@
 /**
  * Deploy Forge Admin JavaScript
+ *
+ * @package Deploy_Forge
+ * @since   1.0.0
  */
 
-(($) => {
+/* global jQuery, deployForgeAdmin */
+
+( function( $ ) {
+	'use strict';
+
+	/**
+	 * Main admin controller object
+	 *
+	 * Handles all admin page interactions including deployments,
+	 * connections, and GitHub integration.
+	 *
+	 * @since 1.0.0
+	 * @type {Object}
+	 */
 	const GitHubDeployAdmin = {
-		init: function () {
+
+		/**
+		 * Initialize the admin module
+		 *
+		 * @since 1.0.0
+		 * @return {void}
+		 */
+		init: function() {
 			this.bindEvents();
 			this.initTableFilters();
 			this.autoRefresh();
 		},
 
-		bindEvents: function () {
-			// Deploy Forge connection
-			$("#connect-btn").on("click", this.connectToDeployForge.bind(this));
-			$("#disconnect-btn").on(
-				"click",
-				this.disconnectFromDeployForge.bind(this),
-			);
+		/**
+		 * Bind all event handlers
+		 *
+		 * @since 1.0.0
+		 * @return {void}
+		 */
+		bindEvents: function() {
+			// Deploy Forge connection.
+			$( '#connect-btn' ).on( 'click', this.connectToDeployForge.bind( this ) );
+			$( '#disconnect-btn' ).on( 'click', this.disconnectFromDeployForge.bind( this ) );
 
-			// Workflow loading
-			$("#load-workflows-btn").on("click", this.loadWorkflows.bind(this));
-			$("#github_workflow_dropdown").on(
-				"change",
-				this.onWorkflowSelect.bind(this),
-			);
+			// Workflow loading.
+			$( '#load-workflows-btn' ).on( 'click', this.loadWorkflows.bind( this ) );
+			$( '#github_workflow_dropdown' ).on( 'change', this.onWorkflowSelect.bind( this ) );
 
-			// Test connection
-			$("#test-connection-btn").on("click", this.testConnection.bind(this));
+			// Test connection.
+			$( '#test-connection-btn' ).on( 'click', this.testConnection.bind( this ) );
 
-			// Deploy now
-			$("#deploy-now-btn").on("click", this.deployNow.bind(this));
+			// Deploy now.
+			$( '#deploy-now-btn' ).on( 'click', this.deployNow.bind( this ) );
 
-			// Refresh status
-			$("#refresh-status-btn").on("click", this.refreshStatus.bind(this));
+			// Refresh status.
+			$( '#refresh-status-btn' ).on( 'click', this.refreshStatus.bind( this ) );
 
-			// Rollback
-			$(".rollback-btn").on("click", this.rollback.bind(this));
+			// Rollback.
+			$( '.rollback-btn' ).on( 'click', this.rollback.bind( this ) );
 
-			// Approve deployment (manual approval)
-			$(".approve-deployment-btn").on(
-				"click",
-				this.approveDeployment.bind(this),
-			);
+			// Approve deployment (manual approval).
+			$( '.approve-deployment-btn' ).on( 'click', this.approveDeployment.bind( this ) );
 
-			// Cancel deployment
-			$(".cancel-deployment-btn").on("click", this.cancelDeployment.bind(this));
+			// Cancel deployment.
+			$( '.cancel-deployment-btn' ).on( 'click', this.cancelDeployment.bind( this ) );
 
-			// View details
-			$(".view-details-btn").on("click", this.viewDetails.bind(this));
+			// View details.
+			$( '.view-details-btn' ).on( 'click', this.viewDetails.bind( this ) );
 
-			// Reset all data
-			$("#reset-all-data-btn").on("click", this.resetAllData.bind(this));
+			// Reset all data.
+			$( '#reset-all-data-btn' ).on( 'click', this.resetAllData.bind( this ) );
 
-			// Close modal
-			$(".deploy-forge-modal-close").on("click", this.closeModal.bind(this));
-			$(".deploy-forge-modal").on("click", function (e) {
-				if (e.target === this) {
-					$(this).hide();
+			// Close modal.
+			$( '.deploy-forge-modal-close' ).on( 'click', this.closeModal.bind( this ) );
+			$( '.deploy-forge-modal' ).on( 'click', function( e ) {
+				if ( e.target === this ) {
+					$( this ).hide();
 				}
-			});
+			} );
 
-			// Show workflow button if repo is configured (after page load)
+			// Show workflow button if repo is configured (after page load).
 			this.checkWorkflowButtonVisibility();
 
-			// Handle deployment method change
-			$("#deployment_method").on(
-				"change",
-				this.onDeploymentMethodChange.bind(this),
-			);
-			this.onDeploymentMethodChange(); // Run on page load
+			// Handle deployment method change.
+			$( '#deployment_method' ).on( 'change', this.onDeploymentMethodChange.bind( this ) );
+			this.onDeploymentMethodChange(); // Run on page load.
 		},
 
 		/**
 		 * Initialize table search and filter functionality
+		 *
+		 * @since 1.0.0
+		 * @return {void}
 		 */
-		initTableFilters: function () {
-			const $searchInput = $("#deployment-search");
-			const $statusFilter = $("#deployment-status-filter");
-			const $table = $("#deployments-table");
+		initTableFilters: function() {
+			const $searchInput = $( '#deployment-search' );
+			const $statusFilter = $( '#deployment-status-filter' );
+			const $table = $( '#deployments-table' );
 
-			if (!$table.length) {
-				return; // No table on this page
+			if ( ! $table.length ) {
+				return; // No table on this page.
 			}
 
-			// Search functionality
-			$searchInput.on("keyup", () => {
+			// Search functionality.
+			$searchInput.on( 'keyup', () => {
 				this.filterTable();
-			});
+			} );
 
-			// Status filter functionality
-			$statusFilter.on("change", () => {
+			// Status filter functionality.
+			$statusFilter.on( 'change', () => {
 				this.filterTable();
-			});
+			} );
 		},
 
 		/**
 		 * Filter deployments table based on search and status
+		 *
+		 * @since 1.0.0
+		 * @return {void}
 		 */
 		filterTable: () => {
-			const searchTerm = $("#deployment-search").val().toLowerCase();
-			const statusFilter = $("#deployment-status-filter").val().toLowerCase();
-			const $rows = $("#deployments-table tbody tr");
+			const searchTerm = $( '#deployment-search' ).val().toLowerCase();
+			const statusFilter = $( '#deployment-status-filter' ).val().toLowerCase();
+			const $rows = $( '#deployments-table tbody tr' );
 
-			$rows.each(function () {
-				const $row = $(this);
+			$rows.each( function() {
+				const $row = $( this );
 				const rowText = $row.text().toLowerCase();
-				const rowStatus = $row.data("status");
+				const rowStatus = $row.data( 'status' );
 
-				// Check search match
-				const searchMatch = !searchTerm || rowText.includes(searchTerm);
+				// Check search match.
+				const searchMatch = ! searchTerm || rowText.includes( searchTerm );
 
-				// Check status match
-				const statusMatch = !statusFilter || rowStatus === statusFilter;
+				// Check status match.
+				const statusMatch = ! statusFilter || rowStatus === statusFilter;
 
-				// Show/hide row
-				if (searchMatch && statusMatch) {
+				// Show/hide row.
+				if ( searchMatch && statusMatch ) {
 					$row.show();
 				} else {
 					$row.hide();
 				}
-			});
+			} );
 		},
 
-		connectToDeployForge: (e) => {
+		/**
+		 * Connect to Deploy Forge platform
+		 *
+		 * Initiates OAuth flow with the Deploy Forge platform.
+		 *
+		 * @since 1.0.0
+		 * @param {Event} e Click event.
+		 * @return {void}
+		 */
+		connectToDeployForge: ( e ) => {
 			e.preventDefault();
 
-			const button = $(e.target).closest("button");
-			const spinner = $("#connect-loading");
+			const button = $( e.target ).closest( 'button' );
+			const spinner = $( '#connect-loading' );
 
-			button.prop("disabled", true);
-			spinner.addClass("is-active");
+			button.prop( 'disabled', true );
+			spinner.addClass( 'is-active' );
 
-			$.ajax({
+			$.ajax( {
 				url: deployForgeAdmin.ajaxUrl,
-				method: "POST",
+				method: 'POST',
 				data: {
-					action: "deploy_forge_connect",
-					nonce: deployForgeAdmin.nonce,
+					action: 'deploy_forge_connect',
+					nonce: deployForgeAdmin.nonce
 				},
-				success: (response) => {
-					if (response.success && response.data.redirect_url) {
-						// Redirect to Deploy Forge platform
+				success: ( response ) => {
+					if ( response.success && response.data.redirect_url ) {
+						// Redirect to Deploy Forge platform.
 						window.location.href = response.data.redirect_url;
 					} else {
-						alert(response.data?.message || "Failed to initiate connection");
-						button.prop("disabled", false);
-						spinner.removeClass("is-active");
+						alert( response.data?.message || 'Failed to initiate connection' );
+						button.prop( 'disabled', false );
+						spinner.removeClass( 'is-active' );
 					}
 				},
 				error: () => {
-					alert("An error occurred. Please try again.");
-					button.prop("disabled", false);
-					spinner.removeClass("is-active");
-				},
-			});
+					alert( 'An error occurred. Please try again.' );
+					button.prop( 'disabled', false );
+					spinner.removeClass( 'is-active' );
+				}
+			} );
 		},
 
-		disconnectFromDeployForge: (e) => {
+		/**
+		 * Disconnect from Deploy Forge platform
+		 *
+		 * @since 1.0.0
+		 * @param {Event} e Click event.
+		 * @return {void}
+		 */
+		disconnectFromDeployForge: ( e ) => {
 			e.preventDefault();
 
-			if (
-				!confirm(
-					"Are you sure you want to disconnect from Deploy Forge? You will need to reconnect to continue using automatic deployments.",
-				)
-			) {
+			if ( ! confirm( 'Are you sure you want to disconnect from Deploy Forge? You will need to reconnect to continue using automatic deployments.' ) ) {
 				return;
 			}
 
-			const button = $(e.target).closest("button");
-			const spinner = $("#disconnect-loading");
+			const button = $( e.target ).closest( 'button' );
+			const spinner = $( '#disconnect-loading' );
 
-			button.prop("disabled", true);
-			spinner.addClass("is-active");
+			button.prop( 'disabled', true );
+			spinner.addClass( 'is-active' );
 
-			$.ajax({
+			$.ajax( {
 				url: deployForgeAdmin.ajaxUrl,
-				method: "POST",
+				method: 'POST',
 				data: {
-					action: "deploy_forge_disconnect",
-					nonce: deployForgeAdmin.nonce,
+					action: 'deploy_forge_disconnect',
+					nonce: deployForgeAdmin.nonce
 				},
-				success: (response) => {
-					if (response.success) {
-						// Reload the page to show disconnected state
+				success: ( response ) => {
+					if ( response.success ) {
+						// Reload the page to show disconnected state.
 						window.location.reload();
 					} else {
-						alert(response.data?.message || "Failed to disconnect");
-						button.prop("disabled", false);
-						spinner.removeClass("is-active");
+						alert( response.data?.message || 'Failed to disconnect' );
+						button.prop( 'disabled', false );
+						spinner.removeClass( 'is-active' );
 					}
 				},
 				error: () => {
-					alert("An error occurred. Please try again.");
-					button.prop("disabled", false);
-					spinner.removeClass("is-active");
-				},
-			});
+					alert( 'An error occurred. Please try again.' );
+					button.prop( 'disabled', false );
+					spinner.removeClass( 'is-active' );
+				}
+			} );
 		},
 
-		testConnection: (e) => {
+		/**
+		 * Test connection to GitHub
+		 *
+		 * @since 1.0.0
+		 * @param {Event} e Click event.
+		 * @return {void}
+		 */
+		testConnection: ( e ) => {
 			e.preventDefault();
 
-			const button = $(e.target);
+			const button = $( e.target );
 			const originalText = button.text();
-			const resultDiv = $("#connection-result");
+			const resultDiv = $( '#connection-result' );
 
-			button.prop("disabled", true).text(deployForgeAdmin.strings.testing);
+			button.prop( 'disabled', true ).text( deployForgeAdmin.strings.testing );
 
-			$.ajax({
+			$.ajax( {
 				url: deployForgeAdmin.ajaxUrl,
-				type: "POST",
+				type: 'POST',
 				data: {
-					action: "deploy_forge_test_connection",
-					nonce: deployForgeAdmin.nonce,
+					action: 'deploy_forge_test_connection',
+					nonce: deployForgeAdmin.nonce
 				},
-				success: (response) => {
-					if (response.success) {
-						resultDiv.html(
-							'<div class="notice notice-success"><p>' +
-								response.message +
-								"</p></div>",
-						);
+				success: ( response ) => {
+					if ( response.success ) {
+						resultDiv.html( '<div class="notice notice-success"><p>' + response.message + '</p></div>' );
 					} else {
-						resultDiv.html(
-							'<div class="notice notice-error"><p>' +
-								response.message +
-								"</p></div>",
-						);
+						resultDiv.html( '<div class="notice notice-error"><p>' + response.message + '</p></div>' );
 					}
 				},
 				error: () => {
-					resultDiv.html(
-						'<div class="notice notice-error"><p>Connection test failed.</p></div>',
-					);
+					resultDiv.html( '<div class="notice notice-error"><p>Connection test failed.</p></div>' );
 				},
 				complete: () => {
-					button.prop("disabled", false).text(originalText);
-				},
-			});
+					button.prop( 'disabled', false ).text( originalText );
+				}
+			} );
 		},
 
-		deployNow: (e) => {
+		/**
+		 * Trigger manual deployment
+		 *
+		 * @since 1.0.0
+		 * @param {Event} e Click event.
+		 * @return {void}
+		 */
+		deployNow: ( e ) => {
 			e.preventDefault();
 
-			if (!confirm(deployForgeAdmin.strings.confirmDeploy)) {
+			if ( ! confirm( deployForgeAdmin.strings.confirmDeploy ) ) {
 				return;
 			}
 
-			const button = $(e.target);
+			const button = $( e.target );
 			const originalHtml = button.html();
 
-			button
-				.prop("disabled", true)
-				.html(
-					'<span class="deploy-forge-loading"></span> ' +
-						deployForgeAdmin.strings.deploying,
-				);
+			button.prop( 'disabled', true ).html( '<span class="deploy-forge-loading"></span> ' + deployForgeAdmin.strings.deploying );
 
-			$.ajax({
+			$.ajax( {
 				url: deployForgeAdmin.ajaxUrl,
-				type: "POST",
+				type: 'POST',
 				data: {
-					action: "deploy_forge_manual_deploy",
-					nonce: deployForgeAdmin.nonce,
+					action: 'deploy_forge_manual_deploy',
+					nonce: deployForgeAdmin.nonce
 				},
-				success: (response) => {
-					if (response.success) {
-						alert(response.data.message);
+				success: ( response ) => {
+					if ( response.success ) {
+						alert( response.data.message );
 						location.reload();
 					} else {
-						// Check if error is due to deployment in progress
-						if (
-							response.data.error_code === "deployment_in_progress" &&
-							response.data.building_deployment
-						) {
+						// Check if error is due to deployment in progress.
+						if ( 'deployment_in_progress' === response.data.error_code && response.data.building_deployment ) {
 							const buildingDep = response.data.building_deployment;
-							const message =
-								response.data.message +
-								"\n\n" +
-								"Deployment #" +
-								buildingDep.id +
-								" (Status: " +
-								buildingDep.status +
-								")\n" +
-								"Commit: " +
-								buildingDep.commit_hash.substring(0, 7) +
-								"\n\n" +
-								"Would you like to cancel it now?";
+							const message = response.data.message + '\n\n' +
+								'Deployment #' + buildingDep.id + ' (Status: ' + buildingDep.status + ')\n' +
+								'Commit: ' + buildingDep.commit_hash.substring( 0, 7 ) + '\n\n' +
+								'Would you like to cancel it now?';
 
-							if (confirm(message)) {
-								// Cancel the existing deployment
-								GitHubDeployAdmin.cancelExistingDeployment(
-									buildingDep.id,
-									button,
-									originalHtml,
-								);
+							if ( confirm( message ) ) {
+								// Cancel the existing deployment.
+								GitHubDeployAdmin.cancelExistingDeployment( buildingDep.id, button, originalHtml );
 							} else {
-								button.prop("disabled", false).html(originalHtml);
+								button.prop( 'disabled', false ).html( originalHtml );
 							}
 						} else {
-							alert(response.data.message || "Deployment failed.");
-							button.prop("disabled", false).html(originalHtml);
+							alert( response.data.message || 'Deployment failed.' );
+							button.prop( 'disabled', false ).html( originalHtml );
 						}
 					}
 				},
 				error: () => {
-					alert("Deployment request failed.");
-					button.prop("disabled", false).html(originalHtml);
-				},
-			});
+					alert( 'Deployment request failed.' );
+					button.prop( 'disabled', false ).html( originalHtml );
+				}
+			} );
 		},
 
-		cancelExistingDeployment: (deploymentId, button, originalHtml) => {
-			$.ajax({
+		/**
+		 * Cancel an existing deployment
+		 *
+		 * @since 1.0.0
+		 * @param {number} deploymentId  Deployment ID to cancel.
+		 * @param {jQuery} button        Button element.
+		 * @param {string} originalHtml  Original button HTML.
+		 * @return {void}
+		 */
+		cancelExistingDeployment: ( deploymentId, button, originalHtml ) => {
+			$.ajax( {
 				url: deployForgeAdmin.ajaxUrl,
-				type: "POST",
+				type: 'POST',
 				data: {
-					action: "deploy_forge_cancel",
+					action: 'deploy_forge_cancel',
 					nonce: deployForgeAdmin.nonce,
-					deployment_id: deploymentId,
+					deployment_id: deploymentId
 				},
-				success: (response) => {
-					if (response.success) {
-						alert(
-							"Previous deployment cancelled. Please click 'Deploy Now' again to start a new deployment.",
-						);
+				success: ( response ) => {
+					if ( response.success ) {
+						alert( 'Previous deployment cancelled. Please click \'Deploy Now\' again to start a new deployment.' );
 						location.reload();
 					} else {
-						alert(
-							"Failed to cancel existing deployment: " +
-								(response.data.message || "Unknown error"),
-						);
-						button.prop("disabled", false).html(originalHtml);
+						alert( 'Failed to cancel existing deployment: ' + ( response.data.message || 'Unknown error' ) );
+						button.prop( 'disabled', false ).html( originalHtml );
 					}
 				},
 				error: () => {
-					alert("Failed to cancel existing deployment.");
-					button.prop("disabled", false).html(originalHtml);
-				},
-			});
+					alert( 'Failed to cancel existing deployment.' );
+					button.prop( 'disabled', false ).html( originalHtml );
+				}
+			} );
 		},
 
-		refreshStatus: (e) => {
+		/**
+		 * Refresh deployment status
+		 *
+		 * @since 1.0.0
+		 * @param {Event} e Click event.
+		 * @return {void}
+		 */
+		refreshStatus: ( e ) => {
 			e.preventDefault();
 
-			const button = $(e.target);
+			const button = $( e.target );
 			const originalHtml = button.html();
 
-			button
-				.prop("disabled", true)
-				.html('<span class="deploy-forge-loading"></span>');
+			button.prop( 'disabled', true ).html( '<span class="deploy-forge-loading"></span>' );
 
-			$.ajax({
+			$.ajax( {
 				url: deployForgeAdmin.ajaxUrl,
-				type: "POST",
+				type: 'POST',
 				data: {
-					action: "deploy_forge_get_status",
-					nonce: deployForgeAdmin.nonce,
+					action: 'deploy_forge_get_status',
+					nonce: deployForgeAdmin.nonce
 				},
-				success: (response) => {
-					if (response.success) {
+				success: ( response ) => {
+					if ( response.success ) {
 						location.reload();
 					}
 				},
 				complete: () => {
-					button.prop("disabled", false).html(originalHtml);
-				},
-			});
+					button.prop( 'disabled', false ).html( originalHtml );
+				}
+			} );
 		},
 
-		rollback: (e) => {
+		/**
+		 * Rollback to a previous deployment
+		 *
+		 * @since 1.0.0
+		 * @param {Event} e Click event.
+		 * @return {void}
+		 */
+		rollback: ( e ) => {
 			e.preventDefault();
 
-			if (!confirm(deployForgeAdmin.strings.confirmRollback)) {
+			if ( ! confirm( deployForgeAdmin.strings.confirmRollback ) ) {
 				return;
 			}
 
-			const button = $(e.target);
-			const deploymentId = button.data("deployment-id");
+			const button = $( e.target );
+			const deploymentId = button.data( 'deployment-id' );
 			const originalText = button.text();
 
-			button.prop("disabled", true).text("Rolling back...");
+			button.prop( 'disabled', true ).text( 'Rolling back...' );
 
-			$.ajax({
+			$.ajax( {
 				url: deployForgeAdmin.ajaxUrl,
-				type: "POST",
+				type: 'POST',
 				data: {
-					action: "deploy_forge_rollback",
+					action: 'deploy_forge_rollback',
 					nonce: deployForgeAdmin.nonce,
-					deployment_id: deploymentId,
+					deployment_id: deploymentId
 				},
-				success: (response) => {
-					if (response.success) {
-						alert(response.data.message);
+				success: ( response ) => {
+					if ( response.success ) {
+						alert( response.data.message );
 						location.reload();
 					} else {
-						alert(response.data.message || "Rollback failed.");
-						button.prop("disabled", false).text(originalText);
+						alert( response.data.message || 'Rollback failed.' );
+						button.prop( 'disabled', false ).text( originalText );
 					}
 				},
 				error: () => {
-					alert("Rollback request failed.");
-					button.prop("disabled", false).text(originalText);
-				},
-			});
+					alert( 'Rollback request failed.' );
+					button.prop( 'disabled', false ).text( originalText );
+				}
+			} );
 		},
 
-		approveDeployment: (e) => {
+		/**
+		 * Approve a pending deployment
+		 *
+		 * @since 1.0.0
+		 * @param {Event} e Click event.
+		 * @return {void}
+		 */
+		approveDeployment: ( e ) => {
 			e.preventDefault();
 
-			if (!confirm("Are you sure you want to deploy this commit?")) {
+			if ( ! confirm( 'Are you sure you want to deploy this commit?' ) ) {
 				return;
 			}
 
-			const button = $(e.target).closest("button");
-			const deploymentId = button.data("deployment-id");
+			const button = $( e.target ).closest( 'button' );
+			const deploymentId = button.data( 'deployment-id' );
 			const originalHtml = button.html();
 
-			button
-				.prop("disabled", true)
-				.html('<span class="deploy-forge-loading"></span> Deploying...');
+			button.prop( 'disabled', true ).html( '<span class="deploy-forge-loading"></span> Deploying...' );
 
-			$.ajax({
+			$.ajax( {
 				url: deployForgeAdmin.ajaxUrl,
-				type: "POST",
+				type: 'POST',
 				data: {
-					action: "deploy_forge_approve",
+					action: 'deploy_forge_approve',
 					nonce: deployForgeAdmin.nonce,
-					deployment_id: deploymentId,
+					deployment_id: deploymentId
 				},
-				success: (response) => {
-					if (response.success) {
-						alert(response.data.message || "Deployment started successfully!");
+				success: ( response ) => {
+					if ( response.success ) {
+						alert( response.data.message || 'Deployment started successfully!' );
 						location.reload();
 					} else {
-						alert(response.data.message || "Approval failed.");
-						button.prop("disabled", false).html(originalHtml);
+						alert( response.data.message || 'Approval failed.' );
+						button.prop( 'disabled', false ).html( originalHtml );
 					}
 				},
 				error: () => {
-					alert("Approval request failed.");
-					button.prop("disabled", false).html(originalHtml);
-				},
-			});
+					alert( 'Approval request failed.' );
+					button.prop( 'disabled', false ).html( originalHtml );
+				}
+			} );
 		},
 
-		cancelDeployment: (e) => {
+		/**
+		 * Cancel a deployment
+		 *
+		 * @since 1.0.0
+		 * @param {Event} e Click event.
+		 * @return {void}
+		 */
+		cancelDeployment: ( e ) => {
 			e.preventDefault();
 
-			if (!confirm(deployForgeAdmin.strings.confirmCancel)) {
+			if ( ! confirm( deployForgeAdmin.strings.confirmCancel ) ) {
 				return;
 			}
 
-			const button = $(e.target).closest("button");
-			const deploymentId = button.data("deployment-id");
+			const button = $( e.target ).closest( 'button' );
+			const deploymentId = button.data( 'deployment-id' );
 			const originalHtml = button.html();
 
-			button
-				.prop("disabled", true)
-				.html(
-					'<span class="deploy-forge-loading"></span> ' +
-						deployForgeAdmin.strings.cancelling,
-				);
+			button.prop( 'disabled', true ).html( '<span class="deploy-forge-loading"></span> ' + deployForgeAdmin.strings.cancelling );
 
-			$.ajax({
+			$.ajax( {
 				url: deployForgeAdmin.ajaxUrl,
-				type: "POST",
+				type: 'POST',
 				data: {
-					action: "deploy_forge_cancel",
+					action: 'deploy_forge_cancel',
 					nonce: deployForgeAdmin.nonce,
-					deployment_id: deploymentId,
+					deployment_id: deploymentId
 				},
-				success: (response) => {
-					if (response.success) {
-						alert(response.data.message);
+				success: ( response ) => {
+					if ( response.success ) {
+						alert( response.data.message );
 						location.reload();
 					} else {
-						alert(response.data.message || "Cancellation failed.");
-						button.prop("disabled", false).html(originalHtml);
+						alert( response.data.message || 'Cancellation failed.' );
+						button.prop( 'disabled', false ).html( originalHtml );
 					}
 				},
 				error: () => {
-					alert("Cancellation request failed.");
-					button.prop("disabled", false).html(originalHtml);
-				},
-			});
+					alert( 'Cancellation request failed.' );
+					button.prop( 'disabled', false ).html( originalHtml );
+				}
+			} );
 		},
 
-		viewDetails: (e) => {
+		/**
+		 * View deployment details in modal
+		 *
+		 * @since 1.0.0
+		 * @param {Event} e Click event.
+		 * @return {void}
+		 */
+		viewDetails: ( e ) => {
 			e.preventDefault();
 
-			const button = $(e.target);
-			const deploymentId = button.data("deployment-id");
-			const modal = $("#deployment-details-modal");
-			const content = $("#deployment-details-content");
+			const button = $( e.target );
+			const deploymentId = button.data( 'deployment-id' );
+			const modal = $( '#deployment-details-modal' );
+			const content = $( '#deployment-details-content' );
 
 			modal.show();
-			content.html("<p>Loading...</p>");
+			content.html( '<p>Loading...</p>' );
 
-			$.ajax({
+			$.ajax( {
 				url: deployForgeAdmin.ajaxUrl,
-				type: "POST",
+				type: 'POST',
 				data: {
-					action: "deploy_forge_get_status",
+					action: 'deploy_forge_get_status',
 					nonce: deployForgeAdmin.nonce,
-					deployment_id: deploymentId,
+					deployment_id: deploymentId
 				},
-				success: (response) => {
-					if (response.success && response.data.deployment) {
+				success: ( response ) => {
+					if ( response.success && response.data.deployment ) {
 						const d = response.data.deployment;
 						let html = '<table class="widefat">';
-						html +=
-							"<tr><th>Commit Hash</th><td><code>" +
-							d.commit_hash +
-							"</code></td></tr>";
-						html +=
-							"<tr><th>Message</th><td>" +
-							(d.commit_message || "N/A") +
-							"</td></tr>";
-						html +=
-							"<tr><th>Author</th><td>" +
-							(d.commit_author || "N/A") +
-							"</td></tr>";
-						html +=
-							'<tr><th>Status</th><td><span class="deployment-status status-' +
-							d.status +
-							'">' +
-							d.status +
-							"</span></td></tr>";
-						html +=
-							"<tr><th>Trigger Type</th><td>" + d.trigger_type + "</td></tr>";
-						html += "<tr><th>Created At</th><td>" + d.created_at + "</td></tr>";
+						html += '<tr><th>Commit Hash</th><td><code>' + d.commit_hash + '</code></td></tr>';
+						html += '<tr><th>Message</th><td>' + ( d.commit_message || 'N/A' ) + '</td></tr>';
+						html += '<tr><th>Author</th><td>' + ( d.commit_author || 'N/A' ) + '</td></tr>';
+						html += '<tr><th>Status</th><td><span class="deployment-status status-' + d.status + '">' + d.status + '</span></td></tr>';
+						html += '<tr><th>Trigger Type</th><td>' + d.trigger_type + '</td></tr>';
+						html += '<tr><th>Created At</th><td>' + d.created_at + '</td></tr>';
 
-						if (d.deployed_at) {
-							html +=
-								"<tr><th>Deployed At</th><td>" + d.deployed_at + "</td></tr>";
+						if ( d.deployed_at ) {
+							html += '<tr><th>Deployed At</th><td>' + d.deployed_at + '</td></tr>';
 						}
 
-						if (d.build_url) {
-							html +=
-								'<tr><th>Build URL</th><td><a href="' +
-								d.build_url +
-								'" target="_blank">' +
-								d.build_url +
-								"</a></td></tr>";
+						if ( d.build_url ) {
+							html += '<tr><th>Build URL</th><td><a href="' + d.build_url + '" target="_blank">' + d.build_url + '</a></td></tr>';
 						}
 
-						html += "</table>";
+						html += '</table>';
 
-						if (d.deployment_logs) {
-							html += "<h3>Deployment Logs</h3>";
-							html += "<pre>" + d.deployment_logs + "</pre>";
+						if ( d.deployment_logs ) {
+							html += '<h3>Deployment Logs</h3>';
+							html += '<pre>' + d.deployment_logs + '</pre>';
 						}
 
-						if (d.error_message) {
-							html += "<h3>Error Message</h3>";
-							html += "<pre>" + d.error_message + "</pre>";
+						if ( d.error_message ) {
+							html += '<h3>Error Message</h3>';
+							html += '<pre>' + d.error_message + '</pre>';
 						}
 
-						content.html(html);
+						content.html( html );
 					} else {
-						content.html("<p>Failed to load deployment details.</p>");
+						content.html( '<p>Failed to load deployment details.</p>' );
 					}
 				},
 				error: () => {
-					content.html("<p>Error loading deployment details.</p>");
-				},
-			});
+					content.html( '<p>Error loading deployment details.</p>' );
+				}
+			} );
 		},
 
+		/**
+		 * Close modal dialogs
+		 *
+		 * @since 1.0.0
+		 * @return {void}
+		 */
 		closeModal: () => {
-			$(".deploy-forge-modal").hide();
+			$( '.deploy-forge-modal' ).hide();
 		},
 
-		resetAllData: (e) => {
+		/**
+		 * Reset all plugin data
+		 *
+		 * @since 1.0.0
+		 * @param {Event} e Click event.
+		 * @return {void}
+		 */
+		resetAllData: ( e ) => {
 			e.preventDefault();
 
-			// First confirmation
-			if (
-				!confirm(
-					"⚠️ WARNING: This will permanently delete ALL plugin data!\n\n" +
-						"This includes:\n" +
-						"• GitHub connection and credentials\n" +
-						"• All deployment history\n" +
-						"• All backup files\n" +
-						"• All settings\n" +
-						"• Backend server data\n\n" +
-						"This action CANNOT be undone!\n\n" +
-						"Are you sure you want to continue?",
-				)
-			) {
+			// First confirmation.
+			if ( ! confirm(
+				'⚠️ WARNING: This will permanently delete ALL plugin data!\n\n' +
+				'This includes:\n' +
+				'• GitHub connection and credentials\n' +
+				'• All deployment history\n' +
+				'• All backup files\n' +
+				'• All settings\n' +
+				'• Backend server data\n\n' +
+				'This action CANNOT be undone!\n\n' +
+				'Are you sure you want to continue?'
+			) ) {
 				return;
 			}
 
-			// Second confirmation with type-to-confirm
+			// Second confirmation with type-to-confirm.
 			const confirmText = prompt(
-				"To confirm this destructive action, please type: RESET\n\n" +
-					"(Type RESET in all caps to proceed)",
+				'To confirm this destructive action, please type: RESET\n\n' +
+				'(Type RESET in all caps to proceed)'
 			);
 
-			if (confirmText !== "RESET") {
-				if (confirmText !== null) {
-					alert("Reset cancelled. You must type 'RESET' exactly to confirm.");
+			if ( 'RESET' !== confirmText ) {
+				if ( null !== confirmText ) {
+					alert( 'Reset cancelled. You must type \'RESET\' exactly to confirm.' );
 				}
 				return;
 			}
 
-			const button = $(e.target).closest("button");
-			const spinner = $("#reset-loading");
+			const button = $( e.target ).closest( 'button' );
+			const spinner = $( '#reset-loading' );
 
-			button.prop("disabled", true);
-			spinner.addClass("is-active");
+			button.prop( 'disabled', true );
+			spinner.addClass( 'is-active' );
 
-			$.ajax({
+			$.ajax( {
 				url: deployForgeAdmin.ajaxUrl,
-				method: "POST",
+				method: 'POST',
 				data: {
-					action: "deploy_forge_reset_all_data",
-					nonce: deployForgeAdmin.nonce,
+					action: 'deploy_forge_reset_all_data',
+					nonce: deployForgeAdmin.nonce
 				},
-				success: (response) => {
-					if (response.success) {
+				success: ( response ) => {
+					if ( response.success ) {
 						alert(
-							"✓ All plugin data has been reset successfully.\n\n" +
-								"The page will now reload. You will need to reconnect to GitHub.",
+							'✓ All plugin data has been reset successfully.\n\n' +
+							'The page will now reload. You will need to reconnect to GitHub.'
 						);
 						window.location.reload();
 					} else {
-						alert(
-							"Failed to reset plugin data:\n\n" +
-								(response.data?.message || "Unknown error"),
-						);
-						button.prop("disabled", false);
-						spinner.removeClass("is-active");
+						alert( 'Failed to reset plugin data:\n\n' + ( response.data?.message || 'Unknown error' ) );
+						button.prop( 'disabled', false );
+						spinner.removeClass( 'is-active' );
 					}
 				},
 				error: () => {
-					alert(
-						"An error occurred while resetting plugin data. Please try again.",
-					);
-					button.prop("disabled", false);
-					spinner.removeClass("is-active");
-				},
-			});
+					alert( 'An error occurred while resetting plugin data. Please try again.' );
+					button.prop( 'disabled', false );
+					spinner.removeClass( 'is-active' );
+				}
+			} );
 		},
 
+		/**
+		 * Load repositories from GitHub App installation
+		 *
+		 * @since 1.0.0
+		 * @return {void}
+		 */
 		loadInstallationRepos: () => {
-			const $loading = $("#repo-selector-loading");
-			const $list = $("#repo-selector-list");
-			const $error = $("#repo-selector-error");
-			const $errorMessage = $("#repo-selector-error-message");
-			const $select = $("#repo-select");
+			const $loading = $( '#repo-selector-loading' );
+			const $list = $( '#repo-selector-list' );
+			const $error = $( '#repo-selector-error' );
+			const $errorMessage = $( '#repo-selector-error-message' );
+			const $select = $( '#repo-select' );
 
 			$loading.show();
 			$list.hide();
 			$error.hide();
 
-			$.ajax({
+			$.ajax( {
 				url: deployForgeAdmin.ajaxUrl,
-				method: "POST",
+				method: 'POST',
 				data: {
-					action: "deploy_forge_get_installation_repos",
-					nonce: deployForgeAdmin.nonce,
+					action: 'deploy_forge_get_installation_repos',
+					nonce: deployForgeAdmin.nonce
 				},
-				success: (response) => {
-					console.log("Installation repos response:", response);
+				success: ( response ) => {
+					console.log( 'Installation repos response:', response );
 					$loading.hide();
 
-					if (response.success && response.data.repos) {
-						// Populate dropdown
-						$select.html('<option value="">-- Select a Repository --</option>');
+					if ( response.success && response.data.repos ) {
+						// Populate dropdown.
+						$select.html( '<option value="">-- Select a Repository --</option>' );
 
-						response.data.repos.forEach((repo) => {
-							const icon = repo.private ? "🔒 " : "📖 ";
+						response.data.repos.forEach( ( repo ) => {
+							const icon = repo.private ? '🔒 ' : '📖 ';
 							$select.append(
-								$("<option></option>")
-									.val(
-										JSON.stringify({
-											owner: repo.owner,
-											name: repo.name,
-											full_name: repo.full_name,
-											default_branch: repo.default_branch,
-										}),
-									)
-									.text(icon + repo.full_name),
+								$( '<option></option>' )
+									.val( JSON.stringify( {
+										owner: repo.owner,
+										name: repo.name,
+										full_name: repo.full_name,
+										default_branch: repo.default_branch
+									} ) )
+									.text( icon + repo.full_name )
 							);
-						});
+						} );
 
 						$list.show();
 					} else {
-						console.error("Failed to load repos:", response);
-						$errorMessage.text(
-							response.data?.message || "Failed to load repositories",
-						);
+						console.error( 'Failed to load repos:', response );
+						$errorMessage.text( response.data?.message || 'Failed to load repositories' );
 						$error.show();
 					}
 				},
-				error: (xhr, status, error) => {
-					console.error("AJAX error loading repos:", xhr, status, error);
+				error: ( xhr, status, error ) => {
+					console.error( 'AJAX error loading repos:', xhr, status, error );
 					$loading.hide();
-					$errorMessage.text(
-						"An error occurred while loading repositories: " + error,
-					);
+					$errorMessage.text( 'An error occurred while loading repositories: ' + error );
 					$error.show();
-				},
-			});
+				}
+			} );
 		},
 
-		onRepoSelectChange: function () {
-			const $select = $("#repo-select");
-			const $bindButton = $("#bind-repo-btn");
+		/**
+		 * Handle repository selection change
+		 *
+		 * @since 1.0.0
+		 * @return {void}
+		 */
+		onRepoSelectChange: function() {
+			const $select = $( '#repo-select' );
+			const $bindButton = $( '#bind-repo-btn' );
 
-			if ($select.val()) {
-				$bindButton.prop("disabled", false);
+			if ( $select.val() ) {
+				$bindButton.prop( 'disabled', false );
 			} else {
-				$bindButton.prop("disabled", true);
+				$bindButton.prop( 'disabled', true );
 			}
 
-			// Update workflow button visibility based on selection
+			// Update workflow button visibility based on selection.
 			this.checkWorkflowButtonVisibility();
 		},
 
-		bindRepository: (e) => {
+		/**
+		 * Bind a repository to this site
+		 *
+		 * @since 1.0.0
+		 * @param {Event} e Click event.
+		 * @return {void}
+		 */
+		bindRepository: ( e ) => {
 			e.preventDefault();
 
-			const $select = $("#repo-select");
-			const $button = $("#bind-repo-btn");
-			const $spinner = $("#bind-loading");
+			const $select = $( '#repo-select' );
+			const $button = $( '#bind-repo-btn' );
+			const $spinner = $( '#bind-loading' );
 
-			if (!$select.val()) {
+			if ( ! $select.val() ) {
 				return;
 			}
 
-			const repoData = JSON.parse($select.val());
+			const repoData = JSON.parse( $select.val() );
 
-			if (
-				!confirm(
-					"Are you sure you want to bind to " +
-						repoData.full_name +
-						"?\n\n" +
-						"This action is permanent and cannot be undone without disconnecting from GitHub.",
-				)
-			) {
+			if ( ! confirm(
+				'Are you sure you want to bind to ' + repoData.full_name + '?\n\n' +
+				'This action is permanent and cannot be undone without disconnecting from GitHub.'
+			) ) {
 				return;
 			}
 
-			$button.prop("disabled", true);
-			$select.prop("disabled", true);
-			$spinner.addClass("is-active");
+			$button.prop( 'disabled', true );
+			$select.prop( 'disabled', true );
+			$spinner.addClass( 'is-active' );
 
-			$.ajax({
+			$.ajax( {
 				url: deployForgeAdmin.ajaxUrl,
-				method: "POST",
+				method: 'POST',
 				data: {
-					action: "deploy_forge_bind_repo",
+					action: 'deploy_forge_bind_repo',
 					nonce: deployForgeAdmin.nonce,
 					owner: repoData.owner,
 					name: repoData.name,
-					default_branch: repoData.default_branch,
+					default_branch: repoData.default_branch
 				},
-				success: (response) => {
-					if (response.success) {
-						alert(response.data.message || "Repository bound successfully!");
-						// Reload page to show bound state
+				success: ( response ) => {
+					if ( response.success ) {
+						alert( response.data.message || 'Repository bound successfully!' );
+						// Reload page to show bound state.
 						window.location.reload();
 					} else {
-						alert(response.data?.message || "Failed to bind repository");
-						$button.prop("disabled", false);
-						$select.prop("disabled", false);
-						$spinner.removeClass("is-active");
+						alert( response.data?.message || 'Failed to bind repository' );
+						$button.prop( 'disabled', false );
+						$select.prop( 'disabled', false );
+						$spinner.removeClass( 'is-active' );
 					}
 				},
 				error: () => {
-					alert("An error occurred. Please try again.");
-					$button.prop("disabled", false);
-					$select.prop("disabled", false);
-					$spinner.removeClass("is-active");
-				},
-			});
+					alert( 'An error occurred. Please try again.' );
+					$button.prop( 'disabled', false );
+					$select.prop( 'disabled', false );
+					$spinner.removeClass( 'is-active' );
+				}
+			} );
 		},
 
 		/**
 		 * Load available workflows from selected repository
-		 * SECURITY: Validates repo data before making AJAX request
+		 *
+		 * SECURITY: Validates repo data before making AJAX request.
+		 *
+		 * @since 1.0.0
+		 * @param {Event} e Click event.
+		 * @return {void}
 		 */
-		loadWorkflows: (e) => {
+		loadWorkflows: ( e ) => {
 			e.preventDefault();
 
-			const $repoSelect = $("#repo-select");
-			const $button = $("#load-workflows-btn");
-			const $spinner = $("#workflow-loading");
-			const $dropdown = $("#github_workflow_dropdown");
-			const $manualInput = $("#github_workflow_name");
-			const $error = $("#workflow-error");
-			const $count = $("#workflow-count");
+			const $repoSelect = $( '#repo-select' );
+			const $button = $( '#load-workflows-btn' );
+			const $spinner = $( '#workflow-loading' );
+			const $dropdown = $( '#github_workflow_dropdown' );
+			const $manualInput = $( '#github_workflow_name' );
+			const $error = $( '#workflow-error' );
+			const $count = $( '#workflow-count' );
 
-			// Get repository from either bound repo or selector
+			// Get repository from either bound repo or selector.
 			let owner, repo;
 
-			if ($repoSelect.length && $repoSelect.val()) {
-				// From repo selector during setup
+			if ( $repoSelect.length && $repoSelect.val() ) {
+				// From repo selector during setup.
 				try {
-					const repoData = JSON.parse($repoSelect.val());
+					const repoData = JSON.parse( $repoSelect.val() );
 					owner = repoData.owner;
 					repo = repoData.name;
-				} catch (e) {
-					$error.text("Invalid repository selection").show();
+				} catch ( err ) {
+					$error.text( 'Invalid repository selection' ).show();
 					return;
 				}
 			} else {
-				// From bound repository (read from hidden fields or data attributes)
-				owner = $("#github_repo_owner").val();
-				repo = $("#github_repo_name").val();
+				// From bound repository (read from hidden fields or data attributes).
+				owner = $( '#github_repo_owner' ).val();
+				repo = $( '#github_repo_name' ).val();
 			}
 
-			if (!owner || !repo) {
-				$error.text("Please select a repository first").show();
+			if ( ! owner || ! repo ) {
+				$error.text( 'Please select a repository first' ).show();
 				return;
 			}
 
-			// SECURITY: Client-side validation of repo format
-			if (!/^[a-zA-Z0-9_-]+$/.test(owner) || !/^[a-zA-Z0-9_.-]+$/.test(repo)) {
-				$error.text("Invalid repository format").show();
+			// SECURITY: Client-side validation of repo format.
+			if ( ! /^[a-zA-Z0-9_-]+$/.test( owner ) || ! /^[a-zA-Z0-9_.-]+$/.test( repo ) ) {
+				$error.text( 'Invalid repository format' ).show();
 				return;
 			}
 
-			$button.prop("disabled", true);
-			$spinner.addClass("is-active");
+			$button.prop( 'disabled', true );
+			$spinner.addClass( 'is-active' );
 			$error.hide();
 			$count.hide();
 
-			$.ajax({
+			$.ajax( {
 				url: deployForgeAdmin.ajaxUrl,
-				method: "POST",
+				method: 'POST',
 				data: {
-					action: "deploy_forge_get_workflows",
+					action: 'deploy_forge_get_workflows',
 					nonce: deployForgeAdmin.nonce,
 					owner: owner,
-					repo: repo,
+					repo: repo
 				},
-				success: (response) => {
-					$spinner.removeClass("is-active");
-					$button.prop("disabled", false);
+				success: ( response ) => {
+					$spinner.removeClass( 'is-active' );
+					$button.prop( 'disabled', false );
 
-					console.log("Workflows response:", response);
+					console.log( 'Workflows response:', response );
 
-					if (response.success && response.data.workflows) {
+					if ( response.success && response.data.workflows ) {
 						const workflows = response.data.workflows;
 
-						console.log("Workflows count:", workflows.length);
-						console.log("Workflows data:", workflows);
+						console.log( 'Workflows count:', workflows.length );
+						console.log( 'Workflows data:', workflows );
 
-						if (workflows.length === 0) {
-							$error
-								.text(
-									"No workflows found. Make sure your repository has .github/workflows/*.yml files.",
-								)
-								.show();
+						if ( 0 === workflows.length ) {
+							$error.text( 'No workflows found. Make sure your repository has .github/workflows/*.yml files.' ).show();
 							return;
 						}
 
-						// Populate dropdown
+						// Populate dropdown.
 						$dropdown.empty();
-						$dropdown.append(
-							$("<option></option>").val("").text("Select a workflow..."),
-						);
+						$dropdown.append( $( '<option></option>' ).val( '' ).text( 'Select a workflow...' ) );
 
-						// Check if current value matches any workflow
+						// Check if current value matches any workflow.
 						const currentValue = $manualInput.val();
 						let matchFound = false;
 
-						workflows.forEach((workflow) => {
+						workflows.forEach( ( workflow ) => {
 							const isSelected = workflow.filename === currentValue;
-							if (isSelected) matchFound = true;
+							if ( isSelected ) {
+								matchFound = true;
+							}
 
 							$dropdown.append(
-								$("<option></option>")
-									.val(workflow.filename)
-									.text(workflow.name + " (" + workflow.filename + ")")
-									.prop("selected", isSelected),
+								$( '<option></option>' )
+									.val( workflow.filename )
+									.text( workflow.name + ' (' + workflow.filename + ')' )
+									.prop( 'selected', isSelected )
 							);
-						});
+						} );
 
-						// Add "Or enter manually" option
-						$dropdown.append(
-							$("<option></option>")
-								.val("__manual__")
-								.text("✏️ Or enter manually..."),
-						);
+						// Add "Or enter manually" option.
+						$dropdown.append( $( '<option></option>' ).val( '__manual__' ).text( '✏️ Or enter manually...' ) );
 
-						// Show dropdown, hide manual input initially
-						$dropdown.show().prop("name", "github_workflow_name");
-						$manualInput.hide().removeAttr("name");
-						$count.text("✓ " + workflows.length + " workflow(s) found").show();
+						// Show dropdown, hide manual input initially.
+						$dropdown.show().prop( 'name', 'github_workflow_name' );
+						$manualInput.hide().removeAttr( 'name' );
+						$count.text( '✓ ' + workflows.length + ' workflow(s) found' ).show();
 					} else {
-						$error
-							.text(response.data?.message || "Failed to load workflows")
-							.show();
+						$error.text( response.data?.message || 'Failed to load workflows' ).show();
 					}
 				},
 				error: () => {
-					$spinner.removeClass("is-active");
-					$button.prop("disabled", false);
-					$error.text("An error occurred while loading workflows").show();
-				},
-			});
+					$spinner.removeClass( 'is-active' );
+					$button.prop( 'disabled', false );
+					$error.text( 'An error occurred while loading workflows' ).show();
+				}
+			} );
 		},
 
 		/**
 		 * Handle workflow selection from dropdown
-		 * Allows switching back to manual entry
+		 *
+		 * Allows switching back to manual entry.
+		 *
+		 * @since 1.0.0
+		 * @return {void}
 		 */
 		onWorkflowSelect: () => {
-			const $dropdown = $("#github_workflow_dropdown");
-			const $manualInput = $("#github_workflow_name");
+			const $dropdown = $( '#github_workflow_dropdown' );
+			const $manualInput = $( '#github_workflow_name' );
 			const selectedValue = $dropdown.val();
 
-			if (selectedValue === "__manual__") {
-				// User wants to enter manually
-				$dropdown.hide().removeAttr("name");
-				$manualInput.show().prop("name", "github_workflow_name").focus();
-				$("#workflow-count").hide();
-			} else if (selectedValue) {
-				// Valid workflow selected - keep it in sync
-				$manualInput.val(selectedValue);
+			if ( '__manual__' === selectedValue ) {
+				// User wants to enter manually.
+				$dropdown.hide().removeAttr( 'name' );
+				$manualInput.show().prop( 'name', 'github_workflow_name' ).focus();
+				$( '#workflow-count' ).hide();
+			} else if ( selectedValue ) {
+				// Valid workflow selected - keep it in sync.
+				$manualInput.val( selectedValue );
 			}
 		},
 
 		/**
 		 * Check if workflow button should be visible
-		 * Shows button if repo is bound OR selected from dropdown
+		 *
+		 * Shows button if repo is bound OR selected from dropdown.
+		 *
+		 * @since 1.0.0
+		 * @return {void}
 		 */
 		checkWorkflowButtonVisibility: () => {
-			const $workflowButton = $("#load-workflows-btn");
-			const $repoOwner = $("#github_repo_owner");
-			const $repoName = $("#github_repo_name");
-			const $repoSelect = $("#repo-select");
+			const $workflowButton = $( '#load-workflows-btn' );
+			const $repoOwner = $( '#github_repo_owner' );
+			const $repoName = $( '#github_repo_name' );
+			const $repoSelect = $( '#repo-select' );
 
-			// Show if repo is bound (fields are populated and readonly)
-			const isRepoBound =
-				$repoOwner.length && $repoOwner.val() && $repoOwner.prop("readonly");
+			// Show if repo is bound (fields are populated and readonly).
+			const isRepoBound = $repoOwner.length && $repoOwner.val() && $repoOwner.prop( 'readonly' );
 
-			// Show if repo is selected from dropdown
+			// Show if repo is selected from dropdown.
 			const isRepoSelected = $repoSelect.length && $repoSelect.val();
 
-			if (isRepoBound || isRepoSelected) {
+			if ( isRepoBound || isRepoSelected ) {
 				$workflowButton.show();
 			} else {
 				$workflowButton.hide();
 			}
 		},
 
+		/**
+		 * Handle deployment method change
+		 *
+		 * Shows/hides workflow field based on method selection.
+		 *
+		 * @since 1.0.0
+		 * @return {void}
+		 */
 		onDeploymentMethodChange: () => {
-			const $deploymentMethod = $("#deployment_method");
-			const $workflowRow = $("#workflow-row");
+			const $deploymentMethod = $( '#deployment_method' );
+			const $workflowRow = $( '#workflow-row' );
 
-			if (!$deploymentMethod.length) {
+			if ( ! $deploymentMethod.length ) {
 				return;
 			}
 
 			const method = $deploymentMethod.val();
 
-			if (method === "direct_clone") {
-				// Hide workflow field for direct clone
+			if ( 'direct_clone' === method ) {
+				// Hide workflow field for direct clone.
 				$workflowRow.hide();
 			} else {
-				// Show workflow field for GitHub Actions
+				// Show workflow field for GitHub Actions.
 				$workflowRow.show();
 			}
 		},
 
+		/**
+		 * Auto-refresh deployment status
+		 *
+		 * Refreshes status every 30 seconds when active deployments exist.
+		 *
+		 * @since 1.0.0
+		 * @return {void}
+		 */
 		autoRefresh: () => {
-			// Auto-refresh status every 30 seconds if on dashboard
-			if ($(".deploy-forge-dashboard").length > 0) {
-				setInterval(() => {
-					// Check for pending, building, queued, or deploying deployments
-					const activeCount = $(
-						".deployment-status.status-pending, .deployment-status.status-building, .deployment-status.status-queued, .deployment-status.status-deploying",
-					).length;
-					if (activeCount > 0) {
-						// Silently refresh status
-						$.ajax({
+			// Auto-refresh status every 30 seconds if on dashboard.
+			if ( $( '.deploy-forge-dashboard' ).length > 0 ) {
+				setInterval( () => {
+					// Check for pending, building, queued, or deploying deployments.
+					const activeCount = $( '.deployment-status.status-pending, .deployment-status.status-building, .deployment-status.status-queued, .deployment-status.status-deploying' ).length;
+					if ( activeCount > 0 ) {
+						// Silently refresh status.
+						$.ajax( {
 							url: deployForgeAdmin.ajaxUrl,
-							type: "POST",
+							type: 'POST',
 							data: {
-								action: "deploy_forge_get_status",
-								nonce: deployForgeAdmin.nonce,
+								action: 'deploy_forge_get_status',
+								nonce: deployForgeAdmin.nonce
 							},
-							success: (response) => {
-								if (response.success) {
-									// Only reload if status changed
-									const oldActive = activeCount;
-									// This is a simplified check - in production, you'd compare actual statuses
+							success: ( response ) => {
+								if ( response.success ) {
+									// Only reload if status changed.
 									location.reload();
 								}
-							},
-						});
+							}
+						} );
 					}
-				}, 30000); // 30 seconds
+				}, 30000 ); // 30 seconds.
 			}
-		},
+		}
 	};
 
-	// Initialize when document is ready
-	$(document).ready(() => {
+	// Initialize when document is ready.
+	$( document ).ready( () => {
 		GitHubDeployAdmin.init();
-	});
-})(jQuery);
+	} );
+}( jQuery ) );
 
 /**
  * GitHub Repository Selector
+ *
+ * Handles repository selection and workflow loading on settings page.
+ *
+ * @since 1.0.0
  */
-(($) => {
+( function( $ ) {
+	'use strict';
+
+	/**
+	 * Repository selector controller
+	 *
+	 * @since 1.0.0
+	 * @type {Object}
+	 */
 	const GitHubRepoSelector = {
-		init: function () {
-			if ($(".deploy-forge-settings").length === 0) {
-				return; // Only run on settings page
+
+		/**
+		 * Initialize the repository selector
+		 *
+		 * @since 1.0.0
+		 * @return {void}
+		 */
+		init: function() {
+			if ( 0 === $( '.deploy-forge-settings' ).length ) {
+				return; // Only run on settings page.
 			}
 
 			this.bindEvents();
 		},
 
-		bindEvents: function () {
-			$("#load-repos-btn").on("click", this.loadRepositories.bind(this));
-			$("#repo-selector").on("change", this.onRepoSelect.bind(this));
-			$("#workflow-selector").on("change", this.onWorkflowSelect.bind(this));
+		/**
+		 * Bind event handlers
+		 *
+		 * @since 1.0.0
+		 * @return {void}
+		 */
+		bindEvents: function() {
+			$( '#load-repos-btn' ).on( 'click', this.loadRepositories.bind( this ) );
+			$( '#repo-selector' ).on( 'change', this.onRepoSelect.bind( this ) );
+			$( '#workflow-selector' ).on( 'change', this.onWorkflowSelect.bind( this ) );
 		},
 
-		loadRepositories: (e) => {
-			if (e) e.preventDefault();
+		/**
+		 * Load repositories from GitHub
+		 *
+		 * @since 1.0.0
+		 * @param {Event} e Click event.
+		 * @return {void}
+		 */
+		loadRepositories: ( e ) => {
+			if ( e ) {
+				e.preventDefault();
+			}
 
-			const $button = $("#load-repos-btn");
-			const $select = $("#repo-selector");
-			const $spinner = $("#repo-loading");
+			const $button = $( '#load-repos-btn' );
+			const $select = $( '#repo-selector' );
+			const $spinner = $( '#repo-loading' );
 
-			// Show loading state
-			$button.prop("disabled", true);
-			$spinner.addClass("is-active");
-			$select
-				.html('<option value="">Loading repositories...</option>')
-				.prop("disabled", true);
+			// Show loading state.
+			$button.prop( 'disabled', true );
+			$spinner.addClass( 'is-active' );
+			$select.html( '<option value="">Loading repositories...</option>' ).prop( 'disabled', true );
 
-			$.ajax({
+			$.ajax( {
 				url: deployForgeAdmin.ajaxUrl,
-				type: "POST",
+				type: 'POST',
 				data: {
-					action: "deploy_forge_get_repos",
-					nonce: deployForgeAdmin.nonce,
+					action: 'deploy_forge_get_repos',
+					nonce: deployForgeAdmin.nonce
 				},
-				success: (response) => {
-					if (response.success && response.data.repos) {
+				success: ( response ) => {
+					if ( response.success && response.data.repos ) {
 						$select.empty();
-						$select.append(
-							'<option value="">-- Select a repository --</option>',
-						);
+						$select.append( '<option value="">-- Select a repository --</option>' );
 
-						response.data.repos.forEach((repo) => {
-							const icon = repo.private ? "🔒 " : "📖 ";
-							const workflowBadge = repo.has_workflows ? " ⚙️" : "";
+						response.data.repos.forEach( ( repo ) => {
+							const icon = repo.private ? '🔒 ' : '📖 ';
+							const workflowBadge = repo.has_workflows ? ' ⚙️' : '';
 
 							$select.append(
-								$("<option></option>")
-									.val(
-										JSON.stringify({
-											owner: repo.owner,
-											name: repo.name,
-											branch: repo.default_branch,
-										}),
-									)
-									.text(icon + repo.full_name + workflowBadge),
+								$( '<option></option>' )
+									.val( JSON.stringify( {
+										owner: repo.owner,
+										name: repo.name,
+										branch: repo.default_branch
+									} ) )
+									.text( icon + repo.full_name + workflowBadge )
 							);
-						});
+						} );
 
-						$select.prop("disabled", false);
+						$select.prop( 'disabled', false );
 
-						// Show success message
-						$(
-							'<div class="notice notice-success is-dismissible"><p>Loaded ' +
-								response.data.repos.length +
-								" repositories!</p></div>",
-						)
-							.insertAfter("h1")
-							.delay(3000)
+						// Show success message.
+						$( '<div class="notice notice-success is-dismissible"><p>Loaded ' + response.data.repos.length + ' repositories!</p></div>' )
+							.insertAfter( 'h1' )
+							.delay( 3000 )
 							.fadeOut();
 					} else {
-						$select.html(
-							'<option value="">Error loading repositories</option>',
-						);
-						alert(
-							response.data?.message ||
-								"Failed to load repositories. Make sure your GitHub token is valid.",
-						);
+						$select.html( '<option value="">Error loading repositories</option>' );
+						alert( response.data?.message || 'Failed to load repositories. Make sure your GitHub token is valid.' );
 					}
 				},
 				error: () => {
-					$select.html('<option value="">Error loading repositories</option>');
-					alert(
-						"Failed to load repositories. Please check your connection and try again.",
-					);
+					$select.html( '<option value="">Error loading repositories</option>' );
+					alert( 'Failed to load repositories. Please check your connection and try again.' );
 				},
 				complete: () => {
-					$button.prop("disabled", false);
-					$spinner.removeClass("is-active");
-				},
-			});
+					$button.prop( 'disabled', false );
+					$spinner.removeClass( 'is-active' );
+				}
+			} );
 		},
 
-		onRepoSelect: function (e) {
-			const value = $(e.target).val();
+		/**
+		 * Handle repository selection
+		 *
+		 * @since 1.0.0
+		 * @param {Event} e Change event.
+		 * @return {void}
+		 */
+		onRepoSelect: function( e ) {
+			const value = $( e.target ).val();
 
-			if (!value) {
-				$("#workflow-selector-row").hide();
+			if ( ! value ) {
+				$( '#workflow-selector-row' ).hide();
 				return;
 			}
 
 			try {
-				const repo = JSON.parse(value);
+				const repo = JSON.parse( value );
 
-				// Auto-fill manual entry fields
-				$("#github_repo_owner").val(repo.owner);
-				$("#github_repo_name").val(repo.name);
-				$("#github_branch").val(repo.branch);
+				// Auto-fill manual entry fields.
+				$( '#github_repo_owner' ).val( repo.owner );
+				$( '#github_repo_name' ).val( repo.name );
+				$( '#github_branch' ).val( repo.branch );
 
-				// Load workflows for this repo
-				this.loadWorkflows(repo.owner, repo.name);
-			} catch (err) {
-				console.error("Error parsing repo data:", err);
+				// Load workflows for this repo.
+				this.loadWorkflows( repo.owner, repo.name );
+			} catch ( err ) {
+				console.error( 'Error parsing repo data:', err );
 			}
 		},
 
-		loadWorkflows: (owner, repo) => {
-			const $row = $("#workflow-selector-row");
-			const $select = $("#workflow-selector");
-			const $spinner = $("#workflow-loading");
+		/**
+		 * Load workflows for a repository
+		 *
+		 * @since 1.0.0
+		 * @param {string} owner Repository owner.
+		 * @param {string} repo  Repository name.
+		 * @return {void}
+		 */
+		loadWorkflows: ( owner, repo ) => {
+			const $row = $( '#workflow-selector-row' );
+			const $select = $( '#workflow-selector' );
+			const $spinner = $( '#workflow-loading' );
 
-			// Show loading state
+			// Show loading state.
 			$row.show();
-			$spinner.addClass("is-active");
-			$select
-				.html('<option value="">Loading workflows...</option>')
-				.prop("disabled", true);
+			$spinner.addClass( 'is-active' );
+			$select.html( '<option value="">Loading workflows...</option>' ).prop( 'disabled', true );
 
-			$.ajax({
+			$.ajax( {
 				url: deployForgeAdmin.ajaxUrl,
-				type: "POST",
+				type: 'POST',
 				data: {
-					action: "deploy_forge_get_workflows",
+					action: 'deploy_forge_get_workflows',
 					nonce: deployForgeAdmin.nonce,
 					owner: owner,
-					repo: repo,
+					repo: repo
 				},
-				success: (response) => {
-					if (response.success && response.data.workflows) {
+				success: ( response ) => {
+					if ( response.success && response.data.workflows ) {
 						$select.empty();
-						$select.append('<option value="">-- Select a workflow --</option>');
+						$select.append( '<option value="">-- Select a workflow --</option>' );
 
-						if (response.data.workflows.length === 0) {
-							$select.append(
-								'<option value="" disabled>No workflows found</option>',
-							);
+						if ( 0 === response.data.workflows.length ) {
+							$select.append( '<option value="" disabled>No workflows found</option>' );
 						} else {
-							response.data.workflows.forEach((workflow) => {
-								const stateIcon = workflow.state === "active" ? "✓ " : "⚠️ ";
+							response.data.workflows.forEach( ( workflow ) => {
+								const stateIcon = 'active' === workflow.state ? '✓ ' : '⚠️ ';
 
 								$select.append(
-									$("<option></option>")
-										.val(workflow.filename)
-										.text(
-											stateIcon +
-												workflow.name +
-												" (" +
-												workflow.filename +
-												")",
-										),
+									$( '<option></option>' )
+										.val( workflow.filename )
+										.text( stateIcon + workflow.name + ' (' + workflow.filename + ')' )
 								);
-							});
+							} );
 						}
 
-						$select.prop("disabled", false);
+						$select.prop( 'disabled', false );
 					} else {
-						$select.html('<option value="">No workflows found</option>');
+						$select.html( '<option value="">No workflows found</option>' );
 					}
 				},
 				error: () => {
-					$select.html('<option value="">Error loading workflows</option>');
+					$select.html( '<option value="">Error loading workflows</option>' );
 				},
 				complete: () => {
-					$spinner.removeClass("is-active");
-				},
-			});
+					$spinner.removeClass( 'is-active' );
+				}
+			} );
 		},
 
-		onWorkflowSelect: (e) => {
-			const value = $(e.target).val();
+		/**
+		 * Handle workflow selection
+		 *
+		 * @since 1.0.0
+		 * @param {Event} e Change event.
+		 * @return {void}
+		 */
+		onWorkflowSelect: ( e ) => {
+			const value = $( e.target ).val();
 
-			if (value) {
-				$("#github_workflow_name").val(value);
+			if ( value ) {
+				$( '#github_workflow_name' ).val( value );
 			}
-		},
+		}
 	};
 
-	// Initialize on document ready
-	$(document).ready(() => {
+	// Initialize on document ready.
+	$( document ).ready( () => {
 		GitHubRepoSelector.init();
-	});
-})(jQuery);
+	} );
+}( jQuery ) );
 
 /**
  * Generate Webhook Secret Handler
+ *
+ * @since 1.0.0
  */
-(($) => {
+( function( $ ) {
+	'use strict';
+
+	/**
+	 * Secret generator controller
+	 *
+	 * @since 1.0.0
+	 * @type {Object}
+	 */
 	const SecretGenerator = {
-		init: function () {
-			$("#generate-secret-btn").on("click", this.generateSecret.bind(this));
+
+		/**
+		 * Initialize the secret generator
+		 *
+		 * @since 1.0.0
+		 * @return {void}
+		 */
+		init: function() {
+			$( '#generate-secret-btn' ).on( 'click', this.generateSecret.bind( this ) );
 		},
 
-		generateSecret: (e) => {
+		/**
+		 * Generate a new webhook secret
+		 *
+		 * @since 1.0.0
+		 * @param {Event} e Click event.
+		 * @return {void}
+		 */
+		generateSecret: ( e ) => {
 			e.preventDefault();
 
-			const $button = $("#generate-secret-btn");
-			const $spinner = $("#secret-loading");
+			const $button = $( '#generate-secret-btn' );
+			const $spinner = $( '#secret-loading' );
 
-			$button.prop("disabled", true);
-			$spinner.addClass("is-active");
+			$button.prop( 'disabled', true );
+			$spinner.addClass( 'is-active' );
 
-			$.ajax({
+			$.ajax( {
 				url: deployForgeAdmin.ajaxUrl,
-				type: "POST",
+				type: 'POST',
 				data: {
-					action: "deploy_forge_generate_secret",
-					nonce: deployForgeAdmin.nonce,
+					action: 'deploy_forge_generate_secret',
+					nonce: deployForgeAdmin.nonce
 				},
-				success: (response) => {
-					if (response.success) {
-						$("#webhook_secret").val(response.data.secret);
+				success: ( response ) => {
+					if ( response.success ) {
+						$( '#webhook_secret' ).val( response.data.secret );
 
-						// Show success message
-						const $notice = $(
-							'<div class="notice notice-success is-dismissible" style="margin: 15px 0;">' +
-								"<p>Webhook secret generated successfully!</p>" +
-								"</div>",
-						);
-						$(".deploy-forge-settings h1").after($notice);
+						// Show success message.
+						const $notice = $( '<div class="notice notice-success is-dismissible" style="margin: 15px 0;"><p>Webhook secret generated successfully!</p></div>' );
+						$( '.deploy-forge-settings h1' ).after( $notice );
 
-						setTimeout(() => {
-							$notice.fadeOut(function () {
-								$(this).remove();
-							});
-						}, 3000);
+						setTimeout( () => {
+							$notice.fadeOut( function() {
+								$( this ).remove();
+							} );
+						}, 3000 );
 					} else {
-						alert(
-							"Failed to generate secret: " +
-								(response.data.message || "Unknown error"),
-						);
+						alert( 'Failed to generate secret: ' + ( response.data.message || 'Unknown error' ) );
 					}
 				},
 				error: () => {
-					alert("Failed to generate secret. Please try again.");
+					alert( 'Failed to generate secret. Please try again.' );
 				},
 				complete: () => {
-					$button.prop("disabled", false);
-					$spinner.removeClass("is-active");
-				},
-			});
-		},
+					$button.prop( 'disabled', false );
+					$spinner.removeClass( 'is-active' );
+				}
+			} );
+		}
 	};
 
-	$(document).ready(() => {
+	$( document ).ready( () => {
 		SecretGenerator.init();
-	});
-})(jQuery);
+	} );
+}( jQuery ) );
 
 /**
  * Nonce Refresh Handler
- * Prevents "link expired" errors on settings page
+ *
+ * Prevents "link expired" errors on settings page by warning
+ * users when the page has been open for too long.
+ *
+ * @since 1.0.0
  */
-(($) => {
-	const NonceRefresh = {
-		// WordPress nonces expire after 12-24 hours (depends on settings)
-		// We'll warn after 1 hour and auto-refresh form after that
-		WARNING_TIME: 60 * 60 * 1000, // 1 hour in milliseconds
+( function( $ ) {
+	'use strict';
 
-		init: function () {
-			if ($(".deploy-forge-settings").length === 0) {
-				return; // Only run on settings page
+	/**
+	 * Nonce refresh controller
+	 *
+	 * @since 1.0.0
+	 * @type {Object}
+	 */
+	const NonceRefresh = {
+
+		/**
+		 * Warning time in milliseconds (1 hour)
+		 *
+		 * @since 1.0.0
+		 * @type {number}
+		 */
+		WARNING_TIME: 60 * 60 * 1000,
+
+		/**
+		 * Initialize the nonce refresh handler
+		 *
+		 * @since 1.0.0
+		 * @return {void}
+		 */
+		init: function() {
+			if ( 0 === $( '.deploy-forge-settings' ).length ) {
+				return; // Only run on settings page.
 			}
 
 			this.pageLoadTime = Date.now();
 			this.checkExpiration();
 		},
 
-		checkExpiration: function () {
-			// Check every 5 minutes
-			setInterval(
-				() => {
-					const timeElapsed = Date.now() - this.pageLoadTime;
+		/**
+		 * Check for page expiration
+		 *
+		 * @since 1.0.0
+		 * @return {void}
+		 */
+		checkExpiration: function() {
+			// Check every 5 minutes.
+			setInterval( () => {
+				const timeElapsed = Date.now() - this.pageLoadTime;
 
-					// After 1 hour, show warning
-					if (timeElapsed > this.WARNING_TIME) {
-						this.showWarning();
-					}
-				},
-				5 * 60 * 1000,
-			); // Check every 5 minutes
+				// After 1 hour, show warning.
+				if ( timeElapsed > this.WARNING_TIME ) {
+					this.showWarning();
+				}
+			}, 5 * 60 * 1000 ); // Check every 5 minutes.
 		},
 
-		showWarning: function () {
-			// Only show once
-			if (this.warningShown) {
+		/**
+		 * Show expiration warning
+		 *
+		 * @since 1.0.0
+		 * @return {void}
+		 */
+		showWarning: function() {
+			// Only show once.
+			if ( this.warningShown ) {
 				return;
 			}
 			this.warningShown = true;
 
 			const $notice = $(
 				'<div class="notice notice-warning is-dismissible" style="margin: 15px 0;">' +
-					"<p><strong>Notice:</strong> This page has been open for a while. " +
-					'Please <a href="#" id="refresh-settings-page">refresh the page</a> before saving to avoid security errors.</p>' +
-					"</div>",
+				'<p><strong>Notice:</strong> This page has been open for a while. ' +
+				'Please <a href="#" id="refresh-settings-page">refresh the page</a> before saving to avoid security errors.</p>' +
+				'</div>'
 			);
 
-			$(".deploy-forge-settings h1").after($notice);
+			$( '.deploy-forge-settings h1' ).after( $notice );
 
-			// Handle refresh click
-			$("#refresh-settings-page").on("click", (e) => {
+			// Handle refresh click.
+			$( '#refresh-settings-page' ).on( 'click', ( e ) => {
 				e.preventDefault();
 				location.reload();
-			});
+			} );
 
-			// Auto-dismiss after 10 seconds
-			setTimeout(() => {
-				$notice.fadeOut(function () {
-					$(this).remove();
-				});
-			}, 10000);
-		},
+			// Auto-dismiss after 10 seconds.
+			setTimeout( () => {
+				$notice.fadeOut( function() {
+					$( this ).remove();
+				} );
+			}, 10000 );
+		}
 	};
 
-	// Initialize on document ready
-	$(document).ready(() => {
+	// Initialize on document ready.
+	$( document ).ready( () => {
 		NonceRefresh.init();
-	});
-})(jQuery);
+	} );
+}( jQuery ) );

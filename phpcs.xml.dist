@@ -1,0 +1,136 @@
+<?xml version="1.0"?>
+<ruleset name="Deploy Forge Coding Standards">
+	<description>WordPress Coding Standards for Deploy Forge plugin.</description>
+
+	<!-- What to scan -->
+	<file>deploy-forge</file>
+
+	<!-- Exclude vendor directory -->
+	<exclude-pattern>/vendor/*</exclude-pattern>
+	<exclude-pattern>/node_modules/*</exclude-pattern>
+
+	<!-- Exclude JavaScript files - use ESLint for JS linting instead -->
+	<exclude-pattern>*.js</exclude-pattern>
+
+	<!-- Show progress -->
+	<arg value="ps"/>
+
+	<!-- Show sniff codes in all reports -->
+	<arg value="s"/>
+
+	<!-- Strip the file paths down to the relevant bit -->
+	<arg name="basepath" value="."/>
+
+	<!-- Check up to 8 files simultaneously -->
+	<arg name="parallel" value="8"/>
+
+	<!-- Use colors in output -->
+	<arg name="colors"/>
+
+	<!-- Set encoding -->
+	<arg name="encoding" value="utf-8"/>
+
+	<!-- Check for PHP cross-version compatibility -->
+	<config name="testVersion" value="8.0-"/>
+
+	<!-- WordPress Coding Standards -->
+	<rule ref="WordPress">
+		<!-- Allow short array syntax since we're PHP 8.0+ -->
+		<exclude name="Generic.Arrays.DisallowShortArraySyntax"/>
+		<!-- Allow union type hints (PHP 8.0 feature) -->
+		<exclude name="Universal.Operators.DisallowShortTernary"/>
+	</rule>
+
+	<!-- Allow direct database queries for custom deployment table -->
+	<rule ref="WordPress.DB.DirectDatabaseQuery">
+		<exclude-pattern>*/includes/class-database.php</exclude-pattern>
+		<exclude-pattern>*/includes/class-deployment-manager.php</exclude-pattern>
+		<exclude-pattern>*/includes/class-webhook-handler.php</exclude-pattern>
+	</rule>
+
+	<!-- Allow table name interpolation (WordPress limitation - can't use placeholders for table names) -->
+	<rule ref="WordPress.DB.PreparedSQL.InterpolatedNotPrepared">
+		<exclude-pattern>*/includes/class-database.php</exclude-pattern>
+		<exclude-pattern>*/includes/class-deployment-manager.php</exclude-pattern>
+		<exclude-pattern>*/includes/class-webhook-handler.php</exclude-pattern>
+	</rule>
+
+	<!-- Allow error_log for debugging functionality -->
+	<rule ref="WordPress.PHP.DevelopmentFunctions.error_log_error_log">
+		<exclude-pattern>*/includes/class-debug-logger.php</exclude-pattern>
+		<exclude-pattern>*/includes/class-settings.php</exclude-pattern>
+		<exclude-pattern>*/includes/class-deployment-manager.php</exclude-pattern>
+		<exclude-pattern>*/includes/class-webhook-handler.php</exclude-pattern>
+	</rule>
+
+	<!-- Allow silenced errors for non-critical functions -->
+	<rule ref="WordPress.PHP.NoSilencedErrors.Discouraged">
+		<exclude-pattern>*/includes/class-deployment-manager.php</exclude-pattern>
+		<exclude-pattern>*/includes/class-webhook-handler.php</exclude-pattern>
+	</rule>
+
+	<!-- Allow mixed OO and functions in main plugin file (WordPress plugin pattern) -->
+	<rule ref="Universal.Files.SeparateFunctionsFromOO.Mixed">
+		<exclude-pattern>*/deploy-forge.php</exclude-pattern>
+	</rule>
+
+	<!-- Templates use local scope variables - not truly global -->
+	<rule ref="WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound">
+		<exclude-pattern>*/templates/*</exclude-pattern>
+	</rule>
+
+	<!-- Allow direct file system operations for theme deployment -->
+	<rule ref="WordPress.WP.AlternativeFunctions.file_system_operations_mkdir">
+		<exclude-pattern>*/includes/class-deployment-manager.php</exclude-pattern>
+	</rule>
+	<rule ref="WordPress.WP.AlternativeFunctions.file_system_operations_rmdir">
+		<exclude-pattern>*/includes/class-deployment-manager.php</exclude-pattern>
+	</rule>
+	<rule ref="WordPress.WP.AlternativeFunctions.file_system_operations_chmod">
+		<exclude-pattern>*/includes/class-deployment-manager.php</exclude-pattern>
+	</rule>
+	<rule ref="WordPress.WP.AlternativeFunctions.unlink_unlink">
+		<exclude-pattern>*/includes/class-deployment-manager.php</exclude-pattern>
+	</rule>
+
+	<!-- Allow "default" parameter name (common convention) -->
+	<rule ref="Universal.NamingConventions.NoReservedKeywordParameterNames.defaultFound">
+		<severity>0</severity>
+	</rule>
+
+	<!-- WordPress-Extra provides additional rules -->
+	<rule ref="WordPress-Extra"/>
+
+	<!-- WordPress-Docs for documentation standards -->
+	<rule ref="WordPress-Docs"/>
+
+	<!-- Minimum supported WordPress version -->
+	<config name="minimum_wp_version" value="5.8"/>
+
+	<!-- Text domain for internationalization -->
+	<rule ref="WordPress.WP.I18n">
+		<properties>
+			<property name="text_domain" type="array">
+				<element value="deploy-forge"/>
+			</property>
+		</properties>
+	</rule>
+
+	<!-- Prefix for hooks, functions, classes -->
+	<rule ref="WordPress.NamingConventions.PrefixAllGlobals">
+		<properties>
+			<property name="prefixes" type="array">
+				<element value="deploy_forge"/>
+				<element value="Deploy_Forge"/>
+			</property>
+		</properties>
+	</rule>
+
+	<!-- Allow file name exceptions for main plugin file -->
+	<rule ref="WordPress.Files.FileName">
+		<properties>
+			<property name="strict_class_file_names" value="false"/>
+		</properties>
+		<exclude-pattern>deploy-forge/deploy-forge.php</exclude-pattern>
+	</rule>
+</ruleset>
