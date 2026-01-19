@@ -1076,37 +1076,6 @@ class Deploy_Forge_GitHub_API {
 		if ( 200 === $response['status'] ) {
 			$body = $response['body'];
 
-			// Debug: Log what we got from the backend.
-			// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log, WordPress.PHP.DevelopmentFunctions.error_log_print_r
-			error_log( '=== INSTALLATION REPOS DEBUG ===' );
-			// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
-			error_log( 'Body type: ' . gettype( $body ) );
-			// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log, WordPress.PHP.DevelopmentFunctions.error_log_print_r
-			error_log( 'Body content: ' . print_r( $body, true ) );
-
-			if ( is_object( $body ) && isset( $body->repositories ) ) {
-				// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
-				error_log( 'Found repositories in object, count: ' . count( $body->repositories ) );
-				if ( ! empty( $body->repositories ) ) {
-					// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log, WordPress.PHP.DevelopmentFunctions.error_log_print_r
-					error_log( 'First repo: ' . print_r( $body->repositories[0], true ) );
-				}
-			} elseif ( is_array( $body ) && isset( $body['repositories'] ) ) {
-				// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
-				error_log( 'Found repositories in array, count: ' . count( $body['repositories'] ) );
-				if ( ! empty( $body['repositories'] ) ) {
-					// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log, WordPress.PHP.DevelopmentFunctions.error_log_print_r
-					error_log( 'First repo: ' . print_r( $body['repositories'][0], true ) );
-				}
-			} else {
-				// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
-				error_log( 'No repositories found in expected structure' );
-				// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log, WordPress.PHP.DevelopmentFunctions.error_log_print_r
-				error_log( 'Available keys: ' . print_r( is_object( $body ) ? get_object_vars( $body ) : array_keys( $body ), true ) );
-			}
-			// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
-			error_log( '=== END DEBUG ===' );
-
 			// Handle both object and array responses.
 			$repos = is_object( $body ) && isset( $body->repositories )
 				? $body->repositories

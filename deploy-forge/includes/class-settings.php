@@ -381,7 +381,8 @@ class Deploy_Forge_Settings {
 			);
 
 			// Log any errors but don't fail the disconnect.
-			if ( is_wp_error( $response ) ) {
+			if ( is_wp_error( $response ) && defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+				// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- Debug logging.
 				error_log( 'Deploy Forge: Disconnect API error - ' . $response->get_error_message() );
 			}
 		}

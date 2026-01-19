@@ -1373,6 +1373,7 @@ class Deploy_Forge_Webhook_Handler {
 	 */
 	private function log_webhook_receipt( string $event ): void {
 		if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+			// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- Debug logging.
 			error_log(
 				sprintf(
 					'GitHub Deploy: Webhook received - Event: %s, Time: %s',

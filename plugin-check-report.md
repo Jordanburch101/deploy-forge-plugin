@@ -1,59 +1,14 @@
 # Plugin Check Report
 
 **Plugin:** Deploy Forge
-**Generated at:** 2026-01-19 00:59:31
+**Generated at:** 2026-01-19 05:20:57
 
 
-## `deploy-forge.php`
-
-| Line | Column | Type | Code | Message | Docs |
-| --- | --- | --- | --- | --- | --- |
-| 0 | 0 | ERROR | plugin_updater_detected | Including An Update Checker / Changing Updates functionality. Plugin Updater detected. Use of the Update URI header is not allowed in plugins hosted on WordPress.org. | [Docs](https://developer.wordpress.org/plugins/wordpress-org/common-issues/#update-checker) |
-| 0 | 0 | WARNING | plugin_header_nonexistent_domain_path | The "Domain Path" header in the plugin file must point to an existing folder. Found: "languages" | [Docs](https://developer.wordpress.org/plugins/internationalization/how-to-internationalize-your-plugin/#domain-path) |
-| 332 | 3 | ERROR | PluginCheck.CodeAnalysis.DiscouragedFunctions.load_plugin_textdomainFound | load_plugin_textdomain() has been discouraged since WordPress version 4.6. When your plugin is hosted on WordPress.org, you no longer need to manually include this function call for translations under your plugin slug. WordPress will automatically load the translations for you as needed. | [Docs](https://make.wordpress.org/core/2016/07/06/i18n-improvements-in-4-6/) |
-
-## `includes/class-update-checker.php`
+## `readme.txt`
 
 | Line | Column | Type | Code | Message | Docs |
 | --- | --- | --- | --- | --- | --- |
-| 0 | 0 | ERROR | plugin_updater_detected | Plugin Updater detected. These are not permitted in WordPress.org hosted plugins. Detected: site_transient_update_plugins |  |
-| 0 | 0 | WARNING | update_modification_detected | Plugin Updater detected. Detected code which may be altering WordPress update routines. Detected: auto_update_plugin | [Docs](https://developer.wordpress.org/plugins/wordpress-org/common-issues/#update-checker) |
-| 0 | 0 | WARNING | update_modification_detected | Plugin Updater detected. Detected code which may be altering WordPress update routines. Detected: pre_set_site_transient_update_plugins | [Docs](https://developer.wordpress.org/plugins/wordpress-org/common-issues/#update-checker) |
-| 0 | 0 | WARNING | update_modification_detected | Plugin Updater detected. Detected code which may be altering WordPress update routines. Detected: _site_transient_update_plugins | [Docs](https://developer.wordpress.org/plugins/wordpress-org/common-issues/#update-checker) |
-
-## `includes/class-deployment-manager.php`
-
-| Line | Column | Type | Code | Message | Docs |
-| --- | --- | --- | --- | --- | --- |
-| 981 | 11 | ERROR | WordPress.WP.AlternativeFunctions.file_system_operations_mkdir | File operations should use WP_Filesystem methods instead of direct PHP filesystem calls. Found: mkdir(). |  |
-| 1007 | 4 | WARNING | Squiz.PHP.DiscouragedFunctions.Discouraged | The use of function set_time_limit() is discouraged |  |
-| 1168 | 13 | ERROR | WordPress.WP.AlternativeFunctions.file_system_operations_mkdir | File operations should use WP_Filesystem methods instead of direct PHP filesystem calls. Found: mkdir(). |  |
-| 1430 | 11 | ERROR | WordPress.WP.AlternativeFunctions.file_system_operations_mkdir | File operations should use WP_Filesystem methods instead of direct PHP filesystem calls. Found: mkdir(). |  |
-| 1445 | 4 | WARNING | Squiz.PHP.DiscouragedFunctions.Discouraged | The use of function set_time_limit() is discouraged |  |
-| 1504 | 4 | ERROR | WordPress.WP.AlternativeFunctions.unlink_unlink | unlink() is discouraged. Use wp_delete_file() to delete a file. |  |
-| 1548 | 11 | ERROR | WordPress.WP.AlternativeFunctions.file_system_operations_mkdir | File operations should use WP_Filesystem methods instead of direct PHP filesystem calls. Found: mkdir(). |  |
-| 1660 | 11 | ERROR | WordPress.WP.AlternativeFunctions.file_system_operations_mkdir | File operations should use WP_Filesystem methods instead of direct PHP filesystem calls. Found: mkdir(). |  |
-| 2133 | 11 | ERROR | WordPress.WP.AlternativeFunctions.file_system_operations_mkdir | File operations should use WP_Filesystem methods instead of direct PHP filesystem calls. Found: mkdir(). |  |
-| 2157 | 13 | ERROR | WordPress.WP.AlternativeFunctions.file_system_operations_mkdir | File operations should use WP_Filesystem methods instead of direct PHP filesystem calls. Found: mkdir(). |  |
-| 2165 | 5 | ERROR | WordPress.WP.AlternativeFunctions.file_system_operations_chmod | File operations should use WP_Filesystem methods instead of direct PHP filesystem calls. Found: chmod(). |  |
-| 2199 | 5 | ERROR | WordPress.WP.AlternativeFunctions.file_system_operations_rmdir | File operations should use WP_Filesystem methods instead of direct PHP filesystem calls. Found: rmdir(). |  |
-| 2201 | 5 | ERROR | WordPress.WP.AlternativeFunctions.unlink_unlink | unlink() is discouraged. Use wp_delete_file() to delete a file. |  |
-| 2205 | 10 | ERROR | WordPress.WP.AlternativeFunctions.file_system_operations_rmdir | File operations should use WP_Filesystem methods instead of direct PHP filesystem calls. Found: rmdir(). |  |
-
-## `README.md`
-
-| Line | Column | Type | Code | Message | Docs |
-| --- | --- | --- | --- | --- | --- |
-| 0 | 0 | ERROR | missing_readme_header_tested | The "Tested up to" header is missing in the readme file. | [Docs](https://developer.wordpress.org/plugins/wordpress-org/how-your-readme-txt-works/#readme-header-information) |
-| 0 | 0 | ERROR | no_license | Missing "License". Please update your readme with a valid GPLv2 (or later) compatible license. | [Docs](https://developer.wordpress.org/plugins/wordpress-org/common-issues/#no-gpl-compatible-license-declared) |
-| 0 | 0 | ERROR | no_stable_tag | Invalid or missing Stable Tag. Your Stable Tag is meant to be the stable version of your plugin and it needs to be exactly the same with the Version in your main plugin file's header. Any mismatch can prevent users from downloading the correct plugin files from WordPress.org. | [Docs](https://developer.wordpress.org/plugins/wordpress-org/common-issues/#incorrect-stable-tag) |
-| 0 | 0 | WARNING | readme_parser_warnings_trimmed_short_description | The "Short Description" section is too long and was truncated. A maximum of 150 characters is supported. |  |
-
-## `admin/class-admin-pages.php`
-
-| Line | Column | Type | Code | Message | Docs |
-| --- | --- | --- | --- | --- | --- |
-| 297 | 3 | ERROR | PluginCheck.CodeAnalysis.SettingSanitization.register_settingMissing | Sanitization missing for register_setting(). | [Docs](https://developer.wordpress.org/reference/functions/register_setting/) |
+| 0 | 0 | ERROR | outdated_tested_upto_header | Tested up to: 6.7 < 6.9. The "Tested up to" value in your plugin is not set to the current version of WordPress. This means your plugin will not show up in searches, as we require plugins to be compatible and documented as tested up to the most recent version of WordPress. | [Docs](https://developer.wordpress.org/plugins/wordpress-org/how-your-readme-txt-works/#readme-header-information) |
 
 ## `includes/class-webhook-handler.php`
 
@@ -76,20 +31,14 @@
 | 1202 | 27 | WARNING | WordPress.DB.DirectDatabaseQuery.DirectQuery | Use of a direct database call is discouraged. |  |
 | 1202 | 27 | WARNING | WordPress.DB.DirectDatabaseQuery.NoCaching | Direct database call without caching detected. Consider using wp_cache_get() / wp_cache_set() or wp_cache_delete(). |  |
 | 1204 | 6 | WARNING | WordPress.DB.PreparedSQL.InterpolatedNotPrepared | Use placeholders and $wpdb-&gt;prepare(); found interpolated variable {$table_name} at &quot;SELECT * FROM {$table_name} WHERE commit_hash = %s AND status IN (&#039;pending&#039;, &#039;building&#039;) ORDER BY id DESC LIMIT 1&quot; |  |
-| 1376 | 4 | WARNING | WordPress.PHP.DevelopmentFunctions.error_log_error_log | error_log() found. Debug code should not normally be used in production. |  |
-| 1426 | 5 | WARNING | Squiz.PHP.DiscouragedFunctions.Discouraged | The use of function set_time_limit() is discouraged |  |
+| 1427 | 5 | WARNING | Squiz.PHP.DiscouragedFunctions.Discouraged | The use of function set_time_limit() is discouraged |  |
 
-## `includes/class-settings.php`
-
-| Line | Column | Type | Code | Message | Docs |
-| --- | --- | --- | --- | --- | --- |
-| 384 | 5 | WARNING | WordPress.PHP.DevelopmentFunctions.error_log_error_log | error_log() found. Debug code should not normally be used in production. |  |
-
-## `includes/class-debug-logger.php`
+## `includes/class-deployment-manager.php`
 
 | Line | Column | Type | Code | Message | Docs |
 | --- | --- | --- | --- | --- | --- |
-| 99 | 3 | WARNING | WordPress.PHP.DevelopmentFunctions.error_log_error_log | error_log() found. Debug code should not normally be used in production. |  |
+| 1037 | 4 | WARNING | Squiz.PHP.DiscouragedFunctions.Discouraged | The use of function set_time_limit() is discouraged |  |
+| 1475 | 4 | WARNING | Squiz.PHP.DiscouragedFunctions.Discouraged | The use of function set_time_limit() is discouraged |  |
 
 ## `includes/class-database.php`
 
@@ -119,15 +68,3 @@
 | 497 | 21 | WARNING | WordPress.DB.PreparedSQL.InterpolatedNotPrepared | Use placeholders and $wpdb-&gt;prepare(); found interpolated variable {$this-&gt;table_name} at &quot;SELECT COUNT(*) FROM {$this-&gt;table_name} WHERE status = %s&quot; |  |
 | 522 | 5 | WARNING | WordPress.DB.PreparedSQL.InterpolatedNotPrepared | Use placeholders and $wpdb-&gt;prepare(); found interpolated variable {$this-&gt;table_name} at &quot;SELECT * FROM {$this-&gt;table_name}\n |  |
 | 551 | 20 | WARNING | WordPress.DB.PreparedSQL.InterpolatedNotPrepared | Use placeholders and $wpdb-&gt;prepare(); found interpolated variable {$this-&gt;table_name} at &quot;DELETE FROM {$this-&gt;table_name} WHERE created_at &lt; %s&quot; |  |
-
-## `templates/dashboard-page.php`
-
-| Line | Column | Type | Code | Message | Docs |
-| --- | --- | --- | --- | --- | --- |
-| 177 | 60 | WARNING | WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound | Global variables defined by a theme/plugin should start with the theme/plugin prefix. Found: &quot;$deployment&quot;. |  |
-
-## `templates/history-page.php`
-
-| Line | Column | Type | Code | Message | Docs |
-| --- | --- | --- | --- | --- | --- |
-| 37 | 49 | WARNING | WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound | Global variables defined by a theme/plugin should start with the theme/plugin prefix. Found: &quot;$deployment&quot;. |  |

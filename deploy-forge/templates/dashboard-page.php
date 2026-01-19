@@ -174,27 +174,27 @@ if ( ! defined( 'ABSPATH' ) ) {
 					</tr>
 				</thead>
 				<tbody>
-					<?php foreach ( $recent_deployments as $deployment ) : ?>
-						<tr data-status="<?php echo esc_attr( $deployment->status ); ?>">
-							<td><?php echo esc_html( mysql2date( 'M j, Y', $deployment->created_at ) ); ?></td>
-							<td><code><?php echo esc_html( substr( $deployment->commit_hash, 0, 7 ) ); ?></code></td>
-							<td><?php echo esc_html( wp_trim_words( $deployment->commit_message, 8 ) ); ?></td>
+					<?php foreach ( $recent_deployments as $deploy_forge_deployment ) : ?>
+						<tr data-status="<?php echo esc_attr( $deploy_forge_deployment->status ); ?>">
+							<td><?php echo esc_html( mysql2date( 'M j, Y', $deploy_forge_deployment->created_at ) ); ?></td>
+							<td><code><?php echo esc_html( substr( $deploy_forge_deployment->commit_hash, 0, 7 ) ); ?></code></td>
+							<td><?php echo esc_html( wp_trim_words( $deploy_forge_deployment->commit_message, 8 ) ); ?></td>
 							<td>
-								<span class="deployment-status status-<?php echo esc_attr( $deployment->status ); ?>">
-									<?php echo esc_html( strtoupper( $deployment->status ) ); ?>
+								<span class="deployment-status status-<?php echo esc_attr( $deploy_forge_deployment->status ); ?>">
+									<?php echo esc_html( strtoupper( $deploy_forge_deployment->status ) ); ?>
 								</span>
 							</td>
-							<td><?php echo esc_html( ucfirst( $deployment->trigger_type ) ); ?></td>
+							<td><?php echo esc_html( ucfirst( $deploy_forge_deployment->trigger_type ) ); ?></td>
 							<td>
-								<?php if ( 'pending' === $deployment->status ) : ?>
-									<button type="button" class="button button-primary button-small approve-deployment-btn" data-deployment-id="<?php echo esc_attr( $deployment->id ); ?>">
+								<?php if ( 'pending' === $deploy_forge_deployment->status ) : ?>
+									<button type="button" class="button button-primary button-small approve-deployment-btn" data-deployment-id="<?php echo esc_attr( $deploy_forge_deployment->id ); ?>">
 										<?php esc_html_e( 'Deploy', 'deploy-forge' ); ?>
 									</button>
-									<button type="button" class="button button-small cancel-deployment-btn" data-deployment-id="<?php echo esc_attr( $deployment->id ); ?>">
+									<button type="button" class="button button-small cancel-deployment-btn" data-deployment-id="<?php echo esc_attr( $deploy_forge_deployment->id ); ?>">
 										<?php esc_html_e( 'Cancel', 'deploy-forge' ); ?>
 									</button>
-								<?php elseif ( 'building' === $deployment->status ) : ?>
-									<button type="button" class="button button-small cancel-deployment-btn" data-deployment-id="<?php echo esc_attr( $deployment->id ); ?>">
+								<?php elseif ( 'building' === $deploy_forge_deployment->status ) : ?>
+									<button type="button" class="button button-small cancel-deployment-btn" data-deployment-id="<?php echo esc_attr( $deploy_forge_deployment->id ); ?>">
 										<?php esc_html_e( 'Cancel', 'deploy-forge' ); ?>
 									</button>
 								<?php else : ?>

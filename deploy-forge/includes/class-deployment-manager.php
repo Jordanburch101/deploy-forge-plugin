@@ -973,8 +973,6 @@ class Deploy_Forge_Deployment_Manager {
 	 * @return void
 	 */
 	private function extract_and_deploy( int $deployment_id, string $artifact_zip ): void {
-		global $wp_filesystem;
-
 		$this->logger->log_deployment_step( $deployment_id, 'Extract and Deploy', 'started' );
 
 		// Check if artifact file exists and is readable.
@@ -996,8 +994,8 @@ class Deploy_Forge_Deployment_Manager {
 		$temp_extract_dir = $this->get_temp_directory() . '/extract-' . $deployment_id;
 
 		// Create extraction directory using WP_Filesystem.
-		$wp_filesystem = $this->get_filesystem();
-		if ( ! $wp_filesystem ) {
+		$deploy_forge_fs = $this->get_filesystem();
+		if ( ! $deploy_forge_fs ) {
 			$this->logger->error( 'Deployment', 'Failed to initialize WP_Filesystem' );
 			$this->database->update_deployment(
 				$deployment_id,
@@ -2158,8 +2156,8 @@ class Deploy_Forge_Deployment_Manager {
 			return false;
 		}
 
-		$wp_filesystem = $this->get_filesystem();
-		if ( ! $wp_filesystem ) {
+		$deploy_forge_fs = $this->get_filesystem();
+		if ( ! $deploy_forge_fs ) {
 			return false;
 		}
 
@@ -2197,7 +2195,7 @@ class Deploy_Forge_Deployment_Manager {
 				if ( ! copy( $item->getRealPath(), $target ) ) {
 					return false;
 				}
-				$wp_filesystem->chmod( $target, 0644 );
+				$deploy_forge_fs->chmod( $target, 0644 );
 			}
 		}
 
@@ -2217,12 +2215,12 @@ class Deploy_Forge_Deployment_Manager {
 			return false;
 		}
 
-		$wp_filesystem = $this->get_filesystem();
-		if ( ! $wp_filesystem ) {
+		$deploy_forge_fs = $this->get_filesystem();
+		if ( ! $deploy_forge_fs ) {
 			return false;
 		}
 
-		return $wp_filesystem->delete( $dir, true );
+		return $deploy_forge_fs->delete( $dir, true );
 	}
 
 	/**

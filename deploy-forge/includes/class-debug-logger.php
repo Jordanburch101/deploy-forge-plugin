@@ -95,7 +95,8 @@ class Deploy_Forge_Debug_Logger {
 
 		$log_entry .= str_repeat( '-', 80 ) . "\n";
 
-		// Write to log file.
+		// Write to log file - intentional logging to custom log file.
+		// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- Intentional logging to custom file.
 		error_log( $log_entry, 3, $this->log_file );
 	}
 

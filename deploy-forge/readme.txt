@@ -2,7 +2,7 @@
 Contributors: deployforge
 Tags: deployment, github, theme, automation, ci-cd
 Requires at least: 5.8
-Tested up to: 6.7
+Tested up to: 6.9
 Requires PHP: 8.0
 Stable tag: 1.0.45
 License: GPLv2 or later
