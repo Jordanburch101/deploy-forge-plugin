@@ -294,7 +294,41 @@ class Deploy_Forge_Admin_Pages extends Deploy_Forge_Ajax_Handler_Base {
 	 * @return void
 	 */
 	public function register_settings(): void {
-		register_setting( 'deploy_forge_settings', 'deploy_forge_settings' );
+		register_setting(
+			'deploy_forge_settings',
+			'deploy_forge_settings',
+			array(
+				'type'              => 'array',
+				'sanitize_callback' => array( $this, 'sanitize_settings' ),
+			)
+		);
+	}
+
+	/**
+	 * Sanitize settings before saving.
+	 *
+	 * @since 1.0.46
+	 *
+	 * @param array $settings The settings to sanitize.
+	 * @return array Sanitized settings.
+	 */
+	public function sanitize_settings( $settings ): array {
+		if ( ! is_array( $settings ) ) {
+			return array();
+		}
+
+		return array(
+			'github_repo_owner'       => sanitize_text_field( $settings['github_repo_owner'] ?? '' ),
+			'github_repo_name'        => sanitize_text_field( $settings['github_repo_name'] ?? '' ),
+			'github_branch'           => sanitize_text_field( $settings['github_branch'] ?? 'main' ),
+			'github_workflow_name'    => sanitize_text_field( $settings['github_workflow_name'] ?? 'deploy-theme.yml' ),
+			'deployment_method'       => in_array( $settings['deployment_method'] ?? '', array( 'github_actions', 'direct_clone' ), true )
+				? $settings['deployment_method']
+				: 'github_actions',
+			'require_manual_approval' => (bool) ( $settings['require_manual_approval'] ?? true ),
+			'create_backups'          => (bool) ( $settings['create_backups'] ?? true ),
+			'debug_mode'              => (bool) ( $settings['debug_mode'] ?? false ),
+		);
 	}
 
 	/**

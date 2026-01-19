@@ -78,6 +78,28 @@ class Deploy_Forge_Deployment_Manager {
 	}
 
 	/**
+	 * Initialize WP_Filesystem for file operations.
+	 *
+	 * @since 1.0.46
+	 *
+	 * @return \WP_Filesystem_Base|false WP_Filesystem instance or false on failure.
+	 */
+	private function get_filesystem() {
+		global $wp_filesystem;
+
+		if ( ! function_exists( 'WP_Filesystem' ) ) {
+			require_once ABSPATH . 'wp-admin/includes/file.php';
+		}
+
+		// Initialize with direct method to avoid credential prompts in background.
+		if ( ! WP_Filesystem( false, false, true ) ) {
+			return false;
+		}
+
+		return $wp_filesystem;
+	}
+
+	/**
 	 * Start a new deployment.
 	 *
 	 * @since 1.0.0
@@ -968,17 +990,27 @@ class Deploy_Forge_Deployment_Manager {
 			return;
 		}
 
-		// Skip WP_Filesystem - it hangs in background processes.
-		// We'll use native PHP functions instead.
-		$this->logger->log_deployment_step( $deployment_id, 'WP_Filesystem', 'skipped - using native PHP functions' );
 		$this->log_deployment( $deployment_id, 'Extracting artifact...' );
 
 		// Extract to temp directory.
 		$temp_extract_dir = $this->get_temp_directory() . '/extract-' . $deployment_id;
 
-		// Create extraction directory.
+		// Create extraction directory using WP_Filesystem.
+		$wp_filesystem = $this->get_filesystem();
+		if ( ! $wp_filesystem ) {
+			$this->logger->error( 'Deployment', 'Failed to initialize WP_Filesystem' );
+			$this->database->update_deployment(
+				$deployment_id,
+				array(
+					'status'        => 'failed',
+					'error_message' => __( 'Failed to initialize filesystem.', 'deploy-forge' ),
+				)
+			);
+			return;
+		}
+
 		if ( ! is_dir( $temp_extract_dir ) ) {
-			if ( ! mkdir( $temp_extract_dir, 0755, true ) ) {
+			if ( ! wp_mkdir_p( $temp_extract_dir ) ) {
 				$this->logger->error( 'Deployment', "Failed to create extraction directory: {$temp_extract_dir}" );
 				$this->database->update_deployment(
 					$deployment_id,
@@ -1165,7 +1197,7 @@ class Deploy_Forge_Deployment_Manager {
 
 				// Create final extraction directory.
 				if ( ! is_dir( $final_extract_dir ) ) {
-					if ( ! mkdir( $final_extract_dir, 0755, true ) ) {
+					if ( ! wp_mkdir_p( $final_extract_dir ) ) {
 						$this->logger->error( 'Deployment', 'Failed to create final extraction directory' );
 						$this->database->update_deployment(
 							$deployment_id,
@@ -1427,7 +1459,7 @@ class Deploy_Forge_Deployment_Manager {
 
 		// Create target theme directory.
 		if ( ! is_dir( $target_theme_path ) ) {
-			if ( ! mkdir( $target_theme_path, 0755, true ) ) {
+			if ( ! wp_mkdir_p( $target_theme_path ) ) {
 				$this->logger->error( 'Deployment', "Failed to create theme directory: {$target_theme_path}" );
 				$this->database->update_deployment(
 					$deployment_id,
@@ -1500,8 +1532,8 @@ class Deploy_Forge_Deployment_Manager {
 			)
 		);
 
-		// Clean up temp files using native PHP.
-		@unlink( $artifact_zip );
+		// Clean up temp files.
+		wp_delete_file( $artifact_zip );
 		$this->recursive_delete( $temp_extract_dir );
 
 		$this->logger->log_deployment_step( $deployment_id, 'Cleanup Complete', 'success' );
@@ -1537,7 +1569,6 @@ class Deploy_Forge_Deployment_Manager {
 	 * @return string|false Path to backup file on success, false on failure.
 	 */
 	public function backup_current_theme( int $deployment_id ): string|false {
-		// Skip WP_Filesystem - use native PHP.
 		$theme_path      = $this->settings->get_theme_path();
 		$backup_dir      = $this->settings->get_backup_directory();
 		$backup_filename = 'backup-' . $deployment_id . '-' . time() . '.zip';
@@ -1545,7 +1576,7 @@ class Deploy_Forge_Deployment_Manager {
 
 		// Ensure backup directory exists.
 		if ( ! is_dir( $backup_dir ) ) {
-			if ( ! mkdir( $backup_dir, 0755, true ) ) {
+			if ( ! wp_mkdir_p( $backup_dir ) ) {
 				$this->logger->error( 'Deployment', "Failed to create backup directory: {$backup_dir}" );
 				return false;
 			}
@@ -1651,13 +1682,12 @@ class Deploy_Forge_Deployment_Manager {
 			return false;
 		}
 
-		// Skip WP_Filesystem - use native PHP.
 		$theme_path       = $this->settings->get_theme_path();
 		$temp_extract_dir = $this->get_temp_directory() . '/rollback-' . $deployment_id;
 
 		// Create extraction directory.
 		if ( ! is_dir( $temp_extract_dir ) ) {
-			if ( ! mkdir( $temp_extract_dir, 0755, true ) ) {
+			if ( ! wp_mkdir_p( $temp_extract_dir ) ) {
 				$this->logger->error( 'Deployment', 'Failed to create rollback extraction directory' );
 				return false;
 			}
@@ -2128,9 +2158,14 @@ class Deploy_Forge_Deployment_Manager {
 			return false;
 		}
 
+		$wp_filesystem = $this->get_filesystem();
+		if ( ! $wp_filesystem ) {
+			return false;
+		}
+
 		// Create destination if needed.
 		if ( ! is_dir( $dest ) ) {
-			if ( ! mkdir( $dest, 0755, true ) ) {
+			if ( ! wp_mkdir_p( $dest ) ) {
 				return false;
 			}
 		}
@@ -2154,7 +2189,7 @@ class Deploy_Forge_Deployment_Manager {
 
 			if ( $item->isDir() ) {
 				if ( ! is_dir( $target ) ) {
-					if ( ! mkdir( $target, 0755, true ) ) {
+					if ( ! wp_mkdir_p( $target ) ) {
 						return false;
 					}
 				}
@@ -2162,7 +2197,7 @@ class Deploy_Forge_Deployment_Manager {
 				if ( ! copy( $item->getRealPath(), $target ) ) {
 					return false;
 				}
-				chmod( $target, 0644 );
+				$wp_filesystem->chmod( $target, 0644 );
 			}
 		}
 
@@ -2170,7 +2205,7 @@ class Deploy_Forge_Deployment_Manager {
 	}
 
 	/**
-	 * Recursively delete directory (native PHP replacement for WP_Filesystem delete).
+	 * Recursively delete directory using WP_Filesystem.
 	 *
 	 * @since 1.0.0
 	 *
@@ -2182,27 +2217,12 @@ class Deploy_Forge_Deployment_Manager {
 			return false;
 		}
 
-		/**
-		 * Recursive iterator.
-		 *
-		 * @var \RecursiveIteratorIterator $iterator
-		 * @noinspection PhpUndefinedClassInspection
-		 */
-		$iterator = new RecursiveIteratorIterator(
-			// phpcs:ignore -- RecursiveDirectoryIterator is a PHP built-in class.
-			new RecursiveDirectoryIterator($dir, RecursiveDirectoryIterator::SKIP_DOTS),
-			RecursiveIteratorIterator::CHILD_FIRST
-		);
-
-		foreach ( $iterator as $item ) {
-			if ( $item->isDir() ) {
-				rmdir( $item->getRealPath() );
-			} else {
-				unlink( $item->getRealPath() );
-			}
+		$wp_filesystem = $this->get_filesystem();
+		if ( ! $wp_filesystem ) {
+			return false;
 		}
 
-		return rmdir( $dir );
+		return $wp_filesystem->delete( $dir, true );
 	}
 
 	/**

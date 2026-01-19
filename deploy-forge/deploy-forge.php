@@ -9,10 +9,8 @@
  * License: GPL v2 or later
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
  * Text Domain: deploy-forge
- * Domain Path: /languages
  * Requires at least: 5.8
  * Requires PHP: 8.0
- * Update URI: https://updates.getdeployforge.com
  *
  * @package Deploy_Forge
  * @since   1.0.0
@@ -97,14 +95,6 @@ class Deploy_Forge {
 	public $admin_pages;
 
 	/**
-	 * Update Checker instance.
-	 *
-	 * @since 1.0.20
-	 * @var Deploy_Forge_Update_Checker
-	 */
-	public $update_checker;
-
-	/**
 	 * Get singleton instance.
 	 *
 	 * @since 1.0.0
@@ -146,7 +136,6 @@ class Deploy_Forge {
 		require_once DEPLOY_FORGE_PLUGIN_DIR . 'includes/class-github-api.php';
 		require_once DEPLOY_FORGE_PLUGIN_DIR . 'includes/class-deployment-manager.php';
 		require_once DEPLOY_FORGE_PLUGIN_DIR . 'includes/class-webhook-handler.php';
-		require_once DEPLOY_FORGE_PLUGIN_DIR . 'includes/class-update-checker.php';
 
 		// Utility classes.
 		require_once DEPLOY_FORGE_PLUGIN_DIR . 'includes/class-ajax-handler-base.php';
@@ -186,30 +175,6 @@ class Deploy_Forge {
 				$connection_handler
 			);
 		}
-
-		// Initialize update checker.
-		$this->init_update_checker();
-	}
-
-	/**
-	 * Initialize the plugin update checker.
-	 *
-	 * @since 1.0.20
-	 *
-	 * @return void
-	 */
-	private function init_update_checker(): void {
-		// API key is optional for now (no licensing system yet).
-		// Updates are currently public - no authentication required.
-		$api_key = '';
-
-		// Initialize update checker.
-		$this->update_checker = new Deploy_Forge_Update_Checker(
-			__FILE__, // Plugin file path.
-			DEPLOY_FORGE_VERSION, // Current version.
-			'https://updates.getdeployforge.com', // Update server URL.
-			$api_key // API key (empty for now - public updates).
-		);
 	}
 
 	/**
@@ -223,17 +188,11 @@ class Deploy_Forge {
 		register_activation_hook( __FILE__, array( $this, 'activate' ) );
 		register_deactivation_hook( __FILE__, array( $this, 'deactivate' ) );
 
-		add_action( 'plugins_loaded', array( $this, 'load_textdomain' ) );
 		add_action( 'rest_api_init', array( $this->webhook_handler, 'register_routes' ) );
 
 		// Register WP-Cron handler for async deployment processing.
 		add_action( 'deploy_forge_process_queued_deployment', array( $this, 'process_queued_deployment' ) );
 		add_action( 'deploy_forge_process_clone_deployment', array( $this, 'process_clone_deployment' ), 10, 2 );
-
-		// Admin notices for update system.
-		if ( is_admin() ) {
-			add_action( 'admin_notices', array( $this, 'update_system_notices' ) );
-		}
 	}
 
 	/**
@@ -320,35 +279,6 @@ class Deploy_Forge {
 	 */
 	public function process_clone_deployment( int $deployment_id, string $remote_deployment_id ): void {
 		$this->deployment_manager->process_clone_deployment( $deployment_id, $remote_deployment_id );
-	}
-
-	/**
-	 * Load plugin textdomain for translations.
-	 *
-	 * @since 1.0.0
-	 *
-	 * @return void
-	 */
-	public function load_textdomain(): void {
-		load_plugin_textdomain(
-			'deploy-forge',
-			false,
-			dirname( DEPLOY_FORGE_PLUGIN_BASENAME ) . '/languages'
-		);
-	}
-
-	/**
-	 * Display admin notices about update system status.
-	 *
-	 * Reserved for future use when licensing is implemented.
-	 *
-	 * @since 1.0.20
-	 *
-	 * @return void
-	 */
-	public function update_system_notices(): void {
-		// API key not required for updates currently.
-		// This method is kept for future use when licensing is implemented.
 	}
 }
 
