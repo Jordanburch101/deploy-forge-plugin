@@ -547,7 +547,7 @@ The plugin connects to the Deploy Forge website for site management and GitHub w
 
 ### Base URL
 
-`https://deploy-forge-website.vercel.app/api/plugin`
+`https://getdeployforge.com/api/plugin`
 
 ### Connection Flow
 
@@ -578,7 +578,7 @@ Content-Type: application/json
 ```json
 {
   "success": true,
-  "redirectUrl": "https://deploy-forge-website.vercel.app/connect?site_url=..."
+  "redirectUrl": "https://getdeployforge.com/connect?site_url=..."
 }
 ```
 
@@ -633,7 +633,7 @@ X-API-Key: df_live_xxxxxxxxxxxxxxxx
 
 With the new architecture, GitHub webhooks are routed through Deploy Forge:
 
-1. GitHub App sends webhook to `https://deploy-forge-website.vercel.app/api/plugin/webhooks/github`
+1. GitHub App sends webhook to `https://getdeployforge.com/api/plugin/webhooks/github`
 2. Deploy Forge verifies signature using GitHub App webhook secret
 3. Deploy Forge finds all connected sites matching the repository
 4. Deploy Forge forwards webhook to each site's REST endpoint

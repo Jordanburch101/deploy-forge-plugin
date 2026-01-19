@@ -87,11 +87,11 @@ Edit `deploy-forge.php`:
 ```php
 /**
  * Plugin Name: Deploy Forge
- * Plugin URI: https://github.com/jordanburch101/deploy-forge
+ * Plugin URI: https://getdeployforge.com
  * Description: Automates theme deployment from GitHub repositories using GitHub Actions
  * Version: 1.2.0  ← UPDATE THIS
- * Author: Jordan Burch
- * Author URI: https://jordanburch.dev
+ * Author: Deploy Forge
+ * Author URI: https://getdeployforge.com
  */
 ```
 
@@ -202,14 +202,14 @@ After the workflow completes:
 3. **Verify Update Server** (if deployed):
    ```bash
    # Check update server sees new version
-   curl https://updates.deployforge.com/api/updates/check/deploy-forge
+   curl https://updates.getdeployforge.com/api/updates/check/deploy-forge
    ```
 
    Should return:
    ```json
    {
      "version": "1.2.0",
-     "download_url": "https://updates.deployforge.com/api/updates/download",
+     "download_url": "https://updates.getdeployforge.com/api/updates/download",
      ...
    }
    ```
@@ -313,7 +313,7 @@ git push origin v1.2.0
 4. Manually invalidate cache:
    ```bash
    curl -X POST \
-     https://updates.deployforge.com/api/cache/invalidate
+     https://updates.getdeployforge.com/api/cache/invalidate
    ```
 
 ---

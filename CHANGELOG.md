@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.45] - 2026-01-19
+
+### Changed
+- Updated all URLs to use new domain `getdeployforge.com`
+  - Plugin URI, Author URI, Update URI in plugin header
+  - Backend URL constants in `class-settings.php` and `class-github-api.php`
+  - Update checker author profile fallback
+  - API documentation in `spec/api-integration.md`
+  - Release documentation in `RELEASING.md`
+
 ## [1.0.43] - 2026-01-18
 
 ### Fixed
@@ -169,7 +179,7 @@ This release represents a complete architectural shift from direct GitHub integr
 - **Manual Webhook Configuration**: Automatically managed by platform
 
 ### Technical Details
-- **Backend URL**: `https://deploy-forge-website.vercel.app`
+- **Backend URL**: `https://getdeployforge.com`
 - **API Key Format**: `df_live_[32 hex chars]`
 - **Webhook Secret Format**: `whsec_[32 hex chars]`
 - **Connection Flow**: Plugin → Platform Setup → Callback → Credential Exchange

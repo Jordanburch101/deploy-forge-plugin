@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Update checker class
  *
@@ -9,7 +10,7 @@
  * @since   0.5.1
  */
 
-if ( ! defined( 'ABSPATH' ) ) {
+if (! defined('ABSPATH')) {
 	exit;
 }
 
@@ -21,7 +22,8 @@ if ( ! defined( 'ABSPATH' ) ) {
  *
  * @since 0.5.1
  */
-class Deploy_Forge_Update_Checker {
+class Deploy_Forge_Update_Checker
+{
 
 	/**
 	 * Plugin slug.
@@ -91,13 +93,14 @@ class Deploy_Forge_Update_Checker {
 	 * @param string $update_server_url URL of the update server.
 	 * @param string $api_key           API key for authentication.
 	 */
-	public function __construct( $plugin_file, $current_version, $update_server_url, $api_key = '' ) {
-		$this->plugin_basename   = plugin_basename( $plugin_file );
-		$this->plugin_slug       = dirname( $this->plugin_basename );
+	public function __construct($plugin_file, $current_version, $update_server_url, $api_key = '')
+	{
+		$this->plugin_basename   = plugin_basename($plugin_file);
+		$this->plugin_slug       = dirname($this->plugin_basename);
 		$this->current_version   = $current_version;
-		$this->update_server_url = rtrim( $update_server_url, '/' );
+		$this->update_server_url = rtrim($update_server_url, '/');
 		$this->api_key           = $api_key;
-		$this->cache_key         = 'deploy_forge_update_' . md5( $this->plugin_basename );
+		$this->cache_key         = 'deploy_forge_update_' . md5($this->plugin_basename);
 
 		$this->init_hooks();
 	}
@@ -109,19 +112,20 @@ class Deploy_Forge_Update_Checker {
 	 *
 	 * @return void
 	 */
-	private function init_hooks() {
+	private function init_hooks()
+	{
 		// Check for plugin updates.
-		add_filter( 'pre_set_site_transient_update_plugins', array( $this, 'check_for_update' ) );
+		add_filter('pre_set_site_transient_update_plugins', array($this, 'check_for_update'));
 
 		// Provide plugin information for the update modal.
-		add_filter( 'plugins_api', array( $this, 'plugin_info' ), 10, 3 );
+		add_filter('plugins_api', array($this, 'plugin_info'), 10, 3);
 
 		// Clear cache when user manually checks for updates.
-		add_action( 'load-update-core.php', array( $this, 'clear_cache' ) );
-		add_action( 'load-plugins.php', array( $this, 'clear_cache_on_demand' ) );
+		add_action('load-update-core.php', array($this, 'clear_cache'));
+		add_action('load-plugins.php', array($this, 'clear_cache_on_demand'));
 
 		// Enable auto-update support (WordPress 5.5+).
-		add_filter( 'auto_update_plugin', array( $this, 'enable_auto_update_support' ), 10, 2 );
+		add_filter('auto_update_plugin', array($this, 'enable_auto_update_support'), 10, 2);
 	}
 
 	/**
@@ -132,16 +136,17 @@ class Deploy_Forge_Update_Checker {
 	 * @param object $transient Update transient.
 	 * @return object Modified transient.
 	 */
-	public function check_for_update( $transient ) {
-		if ( empty( $transient->checked ) ) {
+	public function check_for_update($transient)
+	{
+		if (empty($transient->checked)) {
 			return $transient;
 		}
 
 		// Check cache first.
-		$cached_response = get_transient( $this->cache_key );
-		if ( false !== $cached_response ) {
-			if ( ! empty( $cached_response ) && version_compare( $this->current_version, $cached_response->new_version, '<' ) ) {
-				$transient->response[ $this->plugin_basename ] = $cached_response;
+		$cached_response = get_transient($this->cache_key);
+		if (false !== $cached_response) {
+			if (! empty($cached_response) && version_compare($this->current_version, $cached_response->new_version, '<')) {
+				$transient->response[$this->plugin_basename] = $cached_response;
 			}
 			return $transient;
 		}
@@ -149,15 +154,15 @@ class Deploy_Forge_Update_Checker {
 		// Fetch update information from server.
 		$update_info = $this->fetch_update_info();
 
-		if ( $update_info && ! is_wp_error( $update_info ) ) {
+		if ($update_info && ! is_wp_error($update_info)) {
 			// Cache the response.
-			set_transient( $this->cache_key, $update_info, $this->cache_duration );
+			set_transient($this->cache_key, $update_info, $this->cache_duration);
 
 			// Add to transient if update available.
-			if ( version_compare( $this->current_version, $update_info->new_version, '<' ) ) {
-				$transient->response[ $this->plugin_basename ] = $update_info;
+			if (version_compare($this->current_version, $update_info->new_version, '<')) {
+				$transient->response[$this->plugin_basename] = $update_info;
 			} else {
-				$transient->no_update[ $this->plugin_basename ] = $update_info;
+				$transient->no_update[$this->plugin_basename] = $update_info;
 			}
 		}
 
@@ -171,13 +176,14 @@ class Deploy_Forge_Update_Checker {
 	 *
 	 * @return object|WP_Error Update information or error.
 	 */
-	private function fetch_update_info() {
+	private function fetch_update_info()
+	{
 		$url = $this->update_server_url . '/api/updates/check/' . $this->plugin_slug;
 
 		$headers = array();
 
 		// Only send API key if one is configured.
-		if ( ! empty( $this->api_key ) ) {
+		if (! empty($this->api_key)) {
 			$headers['X-API-Key'] = $this->api_key;
 		}
 
@@ -189,29 +195,29 @@ class Deploy_Forge_Update_Checker {
 			)
 		);
 
-		if ( is_wp_error( $response ) ) {
+		if (is_wp_error($response)) {
 			// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- Intentional logging for update errors.
-			error_log( 'Deploy Forge Update Check Error: ' . $response->get_error_message() );
+			error_log('Deploy Forge Update Check Error: ' . $response->get_error_message());
 			return $response;
 		}
 
-		$code = wp_remote_retrieve_response_code( $response );
-		if ( 200 !== $code ) {
+		$code = wp_remote_retrieve_response_code($response);
+		if (200 !== $code) {
 			// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- Intentional logging for update errors.
-			error_log( 'Deploy Forge Update Check HTTP Error: ' . $code );
+			error_log('Deploy Forge Update Check HTTP Error: ' . $code);
 			// Translators: %d is the HTTP error code.
-			return new WP_Error( 'http_error', sprintf( __( 'Update server returned error code: %d', 'deploy-forge' ), $code ) );
+			return new WP_Error('http_error', sprintf(__('Update server returned error code: %d', 'deploy-forge'), $code));
 		}
 
-		$body = wp_remote_retrieve_body( $response );
-		$data = json_decode( $body );
+		$body = wp_remote_retrieve_body($response);
+		$data = json_decode($body);
 
-		if ( empty( $data ) ) {
-			return new WP_Error( 'invalid_response', __( 'Invalid response from update server', 'deploy-forge' ) );
+		if (empty($data)) {
+			return new WP_Error('invalid_response', __('Invalid response from update server', 'deploy-forge'));
 		}
 
 		// Transform to WordPress update object format.
-		return $this->transform_update_response( $data );
+		return $this->transform_update_response($data);
 	}
 
 	/**
@@ -222,7 +228,8 @@ class Deploy_Forge_Update_Checker {
 	 * @param object $data Response data from update server.
 	 * @return object WordPress update object.
 	 */
-	private function transform_update_response( $data ) {
+	private function transform_update_response($data)
+	{
 		$update_obj               = new stdClass();
 		$update_obj->slug         = $this->plugin_slug;
 		$update_obj->plugin       = $this->plugin_basename;
@@ -246,19 +253,20 @@ class Deploy_Forge_Update_Checker {
 	 * @param object             $args   Plugin API arguments.
 	 * @return false|object Plugin information or false.
 	 */
-	public function plugin_info( $result, $action, $args ) {
-		if ( 'plugin_information' !== $action ) {
+	public function plugin_info($result, $action, $args)
+	{
+		if ('plugin_information' !== $action) {
 			return $result;
 		}
 
-		if ( empty( $args->slug ) || $args->slug !== $this->plugin_slug ) {
+		if (empty($args->slug) || $args->slug !== $this->plugin_slug) {
 			return $result;
 		}
 
 		// Fetch detailed plugin information.
 		$plugin_info = $this->fetch_plugin_info();
 
-		if ( $plugin_info && ! is_wp_error( $plugin_info ) ) {
+		if ($plugin_info && ! is_wp_error($plugin_info)) {
 			return $plugin_info;
 		}
 
@@ -272,7 +280,8 @@ class Deploy_Forge_Update_Checker {
 	 *
 	 * @return object|WP_Error Plugin information or error.
 	 */
-	private function fetch_plugin_info() {
+	private function fetch_plugin_info()
+	{
 		$url = $this->update_server_url . '/api/updates/info';
 
 		$headers = array(
@@ -280,7 +289,7 @@ class Deploy_Forge_Update_Checker {
 		);
 
 		// Only send API key if one is configured.
-		if ( ! empty( $this->api_key ) ) {
+		if (! empty($this->api_key)) {
 			$headers['X-API-Key'] = $this->api_key;
 		}
 
@@ -298,28 +307,28 @@ class Deploy_Forge_Update_Checker {
 			)
 		);
 
-		if ( is_wp_error( $response ) ) {
+		if (is_wp_error($response)) {
 			// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- Intentional logging for update errors.
-			error_log( 'Deploy Forge Plugin Info Error: ' . $response->get_error_message() );
+			error_log('Deploy Forge Plugin Info Error: ' . $response->get_error_message());
 			return $response;
 		}
 
-		$code = wp_remote_retrieve_response_code( $response );
-		if ( 200 !== $code ) {
+		$code = wp_remote_retrieve_response_code($response);
+		if (200 !== $code) {
 			// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- Intentional logging for update errors.
-			error_log( 'Deploy Forge Plugin Info HTTP Error: ' . $code );
+			error_log('Deploy Forge Plugin Info HTTP Error: ' . $code);
 			// Translators: %d is the HTTP error code.
-			return new WP_Error( 'http_error', sprintf( __( 'Update server returned error code: %d', 'deploy-forge' ), $code ) );
+			return new WP_Error('http_error', sprintf(__('Update server returned error code: %d', 'deploy-forge'), $code));
 		}
 
-		$body = wp_remote_retrieve_body( $response );
-		$data = json_decode( $body );
+		$body = wp_remote_retrieve_body($response);
+		$data = json_decode($body);
 
-		if ( empty( $data ) ) {
-			return new WP_Error( 'invalid_response', __( 'Invalid response from update server', 'deploy-forge' ) );
+		if (empty($data)) {
+			return new WP_Error('invalid_response', __('Invalid response from update server', 'deploy-forge'));
 		}
 
-		return $this->transform_plugin_info( $data );
+		return $this->transform_plugin_info($data);
 	}
 
 	/**
@@ -330,19 +339,20 @@ class Deploy_Forge_Update_Checker {
 	 * @param object $data Response data from update server.
 	 * @return object WordPress plugin info object.
 	 */
-	private function transform_plugin_info( $data ) {
+	private function transform_plugin_info($data)
+	{
 		$info                 = new stdClass();
 		$info->name           = $data->name ?? 'Deploy Forge';
 		$info->slug           = $this->plugin_slug;
 		$info->version        = $data->version ?? $this->current_version;
-		$info->author         = $data->author ?? 'Jordan Burch';
-		$info->author_profile = $data->author_profile ?? 'https://jordanburch.dev';
+		$info->author         = $data->author ?? 'Deploy Forge';
+		$info->author_profile = $data->author_profile ?? 'https://getdeployforge.com';
 		$info->homepage       = $data->homepage ?? 'https://github.com/jordanburch101/deploy-forge';
 		$info->requires       = $data->requires ?? '5.8';
 		$info->tested         = $data->tested ?? '6.4';
 		$info->requires_php   = $data->requires_php ?? '7.4';
 		$info->download_link  = $data->download_link ?? '';
-		$info->last_updated   = $data->last_updated ?? gmdate( 'Y-m-d' );
+		$info->last_updated   = $data->last_updated ?? gmdate('Y-m-d');
 		$info->sections       = $data->sections ?? array(
 			'description' => 'Automates theme deployment from GitHub repositories using GitHub Actions.',
 		);
@@ -359,8 +369,9 @@ class Deploy_Forge_Update_Checker {
 	 *
 	 * @return void
 	 */
-	public function clear_cache() {
-		delete_transient( $this->cache_key );
+	public function clear_cache()
+	{
+		delete_transient($this->cache_key);
 	}
 
 	/**
@@ -370,9 +381,10 @@ class Deploy_Forge_Update_Checker {
 	 *
 	 * @return void
 	 */
-	public function clear_cache_on_demand() {
+	public function clear_cache_on_demand()
+	{
 		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Read-only check for force-check parameter.
-		if ( isset( $_GET['force-check'] ) && '1' === $_GET['force-check'] ) {
+		if (isset($_GET['force-check']) && '1' === $_GET['force-check']) {
 			$this->clear_cache();
 		}
 	}
@@ -385,7 +397,8 @@ class Deploy_Forge_Update_Checker {
 	 * @param string $api_key API key for authentication.
 	 * @return void
 	 */
-	public function set_api_key( $api_key ) {
+	public function set_api_key($api_key)
+	{
 		$this->api_key = $api_key;
 	}
 
@@ -396,7 +409,8 @@ class Deploy_Forge_Update_Checker {
 	 *
 	 * @return string The API key.
 	 */
-	public function get_api_key() {
+	public function get_api_key()
+	{
 		return $this->api_key;
 	}
 
@@ -408,8 +422,9 @@ class Deploy_Forge_Update_Checker {
 	 * @param string $url Update server URL.
 	 * @return void
 	 */
-	public function set_update_server_url( $url ) {
-		$this->update_server_url = rtrim( $url, '/' );
+	public function set_update_server_url($url)
+	{
+		$this->update_server_url = rtrim($url, '/');
 	}
 
 	/**
@@ -419,7 +434,8 @@ class Deploy_Forge_Update_Checker {
 	 *
 	 * @return string The update server URL.
 	 */
-	public function get_update_server_url() {
+	public function get_update_server_url()
+	{
 		return $this->update_server_url;
 	}
 
@@ -430,7 +446,8 @@ class Deploy_Forge_Update_Checker {
 	 *
 	 * @return object|WP_Error Update information or error.
 	 */
-	public function manual_check() {
+	public function manual_check()
+	{
 		$this->clear_cache();
 		return $this->fetch_update_info();
 	}
@@ -447,9 +464,10 @@ class Deploy_Forge_Update_Checker {
 	 * @param object    $item   The plugin item to check.
 	 * @return bool|null Whether to update or null to use default behavior.
 	 */
-	public function enable_auto_update_support( $update, $item ) {
+	public function enable_auto_update_support($update, $item)
+	{
 		// Only handle our plugin.
-		if ( isset( $item->plugin ) && $this->plugin_basename === $item->plugin ) {
+		if (isset($item->plugin) && $this->plugin_basename === $item->plugin) {
 			// Return null to allow WordPress to handle auto-update decision.
 			// This enables the "Enable auto-updates" link in the admin.
 			return $update;
