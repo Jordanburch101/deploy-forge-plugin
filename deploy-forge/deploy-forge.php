@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Plugin Name: Deploy Forge
  * Plugin URI: https://getdeployforge.com
@@ -20,15 +19,15 @@
  */
 
 // Exit if accessed directly.
-if (! defined('ABSPATH')) {
+if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
 // Define plugin constants.
-define('DEPLOY_FORGE_VERSION', '1.0.43');
-define('DEPLOY_FORGE_PLUGIN_DIR', plugin_dir_path(__FILE__));
-define('DEPLOY_FORGE_PLUGIN_URL', plugin_dir_url(__FILE__));
-define('DEPLOY_FORGE_PLUGIN_BASENAME', plugin_basename(__FILE__));
+define( 'DEPLOY_FORGE_VERSION', '1.0.43' );
+define( 'DEPLOY_FORGE_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
+define( 'DEPLOY_FORGE_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
+define( 'DEPLOY_FORGE_PLUGIN_BASENAME', plugin_basename( __FILE__ ) );
 
 /**
  * Main plugin class for Deploy Forge.
@@ -37,8 +36,8 @@ define('DEPLOY_FORGE_PLUGIN_BASENAME', plugin_basename(__FILE__));
  *
  * @since 1.0.0
  */
-class Deploy_Forge
-{
+class Deploy_Forge {
+
 
 
 	/**
@@ -112,9 +111,8 @@ class Deploy_Forge
 	 *
 	 * @return Deploy_Forge The singleton instance.
 	 */
-	public static function get_instance(): self
-	{
-		if (null === self::$instance) {
+	public static function get_instance(): self {
+		if ( null === self::$instance ) {
 			self::$instance = new self();
 		}
 		return self::$instance;
@@ -127,8 +125,7 @@ class Deploy_Forge
 	 *
 	 * @since 1.0.0
 	 */
-	private function __construct()
-	{
+	private function __construct() {
 		$this->load_dependencies();
 		$this->init_hooks();
 	}
@@ -140,8 +137,7 @@ class Deploy_Forge
 	 *
 	 * @return void
 	 */
-	private function load_dependencies(): void
-	{
+	private function load_dependencies(): void {
 		// Core classes.
 		require_once DEPLOY_FORGE_PLUGIN_DIR . 'includes/class-database.php';
 		require_once DEPLOY_FORGE_PLUGIN_DIR . 'includes/class-settings.php';
@@ -157,16 +153,16 @@ class Deploy_Forge
 		require_once DEPLOY_FORGE_PLUGIN_DIR . 'includes/class-data-formatter.php';
 
 		// Admin classes.
-		if (is_admin()) {
+		if ( is_admin() ) {
 			require_once DEPLOY_FORGE_PLUGIN_DIR . 'admin/class-admin-pages.php';
 		}
 
 		// Initialize instances.
 		$this->database           = new Deploy_Forge_Database();
 		$this->settings           = new Deploy_Forge_Settings();
-		$logger                   = new Deploy_Forge_Debug_Logger($this->settings);
-		$connection_handler       = new Deploy_Forge_Connection_Handler($this->settings, $logger);
-		$this->github_api         = new Deploy_Forge_GitHub_API($this->settings, $logger);
+		$logger                   = new Deploy_Forge_Debug_Logger( $this->settings );
+		$connection_handler       = new Deploy_Forge_Connection_Handler( $this->settings, $logger );
+		$this->github_api         = new Deploy_Forge_GitHub_API( $this->settings, $logger );
 		$this->deployment_manager = new Deploy_Forge_Deployment_Manager(
 			$this->settings,
 			$this->github_api,
@@ -180,7 +176,7 @@ class Deploy_Forge
 			$this->deployment_manager
 		);
 
-		if (is_admin()) {
+		if ( is_admin() ) {
 			$this->admin_pages = new Deploy_Forge_Admin_Pages(
 				$this->settings,
 				$this->github_api,
@@ -202,8 +198,7 @@ class Deploy_Forge
 	 *
 	 * @return void
 	 */
-	private function init_update_checker(): void
-	{
+	private function init_update_checker(): void {
 		// API key is optional for now (no licensing system yet).
 		// Updates are currently public - no authentication required.
 		$api_key = '';
@@ -224,21 +219,20 @@ class Deploy_Forge
 	 *
 	 * @return void
 	 */
-	private function init_hooks(): void
-	{
-		register_activation_hook(__FILE__, array($this, 'activate'));
-		register_deactivation_hook(__FILE__, array($this, 'deactivate'));
+	private function init_hooks(): void {
+		register_activation_hook( __FILE__, array( $this, 'activate' ) );
+		register_deactivation_hook( __FILE__, array( $this, 'deactivate' ) );
 
-		add_action('plugins_loaded', array($this, 'load_textdomain'));
-		add_action('rest_api_init', array($this->webhook_handler, 'register_routes'));
+		add_action( 'plugins_loaded', array( $this, 'load_textdomain' ) );
+		add_action( 'rest_api_init', array( $this->webhook_handler, 'register_routes' ) );
 
 		// Register WP-Cron handler for async deployment processing.
-		add_action('deploy_forge_process_queued_deployment', array($this, 'process_queued_deployment'));
-		add_action('deploy_forge_process_clone_deployment', array($this, 'process_clone_deployment'), 10, 2);
+		add_action( 'deploy_forge_process_queued_deployment', array( $this, 'process_queued_deployment' ) );
+		add_action( 'deploy_forge_process_clone_deployment', array( $this, 'process_clone_deployment' ), 10, 2 );
 
 		// Admin notices for update system.
-		if (is_admin()) {
-			add_action('admin_notices', array($this, 'update_system_notices'));
+		if ( is_admin() ) {
+			add_action( 'admin_notices', array( $this, 'update_system_notices' ) );
 		}
 	}
 
@@ -251,8 +245,7 @@ class Deploy_Forge
 	 *
 	 * @return void
 	 */
-	public function activate(): void
-	{
+	public function activate(): void {
 		$this->database->create_tables();
 		flush_rewrite_rules();
 	}
@@ -266,12 +259,11 @@ class Deploy_Forge
 	 *
 	 * @return void
 	 */
-	public function deactivate(): void
-	{
+	public function deactivate(): void {
 		// Clear scheduled cron jobs.
-		wp_clear_scheduled_hook('deploy_forge_check_build_status');
-		wp_clear_scheduled_hook('deploy_forge_process_queued_deployment');
-		wp_clear_scheduled_hook('deploy_forge_process_clone_deployment');
+		wp_clear_scheduled_hook( 'deploy_forge_check_build_status' );
+		wp_clear_scheduled_hook( 'deploy_forge_process_queued_deployment' );
+		wp_clear_scheduled_hook( 'deploy_forge_process_clone_deployment' );
 
 		// Release any locks.
 		$this->database->release_deployment_lock();
@@ -289,27 +281,26 @@ class Deploy_Forge
 	 * @param int $deployment_id The deployment ID to process.
 	 * @return void
 	 */
-	public function process_queued_deployment(int $deployment_id): void
-	{
+	public function process_queued_deployment( int $deployment_id ): void {
 		// Check if deployment lock exists.
 		$locked_deployment = $this->database->get_deployment_lock();
 
-		if ($locked_deployment && $locked_deployment !== $deployment_id) {
+		if ( $locked_deployment && $locked_deployment !== $deployment_id ) {
 			// Another deployment is currently processing, reschedule this one.
 			wp_schedule_single_event(
 				time() + 60,
 				'deploy_forge_process_queued_deployment',
-				array($deployment_id)
+				array( $deployment_id )
 			);
 			return;
 		}
 
 		// Set lock for this deployment (5 minute timeout).
-		$this->database->set_deployment_lock($deployment_id, 300);
+		$this->database->set_deployment_lock( $deployment_id, 300 );
 
 		try {
 			// Process the deployment.
-			$this->deployment_manager->process_successful_build($deployment_id);
+			$this->deployment_manager->process_successful_build( $deployment_id );
 		} finally {
 			// Always release the lock when done (or on error).
 			$this->database->release_deployment_lock();
@@ -327,9 +318,8 @@ class Deploy_Forge
 	 * @param string $remote_deployment_id The remote Deploy Forge deployment ID.
 	 * @return void
 	 */
-	public function process_clone_deployment(int $deployment_id, string $remote_deployment_id): void
-	{
-		$this->deployment_manager->process_clone_deployment($deployment_id, $remote_deployment_id);
+	public function process_clone_deployment( int $deployment_id, string $remote_deployment_id ): void {
+		$this->deployment_manager->process_clone_deployment( $deployment_id, $remote_deployment_id );
 	}
 
 	/**
@@ -339,12 +329,11 @@ class Deploy_Forge
 	 *
 	 * @return void
 	 */
-	public function load_textdomain(): void
-	{
+	public function load_textdomain(): void {
 		load_plugin_textdomain(
 			'deploy-forge',
 			false,
-			dirname(DEPLOY_FORGE_PLUGIN_BASENAME) . '/languages'
+			dirname( DEPLOY_FORGE_PLUGIN_BASENAME ) . '/languages'
 		);
 	}
 
@@ -357,8 +346,7 @@ class Deploy_Forge
 	 *
 	 * @return void
 	 */
-	public function update_system_notices(): void
-	{
+	public function update_system_notices(): void {
 		// API key not required for updates currently.
 		// This method is kept for future use when licensing is implemented.
 	}
@@ -373,8 +361,7 @@ class Deploy_Forge
  *
  * @return Deploy_Forge The plugin instance.
  */
-function deploy_forge(): Deploy_Forge
-{
+function deploy_forge(): Deploy_Forge {
 	return Deploy_Forge::get_instance();
 }
 
