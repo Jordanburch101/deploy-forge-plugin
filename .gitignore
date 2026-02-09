@@ -26,6 +26,9 @@ composer.lock
 # Logs
 *.log
 
+# Internal docs
+/spec
+
 # Personal config
 .cursorrules
 .intelephense.json
