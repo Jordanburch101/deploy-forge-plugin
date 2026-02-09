@@ -1,8 +1,31 @@
+# Dependencies
+/vendor
+/node_modules
+composer.lock
+
+# Build artifacts
 /dist
 /build
-/vendor
-composer.lock
 
 # PHPUnit
 .phpunit.cache
 /coverage
+
+# Environment
+.env
+.env.*
+
+# macOS
+.DS_Store
+
+# IDE / Editor
+.idea/
+*.swp
+*~
+
+# Logs
+*.log
+
+# Personal config
+.cursorrules
+.intelephense.json
