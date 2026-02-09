@@ -21,7 +21,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 // Define plugin constants.
-define( 'DEPLOY_FORGE_VERSION', '1.0.43' );
+define( 'DEPLOY_FORGE_VERSION', get_file_data( __FILE__, array( 'Version' => 'Version' ) )['Version'] );
 define( 'DEPLOY_FORGE_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'DEPLOY_FORGE_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 define( 'DEPLOY_FORGE_PLUGIN_BASENAME', plugin_basename( __FILE__ ) );
@@ -135,6 +135,7 @@ class Deploy_Forge {
 		require_once DEPLOY_FORGE_PLUGIN_DIR . 'includes/class-github-api.php';
 		require_once DEPLOY_FORGE_PLUGIN_DIR . 'includes/class-deployment-manager.php';
 		require_once DEPLOY_FORGE_PLUGIN_DIR . 'includes/class-webhook-handler.php';
+		require_once DEPLOY_FORGE_PLUGIN_DIR . 'includes/class-plugin-updater.php';
 
 		// Utility classes.
 		require_once DEPLOY_FORGE_PLUGIN_DIR . 'includes/class-ajax-handler-base.php';
@@ -163,6 +164,10 @@ class Deploy_Forge {
 			$logger,
 			$this->deployment_manager
 		);
+
+		// Self-hosted update checker (runs on cron too, not just admin).
+		$plugin_updater = new Deploy_Forge_Plugin_Updater();
+		$plugin_updater->init();
 
 		if ( is_admin() ) {
 			$this->admin_pages = new Deploy_Forge_Admin_Pages(

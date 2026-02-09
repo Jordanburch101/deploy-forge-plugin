@@ -457,6 +457,9 @@ class Deploy_Forge_Webhook_Handler {
 			case 'deploy_forge:clone_ready':
 				return $this->handle_clone_ready_event( $data );
 
+			case 'deploy_forge:site_disconnected':
+				return $this->handle_site_disconnected_event( $data );
+
 			case 'ping':
 				return new WP_REST_Response(
 					array(
@@ -937,6 +940,58 @@ class Deploy_Forge_Webhook_Handler {
 		$this->send_early_response_and_process_clone_async( $deployment->id, $deployment_id, $response_data );
 
 		return new WP_REST_Response( $response_data, 200 );
+	}
+
+	/**
+	 * Handle deploy_forge:site_disconnected event.
+	 *
+	 * Called when the site is unbound from the Deploy Forge dashboard.
+	 * Clears all stored credentials and marks the site as disconnected.
+	 *
+	 * @since 1.0.0
+	 *
+	 * @param array $data The event data.
+	 * @return WP_REST_Response Response with processing result.
+	 */
+	private function handle_site_disconnected_event( array $data ): WP_REST_Response {
+		$timestamp = $data['timestamp'] ?? '';
+
+		$this->logger->log(
+			'Webhook',
+			'Site disconnected event received from Deploy Forge dashboard',
+			array(
+				'timestamp' => $timestamp,
+			)
+		);
+
+		// Clear all stored credentials and connection data.
+		// Note: We don't call the API disconnect endpoint since the disconnection
+		// was initiated from the dashboard (we'd create a loop).
+		delete_option( 'deploy_forge_api_key' );
+		delete_option( 'deploy_forge_webhook_secret' );
+		delete_option( 'deploy_forge_site_id' );
+		delete_option( 'deploy_forge_connection_data' );
+
+		// Clear repo settings but preserve other preferences.
+		$current_settings                         = $this->settings->get_all();
+		$current_settings['github_repo_owner']    = '';
+		$current_settings['github_repo_name']     = '';
+		$current_settings['github_branch']        = 'main';
+		$current_settings['github_workflow_name'] = 'deploy-theme.yml';
+		$this->settings->save( $current_settings );
+
+		$this->logger->log( 'Webhook', 'Site credentials cleared - site is now disconnected' );
+
+		// Fire action for any additional cleanup by other code.
+		do_action( 'deploy_forge_site_disconnected' );
+
+		return new WP_REST_Response(
+			array(
+				'success' => true,
+				'message' => __( 'Site disconnected successfully.', 'deploy-forge' ),
+			),
+			200
+		);
 	}
 
 	/**
