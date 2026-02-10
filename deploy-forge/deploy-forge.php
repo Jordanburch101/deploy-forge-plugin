@@ -3,7 +3,7 @@
  * Plugin Name: Deploy Forge
  * Plugin URI: https://getdeployforge.com
  * Description: Automates theme deployment from GitHub repositories via Deploy Forge platform
- * Version: 1.0.52
+ * Version: 1.0.53
  * Author: Deploy Forge
  * Author URI: https://getdeployforge.com
  * License: GPL v2 or later
@@ -198,6 +198,9 @@ class Deploy_Forge {
 		// Register WP-Cron handler for async deployment processing.
 		add_action( 'deploy_forge_process_queued_deployment', array( $this, 'process_queued_deployment' ) );
 		add_action( 'deploy_forge_process_clone_deployment', array( $this, 'process_clone_deployment' ), 10, 2 );
+
+		// Register daily cleanup cron handler.
+		add_action( 'deploy_forge_daily_cleanup', array( $this, 'run_daily_cleanup' ) );
 	}
 
 	/**
@@ -211,6 +214,12 @@ class Deploy_Forge {
 	 */
 	public function activate(): void {
 		$this->database->create_tables();
+
+		// Schedule daily cleanup if not already scheduled.
+		if ( ! wp_next_scheduled( 'deploy_forge_daily_cleanup' ) ) {
+			wp_schedule_event( time(), 'daily', 'deploy_forge_daily_cleanup' );
+		}
+
 		flush_rewrite_rules();
 	}
 
@@ -228,6 +237,7 @@ class Deploy_Forge {
 		wp_clear_scheduled_hook( 'deploy_forge_check_build_status' );
 		wp_clear_scheduled_hook( 'deploy_forge_process_queued_deployment' );
 		wp_clear_scheduled_hook( 'deploy_forge_process_clone_deployment' );
+		wp_clear_scheduled_hook( 'deploy_forge_daily_cleanup' );
 
 		// Release any locks.
 		$this->database->release_deployment_lock();
@@ -284,6 +294,19 @@ class Deploy_Forge {
 	 */
 	public function process_clone_deployment( int $deployment_id, string $remote_deployment_id ): void {
 		$this->deployment_manager->process_clone_deployment( $deployment_id, $remote_deployment_id );
+	}
+
+	/**
+	 * Run daily deployment cleanup (WP-Cron callback).
+	 *
+	 * Prunes old deployment files and database rows.
+	 *
+	 * @since 1.0.53
+	 *
+	 * @return void
+	 */
+	public function run_daily_cleanup(): void {
+		$this->deployment_manager->run_full_cleanup();
 	}
 }
 

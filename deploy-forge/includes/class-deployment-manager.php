@@ -1448,50 +1448,52 @@ class Deploy_Forge_Deployment_Manager {
 			)
 		);
 
-		// Remove existing theme directory contents before copying.
-		// This ensures a clean deployment.
-		if ( is_dir( $target_theme_path ) ) {
-			$this->logger->log_deployment_step( $deployment_id, 'Clearing Existing Theme', 'in_progress' );
-			$this->recursive_delete( $target_theme_path );
+		// Safe deployment: copy to staging directory first, then atomic swap.
+		// This prevents the site from being left with no theme if the copy fails.
+		$staging_path = $target_theme_path . '-staging-' . $deployment_id;
+
+		// Clean any leftover staging directory from a previous crash.
+		if ( is_dir( $staging_path ) ) {
+			$this->recursive_delete( $staging_path );
 		}
 
-		// Create target theme directory.
-		if ( ! is_dir( $target_theme_path ) ) {
-			if ( ! wp_mkdir_p( $target_theme_path ) ) {
-				$this->logger->error( 'Deployment', "Failed to create theme directory: {$target_theme_path}" );
-				$this->database->update_deployment(
-					$deployment_id,
-					array(
-						'status'        => 'failed',
-						'error_message' => __( 'Failed to create theme directory.', 'deploy-forge' ),
-					)
-				);
-				return;
-			}
+		if ( ! wp_mkdir_p( $staging_path ) ) {
+			$this->logger->error( 'Deployment', "Failed to create staging directory: {$staging_path}" );
+			$this->database->update_deployment(
+				$deployment_id,
+				array(
+					'status'        => 'failed',
+					'error_message' => __( 'Failed to create staging directory.', 'deploy-forge' ),
+				)
+			);
+			return;
 		}
 
-		// Copy theme files to target directory.
+		// Copy theme files to staging directory.
 		// Increase timeout for large theme deployments.
 		@set_time_limit( 300 );
 
-		$copy_result = $this->recursive_copy( $source_theme_dir, $target_theme_path );
+		$this->logger->log_deployment_step( $deployment_id, 'Copying to Staging', 'in_progress' );
+
+		$copy_result = $this->recursive_copy( $source_theme_dir, $staging_path );
 
 		if ( ! $copy_result ) {
-			$error_message = __( 'Failed to copy files to theme directory.', 'deploy-forge' );
-			$this->logger->error( 'Deployment', "Deployment #$deployment_id file copy failed" );
+			$error_message = __( 'Failed to copy files to staging directory.', 'deploy-forge' );
+			$this->logger->error( 'Deployment', "Deployment #$deployment_id file copy to staging failed" );
+
+			// Clean up failed staging directory.
+			$this->recursive_delete( $staging_path );
 
 			// Gather directory info for debugging.
 			$source_exists   = is_dir( $source_theme_dir );
-			$target_exists   = is_dir( $target_theme_path );
 			$target_writable = wp_is_writable( dirname( $target_theme_path ) );
 			$source_files    = $source_exists ? count( scandir( $source_theme_dir ) ) - 2 : 0;
 
 			$this->log_deployment(
 				$deployment_id,
 				sprintf(
-					'File copy failed from %s to %s. Source exists: %s (%d files), Target dir writable: %s',
+					'File copy failed from %s to staging. Source exists: %s (%d files), Target dir writable: %s',
 					$source_theme_dir,
-					$target_theme_path,
 					$source_exists ? 'yes' : 'no',
 					$source_files,
 					$target_writable ? 'yes' : 'no'
@@ -1512,11 +1514,38 @@ class Deploy_Forge_Deployment_Manager {
 				'target_dir'         => $target_theme_path,
 				'source_exists'      => $source_exists,
 				'source_file_count'  => $source_files,
-				'target_exists'      => $target_exists,
 				'target_writable'    => $target_writable,
 				'disk_free_space_mb' => function_exists( 'disk_free_space' ) ? round( disk_free_space( dirname( $target_theme_path ) ) / 1024 / 1024, 2 ) : null,
 			);
 			$this->report_status_to_backend( $deployment_id, false, $error_message, $additional_context );
+			return;
+		}
+
+		$this->logger->log_deployment_step( $deployment_id, 'Staging Copy Complete', 'success' );
+
+		// Atomic swap: staging → target, preserving the original on failure.
+		$this->logger->log_deployment_step( $deployment_id, 'Atomic Swap', 'in_progress' );
+
+		$swap_result = $this->safe_swap_directory( $staging_path, $target_theme_path, (string) $deployment_id );
+
+		if ( ! $swap_result ) {
+			$error_message = __( 'Failed to swap staging directory into theme directory.', 'deploy-forge' );
+			$this->logger->error( 'Deployment', "Deployment #$deployment_id atomic swap failed" );
+
+			// Clean up staging directory if it still exists.
+			if ( is_dir( $staging_path ) ) {
+				$this->recursive_delete( $staging_path );
+			}
+
+			$this->database->update_deployment(
+				$deployment_id,
+				array(
+					'status'        => 'failed',
+					'error_message' => $error_message,
+				)
+			);
+
+			$this->report_status_to_backend( $deployment_id, false, $error_message );
 			return;
 		}
 
@@ -1570,8 +1599,8 @@ class Deploy_Forge_Deployment_Manager {
 		// Trigger action hook.
 		do_action( 'deploy_forge_completed', $deployment_id );
 
-		// Clean up old backup and snapshot files beyond retention limit.
-		$this->cleanup_old_deployment_files();
+		// Clean up old deployment files and expired DB rows.
+		$this->run_full_cleanup();
 	}
 
 	/**
@@ -1736,19 +1765,43 @@ class Deploy_Forge_Deployment_Manager {
 			$copy_source = $temp_extract_dir;
 		}
 
-		// Clear existing theme directory before restoring backup to remove files added by newer deployments.
-		$this->recursive_delete( $theme_path );
-		wp_mkdir_p( $theme_path );
+		// Safe rollback: copy to staging directory first, then atomic swap.
+		$staging_path = $theme_path . '-staging-rollback-' . $deployment_id;
 
-		// Copy files back using native PHP.
-		$copy_result = $this->recursive_copy( $copy_source, $theme_path );
+		// Clean any leftover staging directory from a previous crash.
+		if ( is_dir( $staging_path ) ) {
+			$this->recursive_delete( $staging_path );
+		}
 
-		if ( ! $copy_result ) {
-			$this->logger->error( 'Deployment', 'Failed to copy rollback files' );
+		if ( ! wp_mkdir_p( $staging_path ) ) {
+			$this->logger->error( 'Deployment', 'Failed to create rollback staging directory' );
+			$this->recursive_delete( $temp_extract_dir );
 			return false;
 		}
 
-		// Clean up.
+		// Copy rollback files to staging directory.
+		$copy_result = $this->recursive_copy( $copy_source, $staging_path );
+
+		if ( ! $copy_result ) {
+			$this->logger->error( 'Deployment', 'Failed to copy rollback files to staging' );
+			$this->recursive_delete( $staging_path );
+			$this->recursive_delete( $temp_extract_dir );
+			return false;
+		}
+
+		// Atomic swap: staging → theme directory, preserving the original on failure.
+		$swap_result = $this->safe_swap_directory( $staging_path, $theme_path, 'rollback-' . $deployment_id );
+
+		if ( ! $swap_result ) {
+			$this->logger->error( 'Deployment', 'Rollback atomic swap failed' );
+			if ( is_dir( $staging_path ) ) {
+				$this->recursive_delete( $staging_path );
+			}
+			$this->recursive_delete( $temp_extract_dir );
+			return false;
+		}
+
+		// Clean up temp extraction directory.
 		$this->recursive_delete( $temp_extract_dir );
 
 		// Update deployment status.
@@ -2618,6 +2671,77 @@ class Deploy_Forge_Deployment_Manager {
 	}
 
 	/**
+	 * Atomically swap a staging directory into the target location.
+	 *
+	 * Uses rename() which is atomic on the same filesystem. The flow:
+	 * 1. Rename current target → target-old-{suffix}
+	 * 2. Rename staging → target
+	 * 3. Delete the old directory
+	 *
+	 * If step 2 fails, the old directory is restored. If step 1 fails,
+	 * nothing has changed. This prevents the site from being left with
+	 * no theme directory if the copy/rename fails mid-way.
+	 *
+	 * @since 1.0.53
+	 *
+	 * @param string $staging_path The staging directory containing new files.
+	 * @param string $target_path  The final destination (e.g. the theme directory).
+	 * @param string $suffix       Unique suffix for temp names (e.g. deployment ID).
+	 * @return bool True on success, false on failure (original directory preserved).
+	 */
+	private function safe_swap_directory( string $staging_path, string $target_path, string $suffix ): bool {
+		$old_path = $target_path . '-old-' . $suffix;
+
+		// Clean up any leftover old directory from a previous crash.
+		if ( is_dir( $old_path ) ) {
+			$this->recursive_delete( $old_path );
+		}
+
+		// Step 1: Rename current target → old (skip if target doesn't exist yet, e.g. first deploy).
+		if ( is_dir( $target_path ) ) {
+			// phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged, WordPress.WP.AlternativeFunctions.rename_rename -- atomic rename() is intentional; WP_Filesystem::move() is not guaranteed atomic.
+			if ( ! @rename( $target_path, $old_path ) ) {
+				$this->logger->error(
+					'Deployment',
+					'Safe swap failed: could not rename current directory to old',
+					array(
+						'target'   => $target_path,
+						'old_path' => $old_path,
+					)
+				);
+				return false;
+			}
+		}
+
+		// Step 2: Rename staging → target.
+		// phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged, WordPress.WP.AlternativeFunctions.rename_rename -- atomic rename() is intentional; WP_Filesystem::move() is not guaranteed atomic.
+		if ( ! @rename( $staging_path, $target_path ) ) {
+			$this->logger->error(
+				'Deployment',
+				'Safe swap failed: could not rename staging to target',
+				array(
+					'staging' => $staging_path,
+					'target'  => $target_path,
+				)
+			);
+
+			// Restore the old directory if it was renamed.
+			if ( is_dir( $old_path ) ) {
+				// phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged, WordPress.WP.AlternativeFunctions.rename_rename -- best-effort restore; atomic rename() is intentional.
+				@rename( $old_path, $target_path );
+			}
+			return false;
+		}
+
+		// Step 3: Clean up old directory on success.
+		if ( is_dir( $old_path ) ) {
+			$this->recursive_delete( $old_path );
+		}
+
+		return true;
+	}
+
+	/**
 	 * Process a direct clone deployment.
 	 *
 	 * Downloads the repository directly from GitHub (no workflow/artifact).
@@ -2757,6 +2881,60 @@ class Deploy_Forge_Deployment_Manager {
 			);
 			$this->report_status_to_backend( $deployment_id, false, $error_message );
 			$this->database->release_deployment_lock();
+		}
+	}
+
+	/**
+	 * Run full deployment cleanup: prune files beyond retention count, then
+	 * delete associated files and DB rows for deployments older than the
+	 * retention period.
+	 *
+	 * This unifies the two cleanup mechanisms:
+	 * - File cleanup by count (keep N most recent)
+	 * - DB row + file cleanup by age (delete rows older than N days)
+	 *
+	 * @since 1.0.53
+	 *
+	 * @param int $keep_files     Number of most-recent deployments to retain files for.
+	 * @param int $keep_rows_days Number of days to keep deployment DB rows.
+	 * @return void
+	 */
+	public function run_full_cleanup( int $keep_files = 10, int $keep_rows_days = 90 ): void {
+		// Step 1: Prune files beyond retention count.
+		$this->cleanup_old_deployment_files( $keep_files );
+
+		// Step 2: Delete files for deployments older than retention period,
+		// then remove the DB rows.
+		$old_deployments = $this->database->get_old_deployments( $keep_rows_days );
+
+		if ( ! empty( $old_deployments ) ) {
+			$backup_dir = realpath( $this->settings->get_backup_directory() );
+
+			if ( $backup_dir ) {
+				foreach ( $old_deployments as $deployment ) {
+					// Delete backup file if it exists.
+					if ( ! empty( $deployment->backup_path ) && file_exists( $deployment->backup_path ) ) {
+						$real = realpath( $deployment->backup_path );
+						if ( $real && str_starts_with( $real, $backup_dir . DIRECTORY_SEPARATOR ) ) {
+							wp_delete_file( $deployment->backup_path );
+						}
+					}
+
+					// Delete snapshot file if it exists.
+					if ( ! empty( $deployment->snapshot_path ) && file_exists( $deployment->snapshot_path ) ) {
+						$real = realpath( $deployment->snapshot_path );
+						if ( $real && str_starts_with( $real, $backup_dir . DIRECTORY_SEPARATOR ) ) {
+							wp_delete_file( $deployment->snapshot_path );
+						}
+					}
+				}
+			}
+
+			$deleted_rows = $this->database->delete_old_deployments( $keep_rows_days );
+
+			if ( $deleted_rows > 0 ) {
+				$this->logger->log( 'Deployment', "Deleted {$deleted_rows} deployment record(s) older than {$keep_rows_days} days" );
+			}
 		}
 	}
 

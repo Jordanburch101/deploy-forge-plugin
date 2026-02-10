@@ -662,6 +662,32 @@ class Deploy_Forge_Database {
 	}
 
 	/**
+	 * Get old deployments that are beyond the retention period.
+	 *
+	 * Returns deployments older than the specified number of days,
+	 * including their file paths so the caller can clean up files
+	 * before the rows are deleted.
+	 *
+	 * @since 1.0.53
+	 *
+	 * @param int $days Number of days to keep.
+	 * @return array Array of deployment objects with id, backup_path, snapshot_path.
+	 */
+	public function get_old_deployments( int $days = 90 ): array {
+		global $wpdb;
+
+		$date = gmdate( 'Y-m-d H:i:s', strtotime( "-{$days} days" ) );
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		return $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT id, backup_path, snapshot_path FROM {$this->table_name} WHERE created_at < %s",
+				$date
+			)
+		);
+	}
+
+	/**
 	 * Delete old deployments (cleanup).
 	 *
 	 * @since 1.0.0

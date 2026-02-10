@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.53] - 2026-02-10
+
+### Changed
+- Deploy and rollback now use atomic directory swap (copy to staging, rename swap) instead of deleting the theme directory before copying — prevents broken state if the copy fails mid-way
+- Unified deployment cleanup: `run_full_cleanup()` prunes backup/snapshot files by count AND deletes DB rows + files older than 90 days
+
+### Added
+- `safe_swap_directory()` helper for atomic rename-swap of directories
+- `run_full_cleanup()` method combining file and DB row cleanup
+- `get_old_deployments()` database method for age-based cleanup
+- Daily WP-Cron schedule (`deploy_forge_daily_cleanup`) for background cleanup
+
 ## [1.0.52] - 2026-02-10
 
 ### Added
