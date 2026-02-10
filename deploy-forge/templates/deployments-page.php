@@ -66,7 +66,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 			</div>
 			<div class="deploy-forge-header-actions">
 				<a href="<?php echo esc_url( $dashboard_url ); ?>" target="_blank" class="deploy-forge-header-link">
-					<?php esc_html_e( 'Deploy Forge', 'deploy-forge' ); ?>
+					<?php esc_html_e( 'View Dashboard', 'deploy-forge' ); ?>
 					<span class="dashicons dashicons-external"></span>
 				</a>
 				<button type="button" class="button button-primary button-large" id="deploy-now-btn">
