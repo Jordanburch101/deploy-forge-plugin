@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.54] - 2026-02-10
+
+### Fixed
+- Deployment status stuck on "deploying" after successful deploy — split status update into separate DB call from file manifest write so charset/encoding issues in the manifest don't block the status change
+- Added error logging for silent `update_deployment` failures
+
 ## [1.0.53] - 2026-02-10
 
 ### Changed
