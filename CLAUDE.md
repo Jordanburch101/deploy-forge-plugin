@@ -96,8 +96,7 @@ deploy-forge/
 │   └── js/admin-scripts.js        # AJAX handlers, UI logic
 └── templates/
     ├── settings-page.php          # Configuration form
-    ├── dashboard-page.php         # Status overview, deploy now
-    ├── history-page.php           # Deployment log table
+    ├── deployments-page.php       # Deployments landing page (stats, deploy now, history)
     └── setup-wizard/              # Setup wizard templates
 ```
 

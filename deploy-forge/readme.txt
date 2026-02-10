@@ -4,7 +4,7 @@ Tags: deployment, github, theme, automation, ci-cd
 Requires at least: 5.8
 Tested up to: 6.9
 Requires PHP: 8.0
-Stable tag: 1.0.46
+Stable tag: 1.0.47
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -107,6 +107,11 @@ Yes, tokens are encrypted using sodium cryptography before storage.
 
 == Changelog ==
 
+= 1.0.47 =
+* Simplified admin UI: removed Dashboard page, promoted Deployments as the landing page
+* Merged Deploy Now button, stats cards, and search/filter into Deployments page
+* Added "View in Deploy Forge" button linking to the web app dashboard
+
 = 1.0.46 =
 * Self-hosted plugin updates via GitHub Releases — update notifications and one-click updates from the WordPress admin
 * Site disconnected webhook event handler
@@ -133,6 +138,9 @@ Yes, tokens are encrypted using sodium cryptography before storage.
 * Admin interface
 
 == Upgrade Notice ==
+
+= 1.0.47 =
+Simplified admin UI. Deployments is now the landing page with Deploy Now and stats built in.
 
 = 1.0.46 =
 Self-hosted update system. Plugin now checks GitHub Releases for updates.

@@ -154,18 +154,18 @@ class Deploy_Forge_Admin_Pages extends Deploy_Forge_Ajax_Handler_Base {
 			__( 'Deploy Forge', 'deploy-forge' ),
 			'manage_options',
 			'deploy-forge',
-			array( $this, 'render_dashboard_page' ),
+			array( $this, 'render_deployments_page' ),
 			plugins_url( 'admin/images/deploy-forge-menu-icon.png', __DIR__ ),
 			80
 		);
 
 		add_submenu_page(
 			'deploy-forge',
-			__( 'Dashboard', 'deploy-forge' ),
-			__( 'Dashboard', 'deploy-forge' ),
+			__( 'Deployments', 'deploy-forge' ),
+			__( 'Deployments', 'deploy-forge' ),
 			'manage_options',
 			'deploy-forge',
-			array( $this, 'render_dashboard_page' )
+			array( $this, 'render_deployments_page' )
 		);
 
 		add_submenu_page(
@@ -175,15 +175,6 @@ class Deploy_Forge_Admin_Pages extends Deploy_Forge_Ajax_Handler_Base {
 			'manage_options',
 			'deploy-forge-settings',
 			array( $this, 'render_settings_page' )
-		);
-
-		add_submenu_page(
-			'deploy-forge',
-			__( 'Deployment History', 'deploy-forge' ),
-			__( 'History', 'deploy-forge' ),
-			'manage_options',
-			'deploy-forge-history',
-			array( $this, 'render_history_page' )
 		);
 
 		add_submenu_page(
@@ -332,20 +323,29 @@ class Deploy_Forge_Admin_Pages extends Deploy_Forge_Ajax_Handler_Base {
 	}
 
 	/**
-	 * Render dashboard page.
+	 * Render deployments page.
 	 *
-	 * Displays the main dashboard with deployment statistics and recent deployments.
+	 * Displays the main deployments page with deployment statistics,
+	 * Deploy Now button, and paginated deployment history.
 	 *
-	 * @since 1.0.0
+	 * @since 1.0.47
 	 *
 	 * @return void
 	 */
-	public function render_dashboard_page(): void {
-		$stats              = $this->database->get_statistics();
-		$recent_deployments = $this->database->get_recent_deployments( 5 );
-		$is_configured      = $this->settings->is_configured();
+	public function render_deployments_page(): void {
+		$stats         = $this->database->get_statistics();
+		$is_configured = $this->settings->is_configured();
+		$dashboard_url = $this->settings->get_backend_url() . '/dashboard';
 
-		include DEPLOY_FORGE_PLUGIN_DIR . 'templates/dashboard-page.php';
+		$per_page = 20;
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Pagination parameter, no sensitive action.
+		$paged                    = isset( $_GET['paged'] ) ? max( 1, intval( $_GET['paged'] ) ) : 1;
+		$offset                   = ( $paged - 1 ) * $per_page;
+		$deploy_forge_deployments = $this->database->get_recent_deployments( $per_page, $offset );
+		$total_deployments        = $this->database->get_deployment_count();
+		$total_pages              = ceil( $total_deployments / $per_page );
+
+		include DEPLOY_FORGE_PLUGIN_DIR . 'templates/deployments-page.php';
 	}
 
 	/**
@@ -410,26 +410,6 @@ class Deploy_Forge_Admin_Pages extends Deploy_Forge_Ajax_Handler_Base {
 		include DEPLOY_FORGE_PLUGIN_DIR . 'templates/settings-page.php';
 	}
 
-	/**
-	 * Render history page.
-	 *
-	 * Displays paginated deployment history.
-	 *
-	 * @since 1.0.0
-	 *
-	 * @return void
-	 */
-	public function render_history_page(): void {
-		$per_page = 20;
-		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Pagination parameter, no sensitive action.
-		$paged             = isset( $_GET['paged'] ) ? max( 1, intval( $_GET['paged'] ) ) : 1;
-		$offset            = ( $paged - 1 ) * $per_page;
-		$deployments       = $this->database->get_recent_deployments( $per_page, $offset );
-		$total_deployments = $this->database->get_deployment_count();
-		$total_pages       = ceil( $total_deployments / $per_page );
-
-		include DEPLOY_FORGE_PLUGIN_DIR . 'templates/history-page.php';
-	}
 
 	/**
 	 * AJAX: Test GitHub connection.

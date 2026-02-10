@@ -1032,8 +1032,8 @@
 		 * @return {void}
 		 */
 		autoRefresh: () => {
-			// Auto-refresh status every 30 seconds if on dashboard.
-			if ( $( '.deploy-forge-dashboard' ).length > 0 ) {
+			// Auto-refresh status every 30 seconds if on deployments page.
+			if ( $( '.deploy-forge-deployments' ).length > 0 ) {
 				setInterval( () => {
 					// Check for pending, building, queued, or deploying deployments.
 					const activeCount = $( '.deployment-status.status-pending, .deployment-status.status-building, .deployment-status.status-queued, .deployment-status.status-deploying' ).length;

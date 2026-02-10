@@ -231,68 +231,6 @@
 
 /* Deployment Status Badges - now in shared-styles.css */
 
-/* Latest Deployment Summary */
-.deploy-forge-latest-summary {
-	background: #fff;
-	border: 1px solid #c3c4c7;
-	border-radius: 4px;
-	padding: 20px;
-	margin: 20px 0;
-	box-shadow: 0 1px 1px rgba(0, 0, 0, 0.04);
-}
-
-.deploy-forge-latest-summary h2 {
-	margin: 0 0 15px;
-	font-size: 18px;
-	font-weight: 600;
-}
-
-.deploy-forge-summary-content {
-	display: flex;
-	justify-content: space-between;
-	gap: 30px;
-}
-
-.deploy-forge-summary-details {
-	flex: 1;
-}
-
-.deploy-forge-summary-details p {
-	margin: 10px 0;
-	line-height: 1.6;
-}
-
-.deploy-forge-summary-meta {
-	flex-shrink: 0;
-	text-align: right;
-	min-width: 200px;
-}
-
-.deploy-forge-summary-status {
-	margin-bottom: 15px;
-}
-
-.deploy-forge-summary-meta p {
-	margin: 10px 0;
-	line-height: 1.6;
-}
-
-/* Recent Deployments */
-.deploy-forge-recent {
-	margin-top: 20px;
-	background: #fff;
-	border: 1px solid #c3c4c7;
-	border-radius: 4px;
-	padding: 20px;
-	box-shadow: 0 1px 1px rgba(0, 0, 0, 0.04);
-}
-
-.deploy-forge-recent h2 {
-	margin: 0 0 15px;
-	font-size: 18px;
-	font-weight: 600;
-}
-
 /* Table Controls */
 .deploy-forge-table-controls {
 	display: flex;
@@ -355,23 +293,23 @@
 	margin: 0;
 }
 
-/* History Page */
-.deploy-forge-history .wp-list-table {
+/* Deployments Page */
+.deploy-forge-deployments .wp-list-table {
 	margin-top: 20px;
 }
 
-.deploy-forge-history .wp-list-table th,
-.deploy-forge-history .wp-list-table td {
+.deploy-forge-deployments .wp-list-table th,
+.deploy-forge-deployments .wp-list-table td {
 	vertical-align: middle;
 }
 
-.deploy-forge-history .dashicons-external {
+.deploy-forge-deployments .dashicons-external {
 	font-size: 16px;
 	text-decoration: none;
 	color: #2271b1;
 }
 
-.deploy-forge-history .dashicons-external:hover {
+.deploy-forge-deployments .dashicons-external:hover {
 	color: #135e96;
 }
 
@@ -395,14 +333,6 @@
 	grid-template-columns: repeat(2, 1fr);
 	}
 
-	.deploy-forge-summary-content {
-	flex-direction: column;
-	}
-
-	.deploy-forge-summary-meta {
-	text-align: left;
-	}
-
 	.deploy-forge-table-controls {
 	flex-direction: column;
 	}
@@ -411,12 +341,12 @@
 	max-width: 100%;
 	}
 
-	.deploy-forge-history .wp-list-table {
+	.deploy-forge-deployments .wp-list-table {
 	font-size: 13px;
 	}
 
-	.deploy-forge-history .wp-list-table th,
-	.deploy-forge-history .wp-list-table td {
+	.deploy-forge-deployments .wp-list-table th,
+	.deploy-forge-deployments .wp-list-table td {
 	padding: 8px 5px;
 	}
 }
