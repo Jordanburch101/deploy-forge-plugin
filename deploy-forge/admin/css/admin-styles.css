@@ -141,6 +141,27 @@
 	color: #00a32a;
 }
 
+.deploy-forge-repo-link {
+	color: #00a32a;
+	text-decoration: none;
+}
+
+.deploy-forge-repo-link:hover {
+	text-decoration: underline;
+}
+
+.deploy-forge-branch-badge {
+	display: inline-block;
+	background: #f0f0f1;
+	color: #50575e;
+	font-size: 12px;
+	font-weight: 400;
+	padding: 2px 8px;
+	border-radius: 3px;
+	margin-left: 8px;
+	vertical-align: middle;
+}
+
 .status-disconnected {
 	color: #d63638;
 	font-weight: 600;

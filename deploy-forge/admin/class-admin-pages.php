@@ -335,6 +335,8 @@ class Deploy_Forge_Admin_Pages extends Deploy_Forge_Ajax_Handler_Base {
 	public function render_deployments_page(): void {
 		$is_configured = $this->settings->is_configured();
 		$dashboard_url = $this->settings->get_backend_url() . '/dashboard';
+		$repo_name     = $this->settings->get_repo_full_name();
+		$branch        = $this->settings->get( 'github_branch', 'main' );
 
 		$per_page = 20;
 		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Pagination parameter, no sensitive action.

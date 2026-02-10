@@ -41,7 +41,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 					<div class="deploy-forge-connection-info">
 						<p class="status-connected">
 							<span class="dashicons dashicons-yes-alt"></span>
-							<?php esc_html_e( 'Connected to GitHub', 'deploy-forge' ); ?>
+							<a href="<?php echo esc_url( 'https://github.com/' . $repo_name ); ?>" target="_blank" class="deploy-forge-repo-link"><?php echo esc_html( $repo_name ); ?></a>
+							<span class="deploy-forge-branch-badge"><?php echo esc_html( $branch ); ?></span>
 						</p>
 					</div>
 					<div class="deploy-forge-header-actions">

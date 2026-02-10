@@ -4,7 +4,7 @@ Tags: deployment, github, theme, automation, ci-cd
 Requires at least: 5.8
 Tested up to: 6.9
 Requires PHP: 8.0
-Stable tag: 1.0.50
+Stable tag: 1.0.51
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -107,6 +107,9 @@ Yes, tokens are encrypted using sodium cryptography before storage.
 
 == Changelog ==
 
+= 1.0.51 =
+* Deployments header now shows repo name (linked to GitHub) and branch badge
+
 = 1.0.50 =
 * Fixed excessive spacing in changelog display in plugin update modal
 
@@ -148,6 +151,9 @@ Yes, tokens are encrypted using sodium cryptography before storage.
 * Admin interface
 
 == Upgrade Notice ==
+
+= 1.0.51 =
+Deployments header shows repo and branch at a glance.
 
 = 1.0.50 =
 Fixes changelog formatting in the plugin update details modal.

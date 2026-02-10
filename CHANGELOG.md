@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.51] - 2026-02-10
+
+### Changed
+- Deployments header now shows repo name (linked to GitHub) and branch badge instead of generic "Connected to GitHub"
+
 ## [1.0.50] - 2026-02-10
 
 ### Fixed
