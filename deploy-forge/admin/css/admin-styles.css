@@ -423,3 +423,139 @@
 	opacity: 0.5;
 	cursor: not-allowed;
 }
+
+/* ==========================================================================
+	File Changes Modal
+	========================================================================== */
+
+.deploy-forge-modal-wide {
+	max-width: 1000px;
+}
+
+.file-changes-summary-bar {
+	display: flex;
+	gap: 16px;
+	align-items: center;
+	padding: 12px 16px;
+	background: var(--df-bg-secondary);
+	border: 1px solid var(--df-border-secondary);
+	border-radius: var(--df-radius-md);
+	margin-bottom: 16px;
+	flex-wrap: wrap;
+}
+
+.change-count {
+	font-size: 13px;
+	font-weight: 600;
+}
+
+.change-count.modified {
+	color: #e65100;
+}
+
+.change-count.added {
+	color: #1b5e20;
+}
+
+.change-count.removed {
+	color: #b71c1c;
+}
+
+.change-count.total {
+	color: var(--df-text-secondary);
+	font-weight: 400;
+	margin-left: auto;
+}
+
+.change-badge {
+	display: inline-block;
+	padding: 3px 8px;
+	border-radius: var(--df-radius-sm);
+	font-size: 11px;
+	font-weight: 600;
+	text-transform: uppercase;
+}
+
+.badge-modified {
+	background: #fff3e0;
+	color: #e65100;
+}
+
+.badge-added {
+	background: #e8f5e9;
+	color: #1b5e20;
+}
+
+.badge-removed {
+	background: #ffebee;
+	color: #b71c1c;
+}
+
+.change-modified td:first-child {
+	border-left: 3px solid #ff9800;
+}
+
+.change-added td:first-child {
+	border-left: 3px solid #4caf50;
+}
+
+.change-removed td:first-child {
+	border-left: 3px solid #f44336;
+}
+
+/* ==========================================================================
+	Diff Viewer
+	========================================================================== */
+
+.file-diff-output {
+	background: #1e1e1e !important;
+	color: #d4d4d4;
+	font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+	font-size: 13px;
+	line-height: 1.5;
+	padding: 16px !important;
+	border-radius: var(--df-radius-md) !important;
+	border: 1px solid #333 !important;
+	max-height: 600px;
+	overflow: auto;
+	white-space: pre-wrap;
+	word-wrap: break-word;
+}
+
+.file-diff-output .diff-header {
+	color: #569cd6;
+	font-weight: 600;
+	display: block;
+}
+
+.file-diff-output .diff-hunk {
+	color: #c586c0;
+	display: block;
+	margin-top: 4px;
+}
+
+.file-diff-output .diff-add {
+	color: #6a9955;
+	background: rgba(106, 153, 85, 0.15);
+	display: block;
+}
+
+.file-diff-output .diff-remove {
+	color: #f44747;
+	background: rgba(244, 71, 71, 0.15);
+	display: block;
+}
+
+.file-diff-output .diff-context {
+	color: #808080;
+	display: block;
+}
+
+/* ==========================================================================
+	Button States
+	========================================================================== */
+
+.button-no-changes {
+	color: #1b5e20 !important;
+	border-color: #4caf50 !important;
+}

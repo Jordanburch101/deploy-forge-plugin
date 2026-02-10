@@ -4,7 +4,7 @@ Tags: deployment, github, theme, automation, ci-cd
 Requires at least: 5.8
 Tested up to: 6.9
 Requires PHP: 8.0
-Stable tag: 1.0.51
+Stable tag: 1.0.52
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -107,6 +107,17 @@ Yes, tokens are encrypted using sodium cryptography before storage.
 
 == Changelog ==
 
+= 1.0.52 =
+* Active deployment tracking — "Active" badge shows which deployment's files are live
+* File change detection — compare live theme files against the deployed state
+* Unified diff viewer for modified files with syntax-highlighted dark theme
+* Auto-detection of file drift on page load (cached in sessionStorage)
+* Active badge moves correctly on rollback
+* Automatic cleanup of old backup and snapshot files (keeps 10 most recent)
+* Fixed rollback creating nested theme directories
+* Fixed rollback not removing files added by newer deployments
+* XSS hardening in deployment details and connection test UI
+
 = 1.0.51 =
 * Deployments header now shows repo name (linked to GitHub) and branch badge
 
@@ -151,6 +162,9 @@ Yes, tokens are encrypted using sodium cryptography before storage.
 * Admin interface
 
 == Upgrade Notice ==
+
+= 1.0.52 =
+Active deployment tracking, file change detection with diff viewer, rollback fixes, and automatic backup cleanup.
 
 = 1.0.51 =
 Deployments header shows repo and branch at a glance.

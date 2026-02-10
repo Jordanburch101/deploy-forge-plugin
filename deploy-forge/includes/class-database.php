@@ -44,7 +44,7 @@ class Deploy_Forge_Database {
 	 * @since 1.0.0
 	 * @var string
 	 */
-	private const DB_VERSION = '1.1';
+	private const DB_VERSION = '1.2';
 
 	/**
 	 * Constructor.
@@ -167,6 +167,28 @@ class Deploy_Forge_Database {
 			if ( empty( $index_exists ) ) {
 				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 				$wpdb->query( "ALTER TABLE {$this->table_name} ADD INDEX remote_deployment_id (remote_deployment_id)" );
+			}
+		}
+
+		// Migration to 1.2: Add file manifest and snapshot columns.
+		if ( version_compare( $from_version, '1.2', '<' ) ) {
+			$columns_to_add = array(
+				'file_manifest' => 'longtext',
+				'snapshot_path' => 'varchar(500)',
+			);
+
+			foreach ( $columns_to_add as $column => $type ) {
+				$column_exists = $wpdb->get_results(
+					$wpdb->prepare(
+						"SHOW COLUMNS FROM {$this->table_name} LIKE %s",
+						$column
+					)
+				);
+
+				if ( empty( $column_exists ) ) {
+					// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+					$wpdb->query( "ALTER TABLE {$this->table_name} ADD COLUMN {$column} {$type}" );
+				}
 			}
 		}
 
@@ -529,6 +551,112 @@ class Deploy_Forge_Database {
 				$search,
 				$search,
 				$limit
+			)
+		);
+	}
+
+	/**
+	 * Get the active deployment ID.
+	 *
+	 * @since 1.0.52
+	 *
+	 * @return int The active deployment ID, or 0 if none.
+	 */
+	public function get_active_deployment_id(): int {
+		return (int) get_option( 'deploy_forge_active_deployment_id', 0 );
+	}
+
+	/**
+	 * Set the active deployment ID.
+	 *
+	 * @since 1.0.52
+	 *
+	 * @param int $id The deployment ID to mark as active.
+	 * @return bool True on success, false on failure.
+	 */
+	public function set_active_deployment_id( int $id ): bool {
+		return update_option( 'deploy_forge_active_deployment_id', $id );
+	}
+
+	/**
+	 * Get the active deployment record.
+	 *
+	 * @since 1.0.52
+	 *
+	 * @return object|null The deployment object or null if not found.
+	 */
+	public function get_active_deployment(): ?object {
+		$id = $this->get_active_deployment_id();
+
+		if ( ! $id ) {
+			return null;
+		}
+
+		return $this->get_deployment( $id );
+	}
+
+	/**
+	 * Get the previous successful deployment before a given ID.
+	 *
+	 * @since 1.0.52
+	 *
+	 * @param int $before_id Find the deployment before this ID.
+	 * @return object|null The deployment object or null if not found.
+	 */
+	public function get_previous_successful_deployment( int $before_id ): ?object {
+		global $wpdb;
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		$deployment = $wpdb->get_row(
+			$wpdb->prepare(
+				"SELECT * FROM {$this->table_name} WHERE id < %d AND status = 'success' ORDER BY id DESC LIMIT 1",
+				$before_id
+			)
+		);
+
+		return $deployment ?: null;
+	}
+
+	/**
+	 * Get deployments beyond a retention count that have files on disk.
+	 *
+	 * Returns deployments (ordered newest first) that are beyond the keep
+	 * threshold and have a backup_path or snapshot_path set.
+	 *
+	 * @since 1.0.52
+	 *
+	 * @param int $keep Number of most-recent deployments to retain files for.
+	 * @return array Array of deployment objects with id, backup_path, snapshot_path.
+	 */
+	public function get_deployments_with_expired_files( int $keep = 10 ): array {
+		global $wpdb;
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		return $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT id, backup_path, snapshot_path FROM {$this->table_name}
+				WHERE (backup_path IS NOT NULL AND backup_path != '') OR (snapshot_path IS NOT NULL AND snapshot_path != '')
+				ORDER BY id DESC
+				LIMIT 999999999 OFFSET %d",
+				$keep
+			)
+		);
+	}
+
+	/**
+	 * Clear file paths for a deployment after its ZIPs have been deleted.
+	 *
+	 * @since 1.0.52
+	 *
+	 * @param int $deployment_id The deployment ID.
+	 * @return void
+	 */
+	public function clear_deployment_file_paths( int $deployment_id ): void {
+		$this->update_deployment(
+			$deployment_id,
+			array(
+				'backup_path'   => '',
+				'snapshot_path' => '',
 			)
 		);
 	}

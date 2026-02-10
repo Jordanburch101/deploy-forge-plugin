@@ -20,6 +20,10 @@ if ( ! defined( 'WP_CONTENT_DIR' ) ) {
 	define( 'WP_CONTENT_DIR', ABSPATH . 'wp-content' );
 }
 
+if ( ! defined( 'MINUTE_IN_SECONDS' ) ) {
+	define( 'MINUTE_IN_SECONDS', 60 );
+}
+
 if ( ! defined( 'HOUR_IN_SECONDS' ) ) {
 	define( 'HOUR_IN_SECONDS', 3600 );
 }
@@ -30,7 +34,7 @@ if ( ! defined( 'DAY_IN_SECONDS' ) ) {
 
 // Define plugin constants.
 if ( ! defined( 'DEPLOY_FORGE_VERSION' ) ) {
-	define( 'DEPLOY_FORGE_VERSION', '1.0.51' );
+	define( 'DEPLOY_FORGE_VERSION', '1.0.52' );
 }
 
 if ( ! defined( 'DEPLOY_FORGE_PLUGIN_DIR' ) ) {

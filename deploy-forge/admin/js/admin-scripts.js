@@ -31,6 +31,7 @@
 			this.bindEvents();
 			this.initTableFilters();
 			this.autoRefresh();
+			this.autoCheckChanges();
 		},
 
 		/**
@@ -71,6 +72,12 @@
 
 			// Reset all data.
 			$( '#reset-all-data-btn' ).on( 'click', this.resetAllData.bind( this ) );
+
+			// Check changes.
+			$( '.check-changes-btn' ).on( 'click', this.checkChanges.bind( this ) );
+
+			// View diff (delegated for dynamically created buttons).
+			$( document ).on( 'click', '.view-diff-btn', this.viewFileDiff.bind( this ) );
 
 			// Close modal.
 			$( '.deploy-forge-modal-close' ).on( 'click', this.closeModal.bind( this ) );
@@ -257,10 +264,11 @@
 					nonce: deployForgeAdmin.nonce
 				},
 				success: ( response ) => {
+					const msg = GitHubDeployAdmin.escapeHtml( response.message || '' );
 					if ( response.success ) {
-						resultDiv.html( '<div class="notice notice-success"><p>' + response.message + '</p></div>' );
+						resultDiv.html( '<div class="notice notice-success"><p>' + msg + '</p></div>' );
 					} else {
-						resultDiv.html( '<div class="notice notice-error"><p>' + response.message + '</p></div>' );
+						resultDiv.html( '<div class="notice notice-error"><p>' + msg + '</p></div>' );
 					}
 				},
 				error: () => {
@@ -558,32 +566,33 @@
 				success: ( response ) => {
 					if ( response.success && response.data.deployment ) {
 						const d = response.data.deployment;
+						const esc = GitHubDeployAdmin.escapeHtml;
 						let html = '<table class="widefat">';
-						html += '<tr><th>Commit Hash</th><td><code>' + d.commit_hash + '</code></td></tr>';
-						html += '<tr><th>Message</th><td>' + ( d.commit_message || 'N/A' ) + '</td></tr>';
-						html += '<tr><th>Author</th><td>' + ( d.commit_author || 'N/A' ) + '</td></tr>';
-						html += '<tr><th>Status</th><td><span class="deployment-status status-' + d.status + '">' + d.status + '</span></td></tr>';
-						html += '<tr><th>Trigger Type</th><td>' + d.trigger_type + '</td></tr>';
-						html += '<tr><th>Created At</th><td>' + d.created_at + '</td></tr>';
+						html += '<tr><th>Commit Hash</th><td><code>' + esc( d.commit_hash ) + '</code></td></tr>';
+						html += '<tr><th>Message</th><td>' + esc( d.commit_message || 'N/A' ) + '</td></tr>';
+						html += '<tr><th>Author</th><td>' + esc( d.commit_author || 'N/A' ) + '</td></tr>';
+						html += '<tr><th>Status</th><td><span class="deployment-status status-' + esc( d.status ) + '">' + esc( d.status ) + '</span></td></tr>';
+						html += '<tr><th>Trigger Type</th><td>' + esc( d.trigger_type ) + '</td></tr>';
+						html += '<tr><th>Created At</th><td>' + esc( d.created_at ) + '</td></tr>';
 
 						if ( d.deployed_at ) {
-							html += '<tr><th>Deployed At</th><td>' + d.deployed_at + '</td></tr>';
+							html += '<tr><th>Deployed At</th><td>' + esc( d.deployed_at ) + '</td></tr>';
 						}
 
 						if ( d.build_url ) {
-							html += '<tr><th>Build URL</th><td><a href="' + d.build_url + '" target="_blank">' + d.build_url + '</a></td></tr>';
+							html += '<tr><th>Build URL</th><td><a href="' + esc( d.build_url ) + '" target="_blank">' + esc( d.build_url ) + '</a></td></tr>';
 						}
 
 						html += '</table>';
 
 						if ( d.deployment_logs ) {
 							html += '<h3>Deployment Logs</h3>';
-							html += '<pre>' + d.deployment_logs + '</pre>';
+							html += '<pre>' + esc( d.deployment_logs ) + '</pre>';
 						}
 
 						if ( d.error_message ) {
 							html += '<h3>Error Message</h3>';
-							html += '<pre>' + d.error_message + '</pre>';
+							html += '<pre>' + esc( d.error_message ) + '</pre>';
 						}
 
 						content.html( html );
@@ -1015,6 +1024,307 @@
 				// Show workflow field for GitHub Actions.
 				$workflowRow.show();
 			}
+		},
+
+		/**
+		 * Auto-check file changes on page load
+		 *
+		 * Checks sessionStorage for cached results (5 min TTL), otherwise
+		 * fires AJAX to check for file drift on the active deployment.
+		 *
+		 * @since 1.0.52
+		 * @return {void}
+		 */
+		autoCheckChanges: () => {
+			const activeId = deployForgeAdmin.activeDeploymentId;
+
+			if ( ! activeId || activeId <= 0 ) {
+				return;
+			}
+
+			const cacheKey = 'df_changes_' + activeId;
+			const cached = sessionStorage.getItem( cacheKey );
+
+			if ( cached ) {
+				try {
+					const data = JSON.parse( cached );
+					if ( data.timestamp && ( Date.now() - data.timestamp ) < 300000 ) {
+						GitHubDeployAdmin.updateDriftIndicator( activeId, data.changes );
+						return;
+					}
+				} catch ( e ) {
+					// Invalid cache, continue to fetch.
+				}
+			}
+
+			$.ajax( {
+				url: deployForgeAdmin.ajaxUrl,
+				type: 'POST',
+				data: {
+					action: 'deploy_forge_check_changes',
+					nonce: deployForgeAdmin.nonce,
+					deployment_id: activeId
+				},
+				success: ( response ) => {
+					if ( response.success && response.data.changes ) {
+						const changes = response.data.changes;
+						sessionStorage.setItem( cacheKey, JSON.stringify( {
+							changes: changes,
+							timestamp: Date.now()
+						} ) );
+						GitHubDeployAdmin.updateDriftIndicator( activeId, changes );
+					}
+				}
+			} );
+		},
+
+		/**
+		 * Update the drift indicator next to the Active badge
+		 *
+		 * @since 1.0.52
+		 * @param {number} deploymentId The deployment ID.
+		 * @param {Object} changes      The change report object.
+		 * @return {void}
+		 */
+		updateDriftIndicator: ( deploymentId, changes ) => {
+			const $indicator = $( '#drift-indicator-' + deploymentId );
+
+			if ( ! $indicator.length ) {
+				return;
+			}
+
+			if ( changes.has_changes ) {
+				const total = changes.modified_count + changes.added_count + changes.removed_count;
+				$indicator.text( total + ' ' + deployForgeAdmin.strings.changesDetected ).show();
+			}
+		},
+
+		/**
+		 * Check for file changes on a deployment
+		 *
+		 * @since 1.0.52
+		 * @param {Event} e Click event.
+		 * @return {void}
+		 */
+		checkChanges: ( e ) => {
+			e.preventDefault();
+
+			const button = $( e.target ).closest( 'button' );
+			const deploymentId = button.data( 'deployment-id' );
+			const originalText = button.text();
+
+			button.prop( 'disabled', true ).text( deployForgeAdmin.strings.checkingChanges );
+
+			$.ajax( {
+				url: deployForgeAdmin.ajaxUrl,
+				type: 'POST',
+				data: {
+					action: 'deploy_forge_check_changes',
+					nonce: deployForgeAdmin.nonce,
+					deployment_id: deploymentId,
+					force: 1
+				},
+				success: ( response ) => {
+					if ( response.success && response.data.changes ) {
+						const changes = response.data.changes;
+
+						// Update sessionStorage cache.
+						sessionStorage.setItem( 'df_changes_' + deploymentId, JSON.stringify( {
+							changes: changes,
+							timestamp: Date.now()
+						} ) );
+
+						if ( ! changes.has_changes ) {
+							button.text( deployForgeAdmin.strings.noChanges ).addClass( 'button-no-changes' );
+							setTimeout( () => {
+								button.text( originalText ).removeClass( 'button-no-changes' ).prop( 'disabled', false );
+							}, 3000 );
+							// Hide drift indicator.
+							$( '#drift-indicator-' + deploymentId ).hide();
+						} else {
+							button.text( originalText ).prop( 'disabled', false );
+							GitHubDeployAdmin.updateDriftIndicator( deploymentId, changes );
+							GitHubDeployAdmin.showChangesModal( deploymentId, changes );
+						}
+					} else {
+						alert( response.data?.message || 'Failed to check changes.' );
+						button.text( originalText ).prop( 'disabled', false );
+					}
+				},
+				error: () => {
+					alert( 'Failed to check changes.' );
+					button.text( originalText ).prop( 'disabled', false );
+				}
+			} );
+		},
+
+		/**
+		 * Show the file changes modal
+		 *
+		 * @since 1.0.52
+		 * @param {number} deploymentId The deployment ID.
+		 * @param {Object} changes      The change report object.
+		 * @return {void}
+		 */
+		showChangesModal: ( deploymentId, changes ) => {
+			const modal = $( '#file-changes-modal' );
+			const summary = $( '#file-changes-summary' );
+			const list = $( '#file-changes-list' );
+
+			// Build summary bar.
+			let summaryHtml = '';
+			if ( changes.modified_count > 0 ) {
+				summaryHtml += '<span class="change-count modified">' + changes.modified_count + ' modified</span>';
+			}
+			if ( changes.added_count > 0 ) {
+				summaryHtml += '<span class="change-count added">' + changes.added_count + ' added</span>';
+			}
+			if ( changes.removed_count > 0 ) {
+				summaryHtml += '<span class="change-count removed">' + changes.removed_count + ' removed</span>';
+			}
+			summaryHtml += '<span class="change-count total">' + changes.total_files + ' total files tracked</span>';
+			summary.html( summaryHtml );
+
+			// Build file list table.
+			let tableHtml = '<table class="wp-list-table widefat fixed striped">';
+			tableHtml += '<thead><tr><th>File</th><th>Type</th><th>Action</th></tr></thead><tbody>';
+
+			changes.modified.forEach( ( file ) => {
+				tableHtml += '<tr class="change-modified">';
+				tableHtml += '<td><code>' + GitHubDeployAdmin.escapeHtml( file.path ) + '</code></td>';
+				tableHtml += '<td><span class="change-badge badge-modified">Modified</span></td>';
+				tableHtml += '<td><button type="button" class="button button-small view-diff-btn" ' +
+					'data-deployment-id="' + deploymentId + '" ' +
+					'data-file-path="' + GitHubDeployAdmin.escapeHtml( file.path ) + '">View Diff</button></td>';
+				tableHtml += '</tr>';
+			} );
+
+			changes.added.forEach( ( file ) => {
+				tableHtml += '<tr class="change-added">';
+				tableHtml += '<td><code>' + GitHubDeployAdmin.escapeHtml( file.path ) + '</code></td>';
+				tableHtml += '<td><span class="change-badge badge-added">Added</span></td>';
+				tableHtml += '<td>' + GitHubDeployAdmin.formatFileSize( file.size ) + '</td>';
+				tableHtml += '</tr>';
+			} );
+
+			changes.removed.forEach( ( file ) => {
+				tableHtml += '<tr class="change-removed">';
+				tableHtml += '<td><code>' + GitHubDeployAdmin.escapeHtml( file.path ) + '</code></td>';
+				tableHtml += '<td><span class="change-badge badge-removed">Removed</span></td>';
+				tableHtml += '<td>File deleted</td>';
+				tableHtml += '</tr>';
+			} );
+
+			tableHtml += '</tbody></table>';
+			list.html( tableHtml );
+
+			modal.show();
+		},
+
+		/**
+		 * View file diff in modal
+		 *
+		 * @since 1.0.52
+		 * @param {Event} e Click event.
+		 * @return {void}
+		 */
+		viewFileDiff: ( e ) => {
+			e.preventDefault();
+
+			const button = $( e.target ).closest( 'button' );
+			const deploymentId = button.data( 'deployment-id' );
+			const filePath = button.data( 'file-path' );
+			const modal = $( '#file-diff-modal' );
+			const title = $( '#file-diff-title' );
+			const output = $( '#file-diff-content .file-diff-output' );
+
+			title.text( filePath );
+			output.html( deployForgeAdmin.strings.loadingDiff );
+			modal.show();
+
+			$.ajax( {
+				url: deployForgeAdmin.ajaxUrl,
+				type: 'POST',
+				data: {
+					action: 'deploy_forge_get_file_diff',
+					nonce: deployForgeAdmin.nonce,
+					deployment_id: deploymentId,
+					file_path: filePath
+				},
+				success: ( response ) => {
+					if ( response.success && response.data.diff ) {
+						output.html( GitHubDeployAdmin.syntaxHighlightDiff( response.data.diff.diff ) );
+					} else {
+						output.text( response.data?.message || 'Failed to load diff.' );
+					}
+				},
+				error: () => {
+					output.text( 'Failed to load diff.' );
+				}
+			} );
+		},
+
+		/**
+		 * Apply syntax highlighting to unified diff output
+		 *
+		 * @since 1.0.52
+		 * @param {string} diffText Raw unified diff text.
+		 * @return {string} HTML with syntax highlighting classes.
+		 */
+		syntaxHighlightDiff: ( diffText ) => {
+			if ( ! diffText ) {
+				return '<span class="diff-context">No differences found.</span>';
+			}
+
+			const lines = diffText.split( '\n' );
+			let html = '';
+
+			lines.forEach( ( line ) => {
+				const escaped = GitHubDeployAdmin.escapeHtml( line );
+
+				if ( line.startsWith( '---' ) || line.startsWith( '+++' ) ) {
+					html += '<span class="diff-header">' + escaped + '</span>';
+				} else if ( line.startsWith( '@@' ) ) {
+					html += '<span class="diff-hunk">' + escaped + '</span>';
+				} else if ( line.startsWith( '+' ) ) {
+					html += '<span class="diff-add">' + escaped + '</span>';
+				} else if ( line.startsWith( '-' ) ) {
+					html += '<span class="diff-remove">' + escaped + '</span>';
+				} else {
+					html += '<span class="diff-context">' + escaped + '</span>';
+				}
+			} );
+
+			return html;
+		},
+
+		/**
+		 * Escape HTML entities
+		 *
+		 * @since 1.0.52
+		 * @param {string} text Text to escape.
+		 * @return {string} Escaped text.
+		 */
+		escapeHtml: ( text ) => {
+			const div = document.createElement( 'div' );
+			div.appendChild( document.createTextNode( text ) );
+			return div.innerHTML.replace( /"/g, '&quot;' ).replace( /'/g, '&#39;' );
+		},
+
+		/**
+		 * Format file size to human-readable string
+		 *
+		 * @since 1.0.52
+		 * @param {number} bytes File size in bytes.
+		 * @return {string} Formatted size string.
+		 */
+		formatFileSize: ( bytes ) => {
+			if ( bytes < 1024 ) {
+				return bytes + ' B';
+			} else if ( bytes < 1048576 ) {
+				return ( bytes / 1024 ).toFixed( 1 ) + ' KB';
+			}
+			return ( bytes / 1048576 ).toFixed( 1 ) + ' MB';
 		},
 
 		/**

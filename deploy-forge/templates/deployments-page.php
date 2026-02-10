@@ -108,6 +108,11 @@ if ( ! defined( 'ABSPATH' ) ) {
 							<span class="deployment-status status-<?php echo esc_attr( $deploy_forge_deployment->status ); ?>">
 								<?php echo esc_html( ucfirst( str_replace( '_', ' ', $deploy_forge_deployment->status ) ) ); ?>
 							</span>
+							<?php if ( (int) $deploy_forge_deployment->id === $active_deployment_id ) : ?>
+								<span class="deployment-active-badge"><?php esc_html_e( 'Active', 'deploy-forge' ); ?></span>
+								<span id="drift-indicator-<?php echo esc_attr( $deploy_forge_deployment->id ); ?>"
+									class="deployment-drift-indicator" style="display:none;"></span>
+							<?php endif; ?>
 						</td>
 						<td><?php echo esc_html( ucfirst( $deploy_forge_deployment->trigger_type ) ); ?></td>
 						<td>
@@ -115,6 +120,12 @@ if ( ! defined( 'ABSPATH' ) ) {
 								data-deployment-id="<?php echo esc_attr( $deploy_forge_deployment->id ); ?>">
 								<?php esc_html_e( 'Details', 'deploy-forge' ); ?>
 							</button>
+							<?php if ( (int) $deploy_forge_deployment->id === $active_deployment_id && ! empty( $deploy_forge_deployment->file_manifest ) ) : ?>
+								<button type="button" class="button button-small check-changes-btn"
+									data-deployment-id="<?php echo esc_attr( $deploy_forge_deployment->id ); ?>">
+									<?php esc_html_e( 'Check Changes', 'deploy-forge' ); ?>
+								</button>
+							<?php endif; ?>
 							<?php if ( 'success' === $deploy_forge_deployment->status && ! empty( $deploy_forge_deployment->backup_path ) ) : ?>
 								<button type="button" class="button button-small rollback-btn"
 									data-deployment-id="<?php echo esc_attr( $deploy_forge_deployment->id ); ?>">
@@ -171,6 +182,27 @@ if ( ! defined( 'ABSPATH' ) ) {
 		<h2><?php esc_html_e( 'Deployment Details', 'deploy-forge' ); ?></h2>
 		<div id="deployment-details-content">
 			<p><?php esc_html_e( 'Loading...', 'deploy-forge' ); ?></p>
+		</div>
+	</div>
+</div>
+
+<!-- File Changes Modal -->
+<div id="file-changes-modal" class="deploy-forge-modal" style="display: none;">
+	<div class="deploy-forge-modal-content deploy-forge-modal-wide">
+		<span class="deploy-forge-modal-close">&times;</span>
+		<h2><?php esc_html_e( 'File Changes Detected', 'deploy-forge' ); ?></h2>
+		<div id="file-changes-summary" class="file-changes-summary-bar"></div>
+		<div id="file-changes-list"></div>
+	</div>
+</div>
+
+<!-- File Diff Modal -->
+<div id="file-diff-modal" class="deploy-forge-modal" style="display: none;">
+	<div class="deploy-forge-modal-content deploy-forge-modal-wide">
+		<span class="deploy-forge-modal-close">&times;</span>
+		<h2 id="file-diff-title"><?php esc_html_e( 'File Diff', 'deploy-forge' ); ?></h2>
+		<div id="file-diff-content">
+			<pre class="file-diff-output"></pre>
 		</div>
 	</div>
 </div>

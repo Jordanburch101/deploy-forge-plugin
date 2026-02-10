@@ -118,6 +118,10 @@ class Deploy_Forge_Admin_Pages extends Deploy_Forge_Ajax_Handler_Base {
 		add_action( 'wp_ajax_deploy_forge_get_logs', array( $this, 'ajax_get_logs' ) );
 		add_action( 'wp_ajax_deploy_forge_clear_logs', array( $this, 'ajax_clear_logs' ) );
 
+		// File change detection AJAX handlers.
+		add_action( 'wp_ajax_deploy_forge_check_changes', array( $this, 'ajax_check_changes' ) );
+		add_action( 'wp_ajax_deploy_forge_get_file_diff', array( $this, 'ajax_get_file_diff' ) );
+
 		// Deploy Forge platform connection AJAX handlers.
 		add_action( 'wp_ajax_deploy_forge_connect', array( $this, 'ajax_connect' ) );
 		add_action( 'wp_ajax_deploy_forge_disconnect', array( $this, 'ajax_disconnect' ) );
@@ -261,15 +265,20 @@ class Deploy_Forge_Admin_Pages extends Deploy_Forge_Ajax_Handler_Base {
 			'deploy-forge-admin',
 			'deployForgeAdmin',
 			array(
-				'ajaxUrl' => admin_url( 'admin-ajax.php' ),
-				'nonce'   => wp_create_nonce( 'deploy_forge_admin' ),
-				'strings' => array(
+				'ajaxUrl'            => admin_url( 'admin-ajax.php' ),
+				'nonce'              => wp_create_nonce( 'deploy_forge_admin' ),
+				'activeDeploymentId' => $this->database->get_active_deployment_id(),
+				'strings'            => array(
 					'confirmRollback' => __( 'Are you sure you want to rollback to this deployment? This will restore the previous theme files.', 'deploy-forge' ),
 					'confirmDeploy'   => __( 'Are you sure you want to start a deployment?', 'deploy-forge' ),
 					'confirmCancel'   => __( 'Are you sure you want to cancel this deployment? The GitHub Actions workflow will be stopped.', 'deploy-forge' ),
 					'deploying'       => __( 'Deploying...', 'deploy-forge' ),
 					'testing'         => __( 'Testing connection...', 'deploy-forge' ),
 					'cancelling'      => __( 'Cancelling...', 'deploy-forge' ),
+					'checkingChanges' => __( 'Checking...', 'deploy-forge' ),
+					'noChanges'       => __( 'No changes', 'deploy-forge' ),
+					'changesDetected' => __( 'changes detected', 'deploy-forge' ),
+					'loadingDiff'     => __( 'Loading diff...', 'deploy-forge' ),
 				),
 			)
 		);
@@ -345,6 +354,7 @@ class Deploy_Forge_Admin_Pages extends Deploy_Forge_Ajax_Handler_Base {
 		$deploy_forge_deployments = $this->database->get_recent_deployments( $per_page, $offset );
 		$total_deployments        = $this->database->get_deployment_count();
 		$total_pages              = ceil( $total_deployments / $per_page );
+		$active_deployment_id     = $this->database->get_active_deployment_id();
 
 		include DEPLOY_FORGE_PLUGIN_DIR . 'templates/deployments-page.php';
 	}
@@ -828,6 +838,70 @@ class Deploy_Forge_Admin_Pages extends Deploy_Forge_Ajax_Handler_Base {
 		} else {
 			$this->send_error( __( 'Failed to clear logs', 'deploy-forge' ) );
 		}
+	}
+
+	/**
+	 * AJAX: Check for file changes on the active deployment.
+	 *
+	 * Compares the live theme files against the deployed file manifest.
+	 *
+	 * @since 1.0.52
+	 *
+	 * @return void
+	 */
+	public function ajax_check_changes(): void {
+		$this->verify_ajax_request( 'deploy_forge_admin' );
+
+		$deployment_id = $this->get_post_int( 'deployment_id' );
+
+		if ( ! $deployment_id ) {
+			$deployment_id = $this->database->get_active_deployment_id();
+		}
+
+		if ( ! $deployment_id ) {
+			$this->send_error( __( 'No active deployment found', 'deploy-forge' ) );
+			return;
+		}
+
+		$force   = $this->get_post_bool( 'force' );
+		$changes = $this->deployment_manager->detect_file_changes( $deployment_id, $force );
+
+		if ( false === $changes ) {
+			$this->send_error( __( 'Unable to check changes. No file manifest available for this deployment.', 'deploy-forge' ) );
+			return;
+		}
+
+		$this->send_success( array( 'changes' => $changes ) );
+	}
+
+	/**
+	 * AJAX: Get unified diff for a specific file.
+	 *
+	 * Returns the diff between the deployed and current live version of a file.
+	 *
+	 * @since 1.0.52
+	 *
+	 * @return void
+	 */
+	public function ajax_get_file_diff(): void {
+		$this->verify_ajax_request( 'deploy_forge_admin' );
+
+		$deployment_id = $this->get_post_int( 'deployment_id' );
+		$file_path     = $this->get_post_param( 'file_path' );
+
+		if ( ! $deployment_id || empty( $file_path ) ) {
+			$this->send_error( __( 'Missing deployment ID or file path', 'deploy-forge' ) );
+			return;
+		}
+
+		$diff_data = $this->deployment_manager->get_file_diff( $deployment_id, $file_path );
+
+		if ( false === $diff_data ) {
+			$this->send_error( __( 'Unable to generate diff for this file', 'deploy-forge' ) );
+			return;
+		}
+
+		$this->send_success( array( 'diff' => $diff_data ) );
 	}
 
 	/**

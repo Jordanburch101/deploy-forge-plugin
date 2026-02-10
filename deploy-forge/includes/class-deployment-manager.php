@@ -1536,14 +1536,27 @@ class Deploy_Forge_Deployment_Manager {
 
 		$this->logger->log_deployment_step( $deployment_id, 'Cleanup Complete', 'success' );
 
-		// Update deployment as successful.
-		$this->database->update_deployment(
-			$deployment_id,
-			array(
-				'status'      => 'success',
-				'deployed_at' => current_time( 'mysql' ),
-			)
+		// Generate file manifest from freshly deployed theme.
+		$file_manifest = $this->generate_file_manifest( $target_theme_path );
+
+		// Create post-deployment snapshot.
+		$snapshot_path = $this->create_deployment_snapshot( $deployment_id );
+
+		// Update deployment as successful with manifest and snapshot.
+		$update_data = array(
+			'status'        => 'success',
+			'deployed_at'   => current_time( 'mysql' ),
+			'file_manifest' => wp_json_encode( $file_manifest ),
 		);
+
+		if ( $snapshot_path ) {
+			$update_data['snapshot_path'] = $snapshot_path;
+		}
+
+		$this->database->update_deployment( $deployment_id, $update_data );
+
+		// Set this deployment as the active one.
+		$this->database->set_active_deployment_id( $deployment_id );
 
 		// Release deployment lock.
 		$this->database->release_deployment_lock();
@@ -1556,6 +1569,9 @@ class Deploy_Forge_Deployment_Manager {
 
 		// Trigger action hook.
 		do_action( 'deploy_forge_completed', $deployment_id );
+
+		// Clean up old backup and snapshot files beyond retention limit.
+		$this->cleanup_old_deployment_files();
 	}
 
 	/**
@@ -1711,8 +1727,21 @@ class Deploy_Forge_Deployment_Manager {
 		}
 		$zip->close();
 
+		// The backup ZIP stores files under the theme slug directory (e.g. my-theme/style.css).
+		// After extraction, use the inner directory as the copy source to avoid nesting.
+		$inner_dir = $temp_extract_dir . '/' . basename( $theme_path );
+		if ( is_dir( $inner_dir ) ) {
+			$copy_source = $inner_dir;
+		} else {
+			$copy_source = $temp_extract_dir;
+		}
+
+		// Clear existing theme directory before restoring backup to remove files added by newer deployments.
+		$this->recursive_delete( $theme_path );
+		wp_mkdir_p( $theme_path );
+
 		// Copy files back using native PHP.
-		$copy_result = $this->recursive_copy( $temp_extract_dir, $theme_path );
+		$copy_result = $this->recursive_copy( $copy_source, $theme_path );
 
 		if ( ! $copy_result ) {
 			$this->logger->error( 'Deployment', 'Failed to copy rollback files' );
@@ -1729,6 +1758,25 @@ class Deploy_Forge_Deployment_Manager {
 				'status' => 'rolled_back',
 			)
 		);
+
+		// Update active deployment tracking.
+		$previous = $this->database->get_previous_successful_deployment( $deployment_id );
+
+		if ( $previous ) {
+			// Generate a fresh manifest from the restored theme files.
+			$fresh_manifest = $this->generate_file_manifest( $theme_path );
+
+			$this->database->update_deployment(
+				(int) $previous->id,
+				array(
+					'file_manifest' => wp_json_encode( $fresh_manifest ),
+				)
+			);
+
+			$this->database->set_active_deployment_id( (int) $previous->id );
+		} else {
+			$this->database->set_active_deployment_id( 0 );
+		}
 
 		do_action( 'deploy_forge_rolled_back', $deployment_id );
 
@@ -2113,6 +2161,352 @@ class Deploy_Forge_Deployment_Manager {
 	}
 
 	/**
+	 * Generate a file manifest for a directory.
+	 *
+	 * Creates a hash map of all files in the directory with their SHA-256 hash and size.
+	 *
+	 * @since 1.0.52
+	 *
+	 * @param string $directory The directory to scan.
+	 * @return array Associative array of relative_path => { hash, size }.
+	 */
+	private function generate_file_manifest( string $directory ): array {
+		$manifest = array();
+
+		if ( ! is_dir( $directory ) ) {
+			return $manifest;
+		}
+
+		/**
+		 * Recursive iterator.
+		 *
+		 * @var \RecursiveIteratorIterator $iterator
+		 * @noinspection PhpUndefinedClassInspection
+		 */
+		$iterator = new RecursiveIteratorIterator(
+			// phpcs:ignore -- RecursiveDirectoryIterator is a PHP built-in class.
+			new RecursiveDirectoryIterator($directory, RecursiveDirectoryIterator::SKIP_DOTS),
+			RecursiveIteratorIterator::LEAVES_ONLY
+		);
+
+		foreach ( $iterator as $file ) {
+			if ( ! $file->isFile() ) {
+				continue;
+			}
+
+			$relative_path = str_replace( $directory . DIRECTORY_SEPARATOR, '', $file->getPathname() );
+			// Normalize path separators.
+			$relative_path = str_replace( '\\', '/', $relative_path );
+
+			$manifest[ $relative_path ] = array(
+				'hash' => hash_file( 'sha256', $file->getRealPath() ),
+				'size' => $file->getSize(),
+			);
+		}
+
+		return $manifest;
+	}
+
+	/**
+	 * Create a post-deployment snapshot ZIP of the theme.
+	 *
+	 * @since 1.0.52
+	 *
+	 * @param int $deployment_id The deployment ID.
+	 * @return string|false Path to snapshot file on success, false on failure.
+	 */
+	private function create_deployment_snapshot( int $deployment_id ): string|false {
+		$theme_path        = $this->settings->get_theme_path();
+		$backup_dir        = $this->settings->get_backup_directory();
+		$snapshot_filename = 'snapshot-' . $deployment_id . '-' . time() . '.zip';
+		$snapshot_path     = $backup_dir . '/' . $snapshot_filename;
+
+		if ( ! is_dir( $backup_dir ) ) {
+			if ( ! wp_mkdir_p( $backup_dir ) ) {
+				$this->logger->error( 'Deployment', "Failed to create backup directory for snapshot: {$backup_dir}" );
+				return false;
+			}
+		}
+
+		if ( ! is_dir( $theme_path ) ) {
+			$this->logger->error( 'Deployment', "Theme directory does not exist for snapshot: {$theme_path}" );
+			return false;
+		}
+
+		if ( ! class_exists( 'ZipArchive' ) ) {
+			$this->logger->error( 'Deployment', 'ZipArchive class not available for snapshot' );
+			return false;
+		}
+
+		/**
+		 * ZipArchive instance.
+		 *
+		 * @var \ZipArchive $zip
+		 * @noinspection PhpUndefinedClassInspection
+		 */
+		$zip = new ZipArchive();
+		// phpcs:ignore -- ZipArchive::open() is a PHP built-in method.
+		if (true === $zip->open($snapshot_path, ZipArchive::CREATE)) {
+			$this->add_directory_to_zip( $zip, $theme_path, basename( $theme_path ) );
+			$zip->close();
+			return $snapshot_path;
+		}
+
+		$this->logger->error( 'Deployment', 'Failed to create snapshot ZIP file' );
+		return false;
+	}
+
+	/**
+	 * Extract a single file from a ZIP archive.
+	 *
+	 * @since 1.0.52
+	 *
+	 * @param string $zip_path  Path to the ZIP file.
+	 * @param string $file_path Relative file path within the ZIP (without theme prefix).
+	 * @return string|null File contents or null on failure.
+	 */
+	private function extract_file_from_zip( string $zip_path, string $file_path ): ?string {
+		if ( ! file_exists( $zip_path ) || ! class_exists( 'ZipArchive' ) ) {
+			return null;
+		}
+
+		/**
+		 * ZipArchive instance.
+		 *
+		 * @var \ZipArchive $zip
+		 * @noinspection PhpUndefinedClassInspection
+		 */
+		$zip = new ZipArchive();
+		if ( true !== $zip->open( $zip_path ) ) {
+			return null;
+		}
+
+		// The snapshot stores files under the theme folder name.
+		$theme_slug = basename( $this->settings->get_theme_path() );
+		$zip_file   = $theme_slug . '/' . $file_path;
+		$contents   = $zip->getFromName( $zip_file );
+		$zip->close();
+
+		return false !== $contents ? $contents : null;
+	}
+
+	/**
+	 * Generate a unified diff between two strings.
+	 *
+	 * Uses WordPress core's Text_Diff library.
+	 *
+	 * @since 1.0.52
+	 *
+	 * @param string $original   Original file contents.
+	 * @param string $modified   Modified file contents.
+	 * @param string $label_orig Label for the original file.
+	 * @param string $label_mod  Label for the modified file.
+	 * @return string Unified diff output.
+	 */
+	private function generate_unified_diff( string $original, string $modified, string $label_orig, string $label_mod ): string {
+		if ( ! class_exists( 'Text_Diff', false ) ) {
+			require_once ABSPATH . WPINC . '/Text/Diff.php';
+			require_once ABSPATH . WPINC . '/Text/Diff/Renderer.php';
+			require_once ABSPATH . WPINC . '/Text/Diff/Renderer/unified.php';
+		}
+
+		$original_lines = explode( "\n", $original );
+		$modified_lines = explode( "\n", $modified );
+
+		$diff                              = new \Text_Diff( 'auto', array( $original_lines, $modified_lines ) );
+		$renderer                          = new \Text_Diff_Renderer_unified();
+		$renderer->_leading_context_lines  = 3;
+		$renderer->_trailing_context_lines = 3;
+
+		$output = $renderer->render( $diff );
+
+		return "--- {$label_orig}\n+++ {$label_mod}\n" . $output;
+	}
+
+	/**
+	 * Detect file changes between the deployed state and the live theme directory.
+	 *
+	 * @since 1.0.52
+	 *
+	 * @param int  $deployment_id The deployment ID to check against.
+	 * @param bool $force         Whether to bypass the transient cache.
+	 * @return array|false Change report or false on failure.
+	 */
+	public function detect_file_changes( int $deployment_id, bool $force = false ): array|false {
+		$cache_key = 'deploy_forge_changes_' . $deployment_id;
+
+		if ( ! $force ) {
+			$cached = get_transient( $cache_key );
+			if ( false !== $cached ) {
+				return $cached;
+			}
+		}
+
+		$deployment = $this->database->get_deployment( $deployment_id );
+
+		if ( ! $deployment || empty( $deployment->file_manifest ) ) {
+			return false;
+		}
+
+		$stored_manifest = json_decode( $deployment->file_manifest, true );
+
+		if ( ! is_array( $stored_manifest ) ) {
+			return false;
+		}
+
+		$theme_path       = $this->settings->get_theme_path();
+		$current_manifest = $this->generate_file_manifest( $theme_path );
+
+		$modified = array();
+		$added    = array();
+		$removed  = array();
+
+		// Check for modified and removed files.
+		foreach ( $stored_manifest as $path => $info ) {
+			if ( ! isset( $current_manifest[ $path ] ) ) {
+				$removed[] = array(
+					'path' => $path,
+					'size' => $info['size'],
+				);
+			} elseif ( $current_manifest[ $path ]['hash'] !== $info['hash'] ) {
+				$modified[] = array(
+					'path'          => $path,
+					'original_size' => $info['size'],
+					'current_size'  => $current_manifest[ $path ]['size'],
+				);
+			}
+		}
+
+		// Check for added files.
+		foreach ( $current_manifest as $path => $info ) {
+			if ( ! isset( $stored_manifest[ $path ] ) ) {
+				$added[] = array(
+					'path' => $path,
+					'size' => $info['size'],
+				);
+			}
+		}
+
+		$has_changes = ! empty( $modified ) || ! empty( $added ) || ! empty( $removed );
+
+		$result = array(
+			'has_changes'    => $has_changes,
+			'modified_count' => count( $modified ),
+			'added_count'    => count( $added ),
+			'removed_count'  => count( $removed ),
+			'modified'       => $modified,
+			'added'          => $added,
+			'removed'        => $removed,
+			'total_files'    => count( $stored_manifest ),
+			'checked_at'     => current_time( 'mysql' ),
+		);
+
+		set_transient( $cache_key, $result, 5 * MINUTE_IN_SECONDS );
+
+		return $result;
+	}
+
+	/**
+	 * Get a unified diff for a specific file between deployed state and live.
+	 *
+	 * @since 1.0.52
+	 *
+	 * @param int    $deployment_id The deployment ID.
+	 * @param string $file_path     Relative path of the file.
+	 * @return array|false Diff data or false on failure.
+	 */
+	public function get_file_diff( int $deployment_id, string $file_path ): array|false {
+		// Security: reject path traversal, null bytes, and absolute paths.
+		if ( false !== strpos( $file_path, '..' ) || false !== strpos( $file_path, "\0" ) || str_starts_with( $file_path, '/' ) || str_starts_with( $file_path, '\\' ) ) {
+			return false;
+		}
+
+		// Whitelist of text file extensions that can be diffed.
+		$allowed_extensions = array(
+			'php',
+			'css',
+			'js',
+			'html',
+			'htm',
+			'json',
+			'xml',
+			'yml',
+			'yaml',
+			'md',
+			'txt',
+			'scss',
+			'sass',
+			'less',
+			'ts',
+			'tsx',
+			'jsx',
+			'svg',
+			'twig',
+			'hbs',
+			'mustache',
+			'ini',
+			'conf',
+			'cfg',
+			'env',
+			'lock',
+			'map',
+			'pot',
+			'po',
+		);
+
+		$extension = strtolower( pathinfo( $file_path, PATHINFO_EXTENSION ) );
+		if ( ! in_array( $extension, $allowed_extensions, true ) ) {
+			return false;
+		}
+
+		$deployment = $this->database->get_deployment( $deployment_id );
+
+		if ( ! $deployment || empty( $deployment->snapshot_path ) ) {
+			return false;
+		}
+
+		// Get original from snapshot.
+		$original_content = $this->extract_file_from_zip( $deployment->snapshot_path, $file_path );
+		$original_exists  = null !== $original_content;
+
+		if ( ! $original_exists ) {
+			$original_content = '';
+		}
+
+		// Get current live file.
+		$theme_path     = $this->settings->get_theme_path();
+		$live_file_path = $theme_path . '/' . $file_path;
+		$current_exists = file_exists( $live_file_path );
+
+		// Verify the resolved path is within the theme directory (defense in depth).
+		if ( $current_exists ) {
+			$real_path       = realpath( $live_file_path );
+			$real_theme_path = realpath( $theme_path );
+
+			if ( false === $real_path || false === $real_theme_path || 0 !== strpos( $real_path, $real_theme_path ) ) {
+				return false;
+			}
+		}
+
+		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Reading local file, not a remote URL.
+		$current_content = $current_exists ? file_get_contents( $live_file_path ) : '';
+
+		$diff = $this->generate_unified_diff(
+			$original_content,
+			$current_content,
+			'a/' . $file_path,
+			'b/' . $file_path
+		);
+
+		return array(
+			'file_path'       => $file_path,
+			'diff'            => $diff,
+			'original_exists' => $original_exists,
+			'current_exists'  => $current_exists,
+		);
+	}
+
+	/**
 	 * Log deployment message.
 	 *
 	 * @since 1.0.0
@@ -2364,5 +2758,63 @@ class Deploy_Forge_Deployment_Manager {
 			$this->report_status_to_backend( $deployment_id, false, $error_message );
 			$this->database->release_deployment_lock();
 		}
+	}
+
+	/**
+	 * Clean up old deployment files (backups and snapshots) beyond the retention limit.
+	 *
+	 * Keeps the most recent $keep deployments' files and deletes older ZIPs from disk.
+	 * Called after each successful deployment to prevent unbounded disk growth.
+	 *
+	 * @since 1.0.52
+	 *
+	 * @param int $keep Number of most-recent deployments to retain files for.
+	 * @return int Number of files deleted.
+	 */
+	private function cleanup_old_deployment_files( int $keep = 10 ): int {
+		$expired = $this->database->get_deployments_with_expired_files( $keep );
+
+		if ( empty( $expired ) ) {
+			return 0;
+		}
+
+		$backup_dir = realpath( $this->settings->get_backup_directory() );
+		if ( ! $backup_dir ) {
+			return 0;
+		}
+
+		$deleted = 0;
+
+		foreach ( $expired as $deployment ) {
+			$has_files = false;
+
+			if ( ! empty( $deployment->backup_path ) && file_exists( $deployment->backup_path ) ) {
+				$real = realpath( $deployment->backup_path );
+				if ( $real && str_starts_with( $real, $backup_dir . DIRECTORY_SEPARATOR ) ) {
+					wp_delete_file( $deployment->backup_path );
+					$has_files = true;
+					++$deleted;
+				}
+			}
+
+			if ( ! empty( $deployment->snapshot_path ) && file_exists( $deployment->snapshot_path ) ) {
+				$real = realpath( $deployment->snapshot_path );
+				if ( $real && str_starts_with( $real, $backup_dir . DIRECTORY_SEPARATOR ) ) {
+					wp_delete_file( $deployment->snapshot_path );
+					$has_files = true;
+					++$deleted;
+				}
+			}
+
+			if ( $has_files ) {
+				$this->database->clear_deployment_file_paths( (int) $deployment->id );
+			}
+		}
+
+		if ( $deleted > 0 ) {
+			$this->logger->log( 'Deployment', "Cleaned up {$deleted} old deployment file(s)" );
+		}
+
+		return $deleted;
 	}
 }

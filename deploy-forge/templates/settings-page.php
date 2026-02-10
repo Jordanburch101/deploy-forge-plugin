@@ -121,7 +121,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 					<td>
 						<label>
 							<input type="checkbox" name="create_backups" value="1" <?php checked( $current_settings['create_backups'] ); ?>>
-							<?php esc_html_e( 'Create a backup before each deployment (recommended)', 'deploy-forge' ); ?>
+							<?php esc_html_e( 'Create a backup before each deployment (recommended). Only the 10 most recent backups are kept; older files are automatically deleted.', 'deploy-forge' ); ?>
 						</label>
 					</td>
 				</tr>
