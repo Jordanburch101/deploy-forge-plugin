@@ -1,0 +1,218 @@
+name: WordPress Integration Test
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  integration:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        php-version: ['8.0', '8.1', '8.2']
+        wp-version: ['6.4', 'latest']
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: wordpress
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping --silent"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    env:
+      WP_DB_NAME: wordpress
+      WP_DB_USER: root
+      WP_DB_PASS: root
+      WP_DB_HOST: 127.0.0.1
+      WP_URL: http://localhost:8080
+      WP_TITLE: "Test Site"
+      WP_ADMIN_USER: admin
+      WP_ADMIN_PASS: admin123
+      WP_ADMIN_EMAIL: admin@example.com
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup PHP ${{ matrix.php-version }}
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php-version }}
+          extensions: mysqli, zip, sodium
+          coverage: none
+
+      - name: Install WP-CLI
+        run: |
+          curl -O https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar
+          chmod +x wp-cli.phar
+          sudo mv wp-cli.phar /usr/local/bin/wp
+          wp --info
+
+      - name: Install WordPress ${{ matrix.wp-version }}
+        run: |
+          mkdir -p /tmp/wordpress
+          cd /tmp/wordpress
+
+          wp core download --version=${{ matrix.wp-version }}
+
+          wp config create \
+            --dbname=$WP_DB_NAME \
+            --dbuser=$WP_DB_USER \
+            --dbpass=$WP_DB_PASS \
+            --dbhost=$WP_DB_HOST
+
+          wp core install \
+            --url=$WP_URL \
+            --title="$WP_TITLE" \
+            --admin_user=$WP_ADMIN_USER \
+            --admin_password=$WP_ADMIN_PASS \
+            --admin_email=$WP_ADMIN_EMAIL \
+            --skip-email
+
+          echo "WordPress installed successfully"
+          wp core version
+
+      - name: Install plugin
+        run: |
+          # Copy plugin to WordPress plugins directory
+          cp -r deploy-forge /tmp/wordpress/wp-content/plugins/deploy-forge
+
+          # Verify plugin is detected
+          wp plugin list --path=/tmp/wordpress
+          wp plugin list --path=/tmp/wordpress | grep deploy-forge
+
+      - name: Activate plugin
+        run: |
+          wp plugin activate deploy-forge --path=/tmp/wordpress
+          echo "Plugin activated successfully"
+
+          # Verify it's active
+          ACTIVE=$(wp plugin list --status=active --field=name --path=/tmp/wordpress | grep deploy-forge)
+          if [ -z "$ACTIVE" ]; then
+            echo "FAIL: Plugin is not active after activation"
+            exit 1
+          fi
+          echo "Confirmed: deploy-forge is active"
+
+      - name: Check for PHP errors in error log
+        run: |
+          # Enable error logging
+          wp config set WP_DEBUG true --raw --path=/tmp/wordpress
+          wp config set WP_DEBUG_LOG true --raw --path=/tmp/wordpress
+
+          # Load WordPress once to trigger any init errors
+          wp eval "echo 'WordPress loaded successfully';" --path=/tmp/wordpress
+
+          # Check for fatal errors / warnings in debug.log
+          LOG_FILE="/tmp/wordpress/wp-content/debug.log"
+          if [ -f "$LOG_FILE" ]; then
+            echo "=== debug.log contents ==="
+            cat "$LOG_FILE"
+            echo "=========================="
+
+            # Fail on fatal errors or deploy-forge-related warnings
+            if grep -iE "(Fatal error|Parse error)" "$LOG_FILE"; then
+              echo "FAIL: Fatal/parse errors found"
+              exit 1
+            fi
+
+            if grep -i "deploy.forge" "$LOG_FILE" | grep -iE "(Warning|Notice|Deprecated)" ; then
+              echo "WARN: Plugin-related warnings found (non-fatal)"
+            fi
+          else
+            echo "No debug.log — no errors"
+          fi
+
+      - name: Verify database tables created
+        run: |
+          TABLE=$(wp db query "SHOW TABLES LIKE '%github_deployments';" --path=/tmp/wordpress 2>/dev/null)
+          if [ -z "$TABLE" ]; then
+            echo "FAIL: Deployment table was not created on activation"
+            exit 1
+          fi
+          echo "Database table created: $TABLE"
+
+          # Show table structure
+          wp db query "DESCRIBE $(wp db prefix --path=/tmp/wordpress)github_deployments;" --path=/tmp/wordpress
+
+      - name: Verify admin pages load without errors
+        run: |
+          cd /tmp/wordpress
+
+          # Start PHP built-in server
+          php -S localhost:8080 -t . &>/tmp/php-server.log &
+          SERVER_PID=$!
+          sleep 2
+
+          # Log in and get auth cookie
+          COOKIE_JAR=$(mktemp)
+
+          # Get the login nonce
+          curl -s -c "$COOKIE_JAR" "http://localhost:8080/wp-login.php" > /dev/null
+
+          # Log in
+          curl -s -b "$COOKIE_JAR" -c "$COOKIE_JAR" \
+            -d "log=$WP_ADMIN_USER&pwd=$WP_ADMIN_PASS&wp-submit=Log+In&redirect_to=%2Fwp-admin%2F&testcookie=1" \
+            -L "http://localhost:8080/wp-login.php" > /dev/null
+
+          ERRORS=0
+
+          # Test each admin page
+          for PAGE in "admin.php?page=deploy-forge" "admin.php?page=deploy-forge-settings" "admin.php?page=deploy-forge-logs"; do
+            echo "Testing: $PAGE"
+            HTTP_CODE=$(curl -s -o /tmp/page-output.html -w "%{http_code}" \
+              -b "$COOKIE_JAR" "http://localhost:8080/wp-admin/$PAGE")
+
+            if [ "$HTTP_CODE" != "200" ]; then
+              echo "  FAIL: HTTP $HTTP_CODE"
+              ERRORS=$((ERRORS + 1))
+            else
+              echo "  OK: HTTP 200"
+            fi
+
+            # Check for fatal errors in the HTML output
+            if grep -qi "Fatal error\|Parse error\|Call to undefined" /tmp/page-output.html; then
+              echo "  FAIL: PHP error found in page output"
+              grep -i "Fatal error\|Parse error\|Call to undefined" /tmp/page-output.html
+              ERRORS=$((ERRORS + 1))
+            fi
+          done
+
+          # Clean up
+          kill $SERVER_PID 2>/dev/null || true
+          rm -f "$COOKIE_JAR"
+
+          if [ $ERRORS -gt 0 ]; then
+            echo "FAIL: $ERRORS admin page errors found"
+            exit 1
+          fi
+          echo "All admin pages loaded successfully"
+
+      - name: Verify plugin deactivation
+        run: |
+          wp plugin deactivate deploy-forge --path=/tmp/wordpress
+          echo "Plugin deactivated cleanly"
+
+          # Verify it's inactive
+          ACTIVE=$(wp plugin list --status=active --field=name --path=/tmp/wordpress | grep deploy-forge || true)
+          if [ -n "$ACTIVE" ]; then
+            echo "FAIL: Plugin still active after deactivation"
+            exit 1
+          fi
+          echo "Confirmed: deploy-forge is inactive"
+
+      - name: Re-activate and verify (upgrade simulation)
+        run: |
+          wp plugin activate deploy-forge --path=/tmp/wordpress
+          wp eval "echo 'Re-activation successful';" --path=/tmp/wordpress
+          echo "Plugin re-activated without errors"
