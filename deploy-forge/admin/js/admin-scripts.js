@@ -704,7 +704,6 @@
 					nonce: deployForgeAdmin.nonce
 				},
 				success: ( response ) => {
-					console.log( 'Installation repos response:', response );
 					$loading.hide();
 
 					if ( response.success && response.data.repos ) {
@@ -891,13 +890,8 @@
 					$spinner.removeClass( 'is-active' );
 					$button.prop( 'disabled', false );
 
-					console.log( 'Workflows response:', response );
-
 					if ( response.success && response.data.workflows ) {
 						const workflows = response.data.workflows;
-
-						console.log( 'Workflows count:', workflows.length );
-						console.log( 'Workflows data:', workflows );
 
 						if ( 0 === workflows.length ) {
 							$error.text( 'No workflows found. Make sure your repository has .github/workflows/*.yml files.' ).show();

@@ -370,8 +370,6 @@
 			const $successContainer = $( '#deploy-forge-success, .deploy-forge-success-container, .wizard-success-container' ).first();
 			if ( $successContainer.length ) {
 				$successContainer.html( successHtml ).show();
-			} else {
-				console.log( 'Deploy Forge Success:', message );
 			}
 		}
 	};

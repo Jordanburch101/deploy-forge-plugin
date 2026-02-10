@@ -4,7 +4,7 @@ Tags: deployment, github, theme, automation, ci-cd
 Requires at least: 5.8
 Tested up to: 6.9
 Requires PHP: 8.0
-Stable tag: 1.0.48
+Stable tag: 1.0.49
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -107,6 +107,10 @@ Yes, tokens are encrypted using sodium cryptography before storage.
 
 == Changelog ==
 
+= 1.0.49 =
+* Removed debug console.log statements from production JavaScript
+* Added Author URI plugin header
+
 = 1.0.48 =
 * Removed stats widget boxes from Deployments page (stats available in web app dashboard)
 
@@ -141,6 +145,9 @@ Yes, tokens are encrypted using sodium cryptography before storage.
 * Admin interface
 
 == Upgrade Notice ==
+
+= 1.0.49 =
+Production JS cleanup and plugin header improvements.
 
 = 1.0.48 =
 Removed stats widgets from plugin — view stats in the Deploy Forge web app instead.

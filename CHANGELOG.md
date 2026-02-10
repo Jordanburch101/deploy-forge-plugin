@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.49] - 2026-02-10
+
+### Fixed
+- Removed 5 debug `console.log` statements from production JavaScript
+
+### Added
+- `Author URI` plugin header
+
 ## [1.0.48] - 2026-02-10
 
 ### Removed
