@@ -1565,24 +1565,53 @@ class Deploy_Forge_Deployment_Manager {
 
 		$this->logger->log_deployment_step( $deployment_id, 'Cleanup Complete', 'success' );
 
+		// Update status to success FIRST (separate call) so it persists even if
+		// the file_manifest write fails due to charset/encoding issues.
+		$status_updated = $this->database->update_deployment(
+			$deployment_id,
+			array(
+				'status'      => 'success',
+				'deployed_at' => current_time( 'mysql' ),
+			)
+		);
+
+		if ( ! $status_updated ) {
+			$this->logger->error(
+				'Deployment',
+				"Deployment #$deployment_id failed to update status to success",
+				array( 'db_error' => $GLOBALS['wpdb']->last_error )
+			);
+		}
+
 		// Generate file manifest from freshly deployed theme.
-		$file_manifest = $this->generate_file_manifest( $target_theme_path );
+		$file_manifest     = $this->generate_file_manifest( $target_theme_path );
+		$manifest_json     = wp_json_encode( $file_manifest );
+		$manifest_metadata = array();
+
+		if ( false !== $manifest_json ) {
+			$manifest_metadata['file_manifest'] = $manifest_json;
+		}
 
 		// Create post-deployment snapshot.
 		$snapshot_path = $this->create_deployment_snapshot( $deployment_id );
 
-		// Update deployment as successful with manifest and snapshot.
-		$update_data = array(
-			'status'        => 'success',
-			'deployed_at'   => current_time( 'mysql' ),
-			'file_manifest' => wp_json_encode( $file_manifest ),
-		);
-
 		if ( $snapshot_path ) {
-			$update_data['snapshot_path'] = $snapshot_path;
+			$manifest_metadata['snapshot_path'] = $snapshot_path;
 		}
 
-		$this->database->update_deployment( $deployment_id, $update_data );
+		// Write manifest and snapshot in a separate call so encoding issues
+		// don't block the status update above.
+		if ( ! empty( $manifest_metadata ) ) {
+			$metadata_updated = $this->database->update_deployment( $deployment_id, $manifest_metadata );
+
+			if ( ! $metadata_updated ) {
+				$this->logger->error(
+					'Deployment',
+					"Deployment #$deployment_id failed to save manifest/snapshot metadata",
+					array( 'db_error' => $GLOBALS['wpdb']->last_error )
+				);
+			}
+		}
 
 		// Set this deployment as the active one.
 		$this->database->set_active_deployment_id( $deployment_id );
