@@ -173,6 +173,179 @@
 
 /* Deployment Status Badges - now in shared-styles.css */
 
+/* ==========================================================================
+	Enhanced Deployments Table
+	========================================================================== */
+
+.deploy-forge-enhanced-table {
+	border-collapse: separate;
+	border-spacing: 0;
+	margin-top: 20px;
+}
+
+.deploy-forge-enhanced-table thead th {
+	font-size: 11px;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+	color: var(--df-text-secondary);
+	padding: 10px 12px;
+	border-bottom: 2px solid var(--df-border-secondary);
+}
+
+.deploy-forge-enhanced-table tbody td {
+	padding: 14px 12px;
+	vertical-align: middle;
+	border-bottom: 1px solid var(--df-border-secondary);
+}
+
+.deploy-forge-enhanced-table tbody tr:nth-child(even) {
+	background: rgba(0, 0, 0, 0.015);
+}
+
+.deploy-forge-enhanced-table tbody tr:hover {
+	background: rgba(0, 0, 0, 0.03);
+}
+
+/* Status row left border - applied on first td for border-collapse: separate */
+.deploy-forge-enhanced-table tbody tr td:first-child {
+	border-left: 4px solid transparent;
+}
+
+.deploy-forge-enhanced-table tbody tr.status-row-success td:first-child {
+	border-left-color: var(--df-success);
+}
+
+.deploy-forge-enhanced-table tbody tr.status-row-failed td:first-child {
+	border-left-color: var(--df-error);
+}
+
+.deploy-forge-enhanced-table tbody tr.status-row-pending td:first-child {
+	border-left-color: var(--df-warning);
+}
+
+.deploy-forge-enhanced-table tbody tr.status-row-building td:first-child {
+	border-left-color: #2271b1;
+}
+
+.deploy-forge-enhanced-table tbody tr.status-row-queued td:first-child {
+	border-left-color: #7b2d91;
+}
+
+.deploy-forge-enhanced-table tbody tr.status-row-deploying td:first-child {
+	border-left-color: #004a99;
+}
+
+.deploy-forge-enhanced-table tbody tr.status-row-rolled_back td:first-child {
+	border-left-color: var(--df-text-tertiary);
+}
+
+.deploy-forge-enhanced-table tbody tr.status-row-cancelled td:first-child {
+	border-left-color: var(--df-border-primary);
+}
+
+/* Active deployment row */
+.deploy-forge-enhanced-table tbody tr.deploy-forge-row-active {
+	background: rgba(0, 163, 42, 0.03);
+}
+
+.deploy-forge-enhanced-table tbody tr.deploy-forge-row-active:hover {
+	background: rgba(0, 163, 42, 0.05);
+}
+
+/* Deployment column (merged commit + message) */
+.deployment-primary {
+	font-size: 14px;
+	font-weight: 500;
+	color: var(--df-text-primary);
+	line-height: 1.4;
+	display: -webkit-box;
+	-webkit-line-clamp: 2;
+	-webkit-box-orient: vertical;
+	overflow: hidden;
+	margin: 0 0 6px;
+}
+
+.deployment-meta {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	flex-wrap: wrap;
+}
+
+.deployment-hash {
+	font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+	font-size: 12px;
+	background: var(--df-bg-tertiary);
+	padding: 2px 6px;
+	border-radius: var(--df-radius-sm);
+	color: var(--df-text-secondary);
+}
+
+.deployment-hash a {
+	color: var(--df-text-secondary);
+	text-decoration: none;
+}
+
+.deployment-hash a:hover {
+	color: var(--df-primary);
+}
+
+.deploy-forge-enhanced-table .deployment-hash .dashicons {
+	font-size: 12px;
+	width: 12px;
+	height: 12px;
+	vertical-align: middle;
+	margin-left: 2px;
+}
+
+.deployment-trigger-label {
+	font-size: 11px;
+	color: var(--df-text-tertiary);
+	background: var(--df-bg-secondary);
+	padding: 2px 7px;
+	border-radius: 10px;
+	text-transform: lowercase;
+}
+
+/* Date column */
+.deploy-forge-relative-time {
+	font-size: 13px;
+	color: var(--df-text-secondary);
+	cursor: default;
+}
+
+/* Author column */
+.deploy-forge-enhanced-table .deploy-forge-author-cell {
+	font-size: 13px;
+	color: var(--df-text-secondary);
+}
+
+/* Search wrapper with icon */
+.deploy-forge-search-wrapper {
+	position: relative;
+	flex: 1;
+	max-width: 400px;
+}
+
+.deploy-forge-search-wrapper .dashicons {
+	position: absolute;
+	left: 10px;
+	top: 50%;
+	transform: translateY(-50%);
+	color: var(--df-text-tertiary);
+	font-size: 16px;
+	width: 16px;
+	height: 16px;
+	pointer-events: none;
+}
+
+.deploy-forge-search-wrapper .deploy-forge-search-input {
+	padding-left: 32px;
+	width: 100%;
+	box-sizing: border-box;
+}
+
 /* Table Controls */
 .deploy-forge-table-controls {
 	display: flex;
@@ -182,7 +355,6 @@
 
 .deploy-forge-search-input {
 	flex: 1;
-	max-width: 400px;
 	padding: 8px 12px;
 	border: 1px solid #c3c4c7;
 	border-radius: 4px;
@@ -240,11 +412,6 @@
 	margin-top: 20px;
 }
 
-.deploy-forge-deployments .wp-list-table th,
-.deploy-forge-deployments .wp-list-table td {
-	vertical-align: middle;
-}
-
 .deploy-forge-deployments .dashicons-external {
 	font-size: 16px;
 	text-decoration: none;
@@ -286,6 +453,19 @@
 	.deploy-forge-deployments .wp-list-table th,
 	.deploy-forge-deployments .wp-list-table td {
 	padding: 8px 5px;
+	}
+
+	/* Enhanced table responsive */
+	.deploy-forge-enhanced-table .deploy-forge-author-col {
+	display: none;
+	}
+
+	.deploy-forge-enhanced-table tbody td {
+	padding: 10px 8px;
+	}
+
+	.deploy-forge-search-wrapper {
+	max-width: 100%;
 	}
 }
 

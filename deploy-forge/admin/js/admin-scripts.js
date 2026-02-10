@@ -30,6 +30,7 @@
 		init: function() {
 			this.bindEvents();
 			this.initTableFilters();
+			this.initRelativeTimestamps();
 			this.autoRefresh();
 			this.autoCheckChanges();
 		},
@@ -1325,6 +1326,63 @@
 				return ( bytes / 1024 ).toFixed( 1 ) + ' KB';
 			}
 			return ( bytes / 1048576 ).toFixed( 1 ) + ' MB';
+		},
+
+		/**
+		 * Format a Unix timestamp as a relative time string
+		 *
+		 * @since 1.0.55
+		 * @param {number} timestamp Unix timestamp in seconds.
+		 * @return {string|null} Relative time string, or null if older than 30 days.
+		 */
+		formatRelativeTime: ( timestamp ) => {
+			const now = Math.floor( Date.now() / 1000 );
+			const diff = now - timestamp;
+
+			if ( diff < 60 ) {
+				return 'just now';
+			} else if ( diff < 3600 ) {
+				return Math.floor( diff / 60 ) + 'm ago';
+			} else if ( diff < 86400 ) {
+				return Math.floor( diff / 3600 ) + 'h ago';
+			} else if ( diff < 604800 ) {
+				const days = Math.floor( diff / 86400 );
+				return days + ( 1 === days ? ' day ago' : ' days ago' );
+			} else if ( diff < 2592000 ) {
+				const weeks = Math.floor( diff / 604800 );
+				return weeks + ( 1 === weeks ? ' week ago' : ' weeks ago' );
+			}
+
+			return null;
+		},
+
+		/**
+		 * Initialize relative timestamps on deployment date cells
+		 *
+		 * Converts absolute dates to relative times and refreshes every 60 seconds.
+		 *
+		 * @since 1.0.55
+		 * @return {void}
+		 */
+		initRelativeTimestamps: function() {
+			const updateTimestamps = () => {
+				$( '.deploy-forge-relative-time[data-timestamp]' ).each( function() {
+					const $el = $( this );
+					const timestamp = parseInt( $el.data( 'timestamp' ), 10 );
+
+					if ( ! timestamp ) {
+						return;
+					}
+
+					const relative = GitHubDeployAdmin.formatRelativeTime( timestamp );
+					if ( relative ) {
+						$el.text( relative );
+					}
+				} );
+			};
+
+			updateTimestamps();
+			setInterval( updateTimestamps, 60000 );
 		},
 
 		/**

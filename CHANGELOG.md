@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.55] - 2026-02-10
+
+### Changed
+- Redesigned deployments table from 8 columns to 5 (Deployment, Date, Author, Status, Actions)
+- Commit hash, message, and trigger type merged into single Deployment column
+- Status badges now include colored status dots
+- Table rows have colored left borders matching deployment status
+- Dates display as relative timestamps with full date on hover
+- Search input includes search icon
+- Author column hidden on mobile
+
 ## [1.0.54] - 2026-02-10
 
 ### Fixed

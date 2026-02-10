@@ -64,7 +64,10 @@ if ( ! defined( 'ABSPATH' ) ) {
 		<p><?php esc_html_e( 'No deployments found.', 'deploy-forge' ); ?></p>
 	<?php else : ?>
 		<div class="deploy-forge-table-controls">
-			<input type="text" id="deployment-search" class="deploy-forge-search-input" placeholder="<?php esc_attr_e( 'Search deployments', 'deploy-forge' ); ?>" />
+			<div class="deploy-forge-search-wrapper">
+				<span class="dashicons dashicons-search"></span>
+				<input type="text" id="deployment-search" class="deploy-forge-search-input" placeholder="<?php esc_attr_e( 'Search deployments', 'deploy-forge' ); ?>" />
+			</div>
 			<select id="deployment-status-filter" class="deploy-forge-status-filter">
 				<option value=""><?php esc_html_e( 'Filter: Status', 'deploy-forge' ); ?></option>
 				<option value="success"><?php esc_html_e( 'Success', 'deploy-forge' ); ?></option>
@@ -76,51 +79,67 @@ if ( ! defined( 'ABSPATH' ) ) {
 			</select>
 		</div>
 
-		<table class="wp-list-table widefat fixed striped" id="deployments-table">
+		<table class="wp-list-table widefat fixed deploy-forge-enhanced-table" id="deployments-table">
 			<thead>
 				<tr>
-					<th><?php esc_html_e( 'ID', 'deploy-forge' ); ?></th>
-					<th><?php esc_html_e( 'Date/Time', 'deploy-forge' ); ?></th>
-					<th><?php esc_html_e( 'Commit', 'deploy-forge' ); ?></th>
-					<th><?php esc_html_e( 'Message', 'deploy-forge' ); ?></th>
-					<th><?php esc_html_e( 'Author', 'deploy-forge' ); ?></th>
-					<th><?php esc_html_e( 'Status', 'deploy-forge' ); ?></th>
-					<th><?php esc_html_e( 'Trigger', 'deploy-forge' ); ?></th>
-					<th><?php esc_html_e( 'Actions', 'deploy-forge' ); ?></th>
+					<th style="width: 40%;"><?php esc_html_e( 'Deployment', 'deploy-forge' ); ?></th>
+					<th style="width: 15%;"><?php esc_html_e( 'Date', 'deploy-forge' ); ?></th>
+					<th class="deploy-forge-author-col" style="width: 12%;"><?php esc_html_e( 'Author', 'deploy-forge' ); ?></th>
+					<th style="width: 18%;"><?php esc_html_e( 'Status', 'deploy-forge' ); ?></th>
+					<th style="width: 15%;"><?php esc_html_e( 'Actions', 'deploy-forge' ); ?></th>
 				</tr>
 			</thead>
 			<tbody>
-				<?php foreach ( $deploy_forge_deployments as $deploy_forge_deployment ) : ?>
-					<tr data-status="<?php echo esc_attr( $deploy_forge_deployment->status ); ?>">
-						<td><?php echo esc_html( $deploy_forge_deployment->id ); ?></td>
-						<td><?php echo esc_html( mysql2date( 'M j, Y g:i a', $deploy_forge_deployment->created_at ) ); ?></td>
+				<?php
+				foreach ( $deploy_forge_deployments as $deploy_forge_deployment ) :
+					$is_active_row = ( (int) $deploy_forge_deployment->id === $active_deployment_id );
+					$row_classes   = 'deploy-forge-row status-row-' . $deploy_forge_deployment->status;
+					if ( $is_active_row ) {
+						$row_classes .= ' deploy-forge-row-active';
+					}
+					?>
+					<tr class="<?php echo esc_attr( $row_classes ); ?>" data-status="<?php echo esc_attr( $deploy_forge_deployment->status ); ?>">
 						<td>
-							<code><?php echo esc_html( substr( $deploy_forge_deployment->commit_hash, 0, 7 ) ); ?></code>
-							<?php if ( $deploy_forge_deployment->build_url ) : ?>
-								<a href="<?php echo esc_url( $deploy_forge_deployment->build_url ); ?>" target="_blank" title="<?php esc_attr_e( 'View build on GitHub', 'deploy-forge' ); ?>">
-									<span class="dashicons dashicons-external"></span>
-								</a>
-							<?php endif; ?>
+							<div class="deployment-primary"><?php echo esc_html( wp_trim_words( $deploy_forge_deployment->commit_message, 12 ) ); ?></div>
+							<div class="deployment-meta">
+								<span class="deployment-hash">
+									<?php if ( $deploy_forge_deployment->build_url ) : ?>
+										<a href="<?php echo esc_url( $deploy_forge_deployment->build_url ); ?>" target="_blank" title="<?php esc_attr_e( 'View build on GitHub', 'deploy-forge' ); ?>">
+											<?php echo esc_html( substr( $deploy_forge_deployment->commit_hash, 0, 7 ) ); ?>
+											<span class="dashicons dashicons-external"></span>
+										</a>
+									<?php else : ?>
+										<?php echo esc_html( substr( $deploy_forge_deployment->commit_hash, 0, 7 ) ); ?>
+									<?php endif; ?>
+								</span>
+								<span class="deployment-trigger-label"><?php echo esc_html( $deploy_forge_deployment->trigger_type ); ?></span>
+							</div>
 						</td>
-						<td><?php echo esc_html( wp_trim_words( $deploy_forge_deployment->commit_message, 10 ) ); ?></td>
-						<td><?php echo esc_html( $deploy_forge_deployment->commit_author ); ?></td>
+						<td>
+							<span class="deploy-forge-relative-time"
+								data-timestamp="<?php echo esc_attr( mysql2date( 'U', $deploy_forge_deployment->created_at ) ); ?>"
+								title="<?php echo esc_attr( mysql2date( 'M j, Y g:i a', $deploy_forge_deployment->created_at ) ); ?>">
+								<?php echo esc_html( mysql2date( 'M j, Y g:i a', $deploy_forge_deployment->created_at ) ); ?>
+							</span>
+						</td>
+						<td class="deploy-forge-author-col deploy-forge-author-cell"><?php echo esc_html( $deploy_forge_deployment->commit_author ); ?></td>
 						<td>
 							<span class="deployment-status status-<?php echo esc_attr( $deploy_forge_deployment->status ); ?>">
+								<span class="status-dot"></span>
 								<?php echo esc_html( ucfirst( str_replace( '_', ' ', $deploy_forge_deployment->status ) ) ); ?>
 							</span>
-							<?php if ( (int) $deploy_forge_deployment->id === $active_deployment_id ) : ?>
+							<?php if ( $is_active_row ) : ?>
 								<span class="deployment-active-badge"><?php esc_html_e( 'Active', 'deploy-forge' ); ?></span>
 								<span id="drift-indicator-<?php echo esc_attr( $deploy_forge_deployment->id ); ?>"
 									class="deployment-drift-indicator" style="display:none;"></span>
 							<?php endif; ?>
 						</td>
-						<td><?php echo esc_html( ucfirst( $deploy_forge_deployment->trigger_type ) ); ?></td>
 						<td>
 							<button type="button" class="button button-small view-details-btn"
 								data-deployment-id="<?php echo esc_attr( $deploy_forge_deployment->id ); ?>">
 								<?php esc_html_e( 'Details', 'deploy-forge' ); ?>
 							</button>
-							<?php if ( (int) $deploy_forge_deployment->id === $active_deployment_id && ! empty( $deploy_forge_deployment->file_manifest ) ) : ?>
+							<?php if ( $is_active_row && ! empty( $deploy_forge_deployment->file_manifest ) ) : ?>
 								<button type="button" class="button button-small check-changes-btn"
 									data-deployment-id="<?php echo esc_attr( $deploy_forge_deployment->id ); ?>">
 									<?php esc_html_e( 'Check Changes', 'deploy-forge' ); ?>
