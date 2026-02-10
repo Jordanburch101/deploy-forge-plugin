@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.47] - 2026-02-10
+
+### Changed
+- Simplified admin UI from 4 pages to 3: Deployments (landing), Settings, Debug Logs
+- Removed Dashboard page (redundant with Deploy Forge web app dashboard)
+- Renamed History page to Deployments and made it the plugin landing page
+- Merged Deploy Now button and stats cards from Dashboard into Deployments page
+- Added search/filter controls to Deployments table
+- Added "View in Deploy Forge" button linking to web app dashboard
+
+### Removed
+- `dashboard-page.php` template (merged into `deployments-page.php`)
+- `history-page.php` template (replaced by `deployments-page.php`)
+- `deploy-forge-history` submenu item
+- "Latest Deployment Summary" section (redundant with table)
+
 ## [1.0.46] - 2026-02-10
 
 ### Added
