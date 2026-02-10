@@ -18,82 +18,85 @@ if ( ! defined( 'ABSPATH' ) ) {
 	<h1><?php echo esc_html( get_admin_page_title() ); ?></h1>
 
 	<!-- Deploy Forge Connection Status -->
-	<div class="deploy-forge-connection-card" style="background: #fff; border: 1px solid #ccd0d4; border-radius: 4px; padding: 20px; margin: 20px 0;">
+	<div class="deploy-forge-connection-card <?php echo $is_connected ? 'is-connected' : 'is-disconnected'; ?>">
 		<?php if ( $is_connected ) : ?>
-			<h2 style="margin-top: 0;">
-				<span class="dashicons dashicons-yes-alt" style="color: #46b450;"></span>
-				<?php esc_html_e( 'Connected to Deploy Forge', 'deploy-forge' ); ?>
-			</h2>
-			<table class="form-table" style="margin-top: 0;">
+			<div class="deploy-forge-card-header">
+				<span class="deploy-forge-status-indicator status-connected"></span>
+				<h2><?php esc_html_e( 'Connected to Deploy Forge', 'deploy-forge' ); ?></h2>
+			</div>
+			<div class="deploy-forge-connection-details">
 				<?php if ( ! empty( $connection_data['domain'] ) ) : ?>
-					<tr>
-						<th><?php esc_html_e( 'Site Domain', 'deploy-forge' ); ?></th>
-						<td><strong><?php echo esc_html( $connection_data['domain'] ); ?></strong></td>
-					</tr>
+					<div class="deploy-forge-detail-row">
+						<span class="deploy-forge-detail-label"><?php esc_html_e( 'Site Domain', 'deploy-forge' ); ?></span>
+						<span class="deploy-forge-detail-value"><strong><?php echo esc_html( $connection_data['domain'] ); ?></strong></span>
+					</div>
 				<?php endif; ?>
 				<?php if ( ! empty( $connection_data['repo_owner'] ) && ! empty( $connection_data['repo_name'] ) ) : ?>
-					<tr>
-						<th><?php esc_html_e( 'Repository', 'deploy-forge' ); ?></th>
-						<td><code><?php echo esc_html( $connection_data['repo_owner'] . '/' . $connection_data['repo_name'] ); ?></code></td>
-					</tr>
-				<?php endif; ?>
-				<?php if ( ! empty( $connection_data['repo_branch'] ) ) : ?>
-					<tr>
-						<th><?php esc_html_e( 'Branch', 'deploy-forge' ); ?></th>
-						<td><code><?php echo esc_html( $connection_data['repo_branch'] ); ?></code></td>
-					</tr>
+					<div class="deploy-forge-detail-row">
+						<span class="deploy-forge-detail-label"><?php esc_html_e( 'Repository', 'deploy-forge' ); ?></span>
+						<span class="deploy-forge-detail-value">
+							<code><?php echo esc_html( $connection_data['repo_owner'] . '/' . $connection_data['repo_name'] ); ?></code>
+							<?php if ( ! empty( $connection_data['repo_branch'] ) ) : ?>
+								<span class="deploy-forge-branch-badge"><?php echo esc_html( $connection_data['repo_branch'] ); ?></span>
+							<?php endif; ?>
+						</span>
+					</div>
 				<?php endif; ?>
 				<?php if ( ! empty( $connection_data['deployment_method'] ) ) : ?>
-					<tr>
-						<th><?php esc_html_e( 'Deployment Method', 'deploy-forge' ); ?></th>
-						<td>
+					<div class="deploy-forge-detail-row">
+						<span class="deploy-forge-detail-label"><?php esc_html_e( 'Deployment Method', 'deploy-forge' ); ?></span>
+						<span class="deploy-forge-detail-value">
 							<?php
 							echo 'github_actions' === $connection_data['deployment_method']
 								? esc_html__( 'GitHub Actions', 'deploy-forge' )
 								: esc_html__( 'Direct Clone', 'deploy-forge' );
 							?>
-						</td>
-					</tr>
+						</span>
+					</div>
 				<?php endif; ?>
 				<?php if ( ! empty( $connection_data['workflow_path'] ) ) : ?>
-					<tr>
-						<th><?php esc_html_e( 'Workflow File', 'deploy-forge' ); ?></th>
-						<td><code><?php echo esc_html( $connection_data['workflow_path'] ); ?></code></td>
-					</tr>
+					<div class="deploy-forge-detail-row">
+						<span class="deploy-forge-detail-label"><?php esc_html_e( 'Workflow File', 'deploy-forge' ); ?></span>
+						<span class="deploy-forge-detail-value"><code><?php echo esc_html( $connection_data['workflow_path'] ); ?></code></span>
+					</div>
 				<?php endif; ?>
 				<?php if ( ! empty( $connection_data['connected_at'] ) ) : ?>
-					<tr>
-						<th><?php esc_html_e( 'Connected', 'deploy-forge' ); ?></th>
+					<div class="deploy-forge-detail-row">
+						<span class="deploy-forge-detail-label"><?php esc_html_e( 'Connected', 'deploy-forge' ); ?></span>
 						<?php // phpcs:ignore WordPress.DateTime.CurrentTimeTimestamp.Requested -- Using for relative time display. ?>
-						<td><?php echo esc_html( human_time_diff( strtotime( $connection_data['connected_at'] ), current_time( 'timestamp' ) ) . ' ago' ); ?></td>
-					</tr>
+						<span class="deploy-forge-detail-value"><?php echo esc_html( human_time_diff( strtotime( $connection_data['connected_at'] ), current_time( 'timestamp' ) ) . ' ago' ); ?></span>
+					</div>
 				<?php endif; ?>
-			</table>
-			<p style="background: #f0f6fc; border-left: 4px solid #0969da; padding: 12px; margin: 16px 0;">
+			</div>
+			<div class="deploy-forge-message info">
 				<strong><?php esc_html_e( 'Note:', 'deploy-forge' ); ?></strong>
 				<?php esc_html_e( 'Repository configuration is managed on the Deploy Forge platform. To change your repository or deployment method, disconnect and reconnect.', 'deploy-forge' ); ?>
-			</p>
-			<p>
+			</div>
+			<div class="deploy-forge-card-actions">
 				<button type="button" id="disconnect-btn" class="button button-secondary">
 					<span class="dashicons dashicons-dismiss"></span>
 					<?php esc_html_e( 'Disconnect from Deploy Forge', 'deploy-forge' ); ?>
 				</button>
-				<span id="disconnect-loading" class="spinner" style="float: none; margin: 0 10px;"></span>
-			</p>
+				<span id="disconnect-loading" class="spinner"></span>
+			</div>
 		<?php else : ?>
-			<h2 style="margin-top: 0;">
+			<div class="deploy-forge-card-header">
 				<span class="dashicons dashicons-admin-plugins"></span>
-				<?php esc_html_e( 'Connect to Deploy Forge', 'deploy-forge' ); ?>
-			</h2>
-			<p><?php esc_html_e( 'Connect your WordPress site to the Deploy Forge platform to enable automatic theme deployments from GitHub.', 'deploy-forge' ); ?></p>
-			<p><?php esc_html_e( 'The Deploy Forge platform will guide you through connecting your GitHub account and selecting a repository.', 'deploy-forge' ); ?></p>
-			<p>
+				<h2><?php esc_html_e( 'Connect to Deploy Forge', 'deploy-forge' ); ?></h2>
+			</div>
+			<p class="deploy-forge-card-description">
+				<?php esc_html_e( 'Connect your WordPress site to the Deploy Forge platform to enable automatic theme deployments from GitHub.', 'deploy-forge' ); ?>
+			</p>
+			<p class="deploy-forge-card-description">
+				<?php esc_html_e( 'The Deploy Forge platform will guide you through connecting your GitHub account and selecting a repository.', 'deploy-forge' ); ?>
+			</p>
+			<div class="deploy-forge-card-actions">
 				<button type="button" id="connect-btn" class="button button-primary button-hero">
 					<span class="dashicons dashicons-plus-alt"></span>
 					<?php esc_html_e( 'Connect to Deploy Forge', 'deploy-forge' ); ?>
 				</button>
-				<span id="connect-loading" class="spinner" style="float: none; margin: 0 10px;"></span>
-			</p>
+				<span id="connect-loading" class="spinner"></span>
+			</div>
 		<?php endif; ?>
 	</div>
 
@@ -155,7 +158,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 			</p>
 		</form>
 	<?php else : ?>
-		<div style="background: #fff; border: 1px solid #ccd0d4; border-radius: 4px; padding: 20px; margin: 20px 0;">
+		<div class="deploy-forge-next-steps-card">
 			<h2><?php esc_html_e( 'Next Steps', 'deploy-forge' ); ?></h2>
 			<ol>
 				<li><?php esc_html_e( 'Click "Connect to Deploy Forge" above to begin setup', 'deploy-forge' ); ?></li>

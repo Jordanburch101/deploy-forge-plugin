@@ -19,16 +19,24 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 	<?php if ( ! $is_configured ) : ?>
 		<div class="deploy-forge-welcome-banner">
+			<div class="deploy-forge-welcome-glow"></div>
 			<div class="deploy-forge-welcome-content">
+				<img
+					src="https://media.getdeployforge.com/DF%20Logo%20white_lg.png"
+					alt="Deploy Forge"
+					class="deploy-forge-welcome-logo"
+				>
 				<h2 class="deploy-forge-welcome-title"><?php esc_html_e( 'Welcome to Deploy Forge', 'deploy-forge' ); ?></h2>
 				<p class="deploy-forge-welcome-description">
 					<?php esc_html_e( 'Connect your WordPress site to the Deploy Forge platform to enable automatic theme deployments from GitHub.', 'deploy-forge' ); ?>
 				</p>
-				<button type="button" id="connect-btn" class="deploy-forge-welcome-button">
-					<span class="dashicons dashicons-plus-alt"></span>
-					<?php esc_html_e( 'Connect to Deploy Forge', 'deploy-forge' ); ?>
-				</button>
-				<span id="connect-loading" class="spinner" style="float: none; margin: 0 10px;"></span>
+				<div class="deploy-forge-welcome-actions">
+					<button type="button" id="connect-btn" class="deploy-forge-welcome-button">
+						<?php esc_html_e( 'Connect to Deploy Forge', 'deploy-forge' ); ?>
+						<span class="dashicons dashicons-arrow-right-alt2"></span>
+					</button>
+					<span id="connect-loading" class="spinner"></span>
+				</div>
 			</div>
 		</div>
 	<?php endif; ?>

@@ -17,59 +17,93 @@
 
 .deploy-forge-welcome-banner {
 	background: linear-gradient(135deg, #000000 0%, #09090b 50%, #0a0a0a 100%);
-	border: 1px solid rgba(255, 255, 255, 0.1);
+	border: 1px solid rgba(255, 255, 255, 0.08);
 	border-radius: 12px;
 	padding: 0;
 	margin: 20px 0 30px;
-	box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.05);
+	box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
 	overflow: hidden;
+	position: relative;
 	font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 
+.deploy-forge-welcome-glow {
+	position: absolute;
+	top: 50%;
+	left: 50%;
+	transform: translate(-50%, -50%);
+	width: 500px;
+	height: 500px;
+	border-radius: 50%;
+	background: rgba(0, 255, 148, 0.06);
+	filter: blur(80px);
+	pointer-events: none;
+}
+
 .deploy-forge-welcome-content {
-	padding: 36px 44px;
+	padding: 40px 44px;
 	position: relative;
+	z-index: 1;
+}
+
+.deploy-forge-welcome-logo {
+	display: block;
+	height: 32px;
+	width: auto;
+	margin-bottom: 20px;
 }
 
 .deploy-forge-welcome-title {
-	font-size: 30px;
-	font-weight: 700;
+	font-size: 24px;
+	font-weight: 600;
 	color: #ffffff;
-	margin: 0 0 14px;
-	line-height: 1.2;
+	margin: 0 0 10px;
+	line-height: 1.3;
 	letter-spacing: -0.02em;
 }
 
 .deploy-forge-welcome-description {
-	font-size: 16px;
+	font-size: 15px;
 	font-weight: 300;
 	color: #a1a1aa;
-	line-height: 1.7;
-	margin: 0 0 28px;
-	max-width: 700px;
+	line-height: 1.6;
+	margin: 0 0 24px;
+	max-width: 550px;
+}
+
+.deploy-forge-welcome-actions {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+}
+
+.deploy-forge-welcome-actions .spinner {
+	float: none;
+	margin: 0;
 }
 
 .deploy-forge-welcome-button {
 	display: inline-flex;
 	align-items: center;
-	gap: 10px;
-	padding: 14px 28px;
+	gap: 8px;
+	padding: 10px 20px;
 	background: #00ff94;
 	color: #000000;
-	font-size: 14px;
+	font-size: 13px;
 	font-weight: 600;
-	border-radius: 8px;
+	border-radius: 6px;
 	border: none;
+	cursor: pointer;
 	text-decoration: none;
-	transition: all 0.3s ease-out;
-	box-shadow: 0 4px 14px rgba(0, 255, 148, 0.25), 0 0 0 1px rgba(0, 255, 148, 0.1);
+	transition: all 0.2s ease-out;
+	box-shadow: 0 0 20px rgba(0, 255, 148, 0.15);
 }
 
 .deploy-forge-welcome-button:hover {
-	background: #00ff94;
+	background: #33ffaa;
 	color: #000000;
-	transform: translateY(-2px);
-	box-shadow: 0 8px 24px rgba(0, 255, 148, 0.35), 0 0 0 1px rgba(0, 255, 148, 0.2);
+	transform: translateY(-1px);
+	box-shadow: 0 0 30px rgba(0, 255, 148, 0.25);
 }
 
 .deploy-forge-welcome-button:focus {
@@ -78,9 +112,9 @@
 }
 
 .deploy-forge-welcome-button .dashicons {
-	font-size: 18px;
-	width: 18px;
-	height: 18px;
+	font-size: 16px;
+	width: 16px;
+	height: 16px;
 	margin: 0;
 }
 
@@ -439,15 +473,160 @@
 
 /* Loading States - now in shared-styles.css */
 
-/* Settings Page */
+/* ==========================================================================
+	Settings Page - Connection Card
+	========================================================================== */
+
+.deploy-forge-connection-card {
+	background: var(--df-bg-primary);
+	border: 1px solid var(--df-border-secondary);
+	border-radius: var(--df-radius-lg);
+	padding: var(--df-spacing-2xl);
+	margin: 20px 0;
+	box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+}
+
+.deploy-forge-connection-card.is-connected {
+	border-left: 4px solid var(--df-success);
+}
+
+.deploy-forge-card-header {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	margin-bottom: var(--df-spacing-lg);
+}
+
+.deploy-forge-card-header h2 {
+	margin: 0;
+	font-size: 16px;
+	font-weight: 600;
+	color: var(--df-text-primary);
+}
+
+.deploy-forge-card-header .dashicons {
+	color: var(--df-text-secondary);
+	font-size: 22px;
+	width: 22px;
+	height: 22px;
+}
+
+.deploy-forge-status-indicator {
+	display: inline-block;
+	width: 10px;
+	height: 10px;
+	border-radius: 50%;
+	flex-shrink: 0;
+}
+
+.deploy-forge-status-indicator.status-connected {
+	background: var(--df-success);
+	box-shadow: 0 0 0 3px rgba(0, 163, 42, 0.15);
+}
+
+.deploy-forge-connection-details {
+	display: grid;
+	grid-template-columns: 140px 1fr;
+	gap: 0;
+	margin-bottom: var(--df-spacing-lg);
+	border: 1px solid var(--df-border-secondary);
+	border-radius: var(--df-radius-md);
+	overflow: hidden;
+}
+
+.deploy-forge-detail-row {
+	display: contents;
+}
+
+.deploy-forge-detail-label,
+.deploy-forge-detail-value {
+	padding: 10px var(--df-spacing-lg);
+	font-size: 13px;
+	border-bottom: 1px solid var(--df-border-secondary);
+}
+
+.deploy-forge-detail-row:last-child .deploy-forge-detail-label,
+.deploy-forge-detail-row:last-child .deploy-forge-detail-value {
+	border-bottom: none;
+}
+
+.deploy-forge-detail-label {
+	color: var(--df-text-secondary);
+	font-weight: 500;
+	background: var(--df-bg-secondary);
+}
+
+.deploy-forge-detail-value {
+	color: var(--df-text-primary);
+}
+
+.deploy-forge-detail-value code {
+	background: var(--df-bg-tertiary);
+	padding: 2px 6px;
+	border-radius: var(--df-radius-sm);
+	font-size: 12px;
+}
+
+.deploy-forge-connection-card .deploy-forge-message {
+	margin: 0 0 var(--df-spacing-lg);
+}
+
+.deploy-forge-card-actions {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+}
+
+.deploy-forge-card-actions .spinner {
+	float: none;
+	margin: 0;
+}
+
+.deploy-forge-card-description {
+	color: var(--df-text-secondary);
+	font-size: 14px;
+	line-height: 1.6;
+	margin: 0 0 var(--df-spacing-md);
+	max-width: 600px;
+}
+
+/* Next Steps Card */
+.deploy-forge-next-steps-card {
+	background: var(--df-bg-primary);
+	border: 1px solid var(--df-border-secondary);
+	border-radius: var(--df-radius-lg);
+	padding: var(--df-spacing-2xl);
+	margin: 20px 0;
+	box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+}
+
+.deploy-forge-next-steps-card h2 {
+	margin-top: 0;
+	font-size: 16px;
+	font-weight: 600;
+	color: var(--df-text-primary);
+}
+
+.deploy-forge-next-steps-card ol {
+	color: var(--df-text-secondary);
+	line-height: 1.8;
+	margin-bottom: 0;
+	padding-left: 20px;
+}
+
+.deploy-forge-next-steps-card ol li {
+	padding: 2px 0;
+}
+
+/* Settings Form Table */
 .deploy-forge-settings .form-table th {
 	width: 220px;
 }
 
 .deploy-forge-settings code {
-	background: #f0f0f1;
+	background: var(--df-bg-tertiary);
 	padding: 2px 6px;
-	border-radius: 3px;
+	border-radius: var(--df-radius-sm);
 }
 
 /* Connection Result */
@@ -474,6 +653,23 @@
 
 /* Responsive Design */
 @media screen and (max-width: 782px) {
+	.deploy-forge-connection-card {
+	padding: var(--df-spacing-lg);
+	}
+
+	.deploy-forge-connection-details {
+	grid-template-columns: 1fr;
+	}
+
+	.deploy-forge-detail-label {
+	border-bottom: none;
+	padding-bottom: 2px;
+	}
+
+	.deploy-forge-detail-value {
+	padding-top: 2px;
+	}
+
 	.deploy-forge-header-bar {
 	flex-direction: column;
 	align-items: stretch;
