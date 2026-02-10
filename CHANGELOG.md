@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.56] - 2026-02-10
+
+### Changed
+- Redesigned deployment header as borderless/minimal layout
+- Header now shows last deploy time (relative), active commit hash, and total deployment count
+- "View in Deploy Forge" reduced to a subtle text link
+
+### Fixed
+- Rollback button no longer appears on the active deployment (rolling back the live version makes no sense)
+
 ## [1.0.55] - 2026-02-10
 
 ### Changed

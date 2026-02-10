@@ -34,27 +34,44 @@ if ( ! defined( 'ABSPATH' ) ) {
 	<?php endif; ?>
 
 	<?php if ( $is_configured ) : ?>
-		<!-- Deploy Now Bar -->
-		<div class="deploy-forge-header">
-			<div class="deploy-forge-header-content">
-				<div class="deploy-forge-header-body">
-					<div class="deploy-forge-connection-info">
-						<p class="status-connected">
-							<span class="dashicons dashicons-yes-alt"></span>
-							<a href="<?php echo esc_url( 'https://github.com/' . $repo_name ); ?>" target="_blank" class="deploy-forge-repo-link"><?php echo esc_html( $repo_name ); ?></a>
-							<span class="deploy-forge-branch-badge"><?php echo esc_html( $branch ); ?></span>
-						</p>
-					</div>
-					<div class="deploy-forge-header-actions">
-						<a href="<?php echo esc_url( $dashboard_url ); ?>" target="_blank" class="button button-large">
-							<?php esc_html_e( 'View in Deploy Forge', 'deploy-forge' ); ?>
-							<span class="dashicons dashicons-external" style="margin-top: 4px;"></span>
-						</a>
-						<button type="button" class="button button-primary button-large" id="deploy-now-btn">
-							<?php esc_html_e( 'Deploy Now', 'deploy-forge' ); ?>
-						</button>
-					</div>
+		<!-- Deploy Header -->
+		<div class="deploy-forge-header-bar">
+			<div class="deploy-forge-header-left">
+				<div class="deploy-forge-header-repo">
+					<a href="<?php echo esc_url( 'https://github.com/' . $repo_name ); ?>" target="_blank" class="deploy-forge-repo-link"><?php echo esc_html( $repo_name ); ?></a>
+					<span class="deploy-forge-branch-badge"><?php echo esc_html( $branch ); ?></span>
 				</div>
+				<?php if ( $active_deployment ) : ?>
+					<div class="deploy-forge-header-meta">
+						<span class="deploy-forge-header-detail">
+							<span class="deploy-forge-header-label"><?php esc_html_e( 'Last deploy', 'deploy-forge' ); ?></span>
+							<span class="deploy-forge-relative-time"
+								data-timestamp="<?php echo esc_attr( mysql2date( 'U', $active_deployment->deployed_at ?? $active_deployment->created_at ) ); ?>"
+								title="<?php echo esc_attr( mysql2date( 'M j, Y g:i a', $active_deployment->deployed_at ?? $active_deployment->created_at ) ); ?>">
+								<?php echo esc_html( mysql2date( 'M j, Y g:i a', $active_deployment->deployed_at ?? $active_deployment->created_at ) ); ?>
+							</span>
+						</span>
+						<span class="deploy-forge-header-separator"></span>
+						<span class="deploy-forge-header-detail">
+							<span class="deploy-forge-header-label"><?php esc_html_e( 'Commit', 'deploy-forge' ); ?></span>
+							<code class="deploy-forge-header-hash"><?php echo esc_html( substr( $active_deployment->commit_hash, 0, 7 ) ); ?></code>
+						</span>
+						<span class="deploy-forge-header-separator"></span>
+						<span class="deploy-forge-header-detail">
+							<span class="deploy-forge-header-label"><?php esc_html_e( 'Deployments', 'deploy-forge' ); ?></span>
+							<?php echo esc_html( $total_deployments ); ?>
+						</span>
+					</div>
+				<?php endif; ?>
+			</div>
+			<div class="deploy-forge-header-actions">
+				<a href="<?php echo esc_url( $dashboard_url ); ?>" target="_blank" class="deploy-forge-header-link">
+					<?php esc_html_e( 'Deploy Forge', 'deploy-forge' ); ?>
+					<span class="dashicons dashicons-external"></span>
+				</a>
+				<button type="button" class="button button-primary button-large" id="deploy-now-btn">
+					<?php esc_html_e( 'Deploy Now', 'deploy-forge' ); ?>
+				</button>
 			</div>
 		</div>
 	<?php endif; ?>
@@ -145,7 +162,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 									<?php esc_html_e( 'Check Changes', 'deploy-forge' ); ?>
 								</button>
 							<?php endif; ?>
-							<?php if ( 'success' === $deploy_forge_deployment->status && ! empty( $deploy_forge_deployment->backup_path ) ) : ?>
+							<?php if ( 'success' === $deploy_forge_deployment->status && ! empty( $deploy_forge_deployment->backup_path ) && ! $is_active_row ) : ?>
 								<button type="button" class="button button-small rollback-btn"
 									data-deployment-id="<?php echo esc_attr( $deploy_forge_deployment->id ); ?>">
 									<?php esc_html_e( 'Rollback', 'deploy-forge' ); ?>

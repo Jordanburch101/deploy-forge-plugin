@@ -355,6 +355,7 @@ class Deploy_Forge_Admin_Pages extends Deploy_Forge_Ajax_Handler_Base {
 		$total_deployments        = $this->database->get_deployment_count();
 		$total_pages              = ceil( $total_deployments / $per_page );
 		$active_deployment_id     = $this->database->get_active_deployment_id();
+		$active_deployment        = $this->database->get_active_deployment();
 
 		include DEPLOY_FORGE_PLUGIN_DIR . 'templates/deployments-page.php';
 	}

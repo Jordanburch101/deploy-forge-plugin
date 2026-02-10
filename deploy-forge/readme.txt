@@ -4,7 +4,7 @@ Tags: deployment, github, theme, automation, ci-cd
 Requires at least: 5.8
 Tested up to: 6.9
 Requires PHP: 8.0
-Stable tag: 1.0.55
+Stable tag: 1.0.56
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -107,6 +107,10 @@ Yes, tokens are encrypted using sodium cryptography before storage.
 
 == Changelog ==
 
+= 1.0.56 =
+* Borderless deployment header with last deploy time, commit hash, and deployment count
+* Fixed rollback button incorrectly showing on the active deployment
+
 = 1.0.55 =
 * Redesigned deployments table — 5 columns instead of 8, with colored status borders, status dots, relative timestamps, and merged deployment info column
 
@@ -165,6 +169,9 @@ Yes, tokens are encrypted using sodium cryptography before storage.
 * Admin interface
 
 == Upgrade Notice ==
+
+= 1.0.56 =
+Minimal header with deployment details. Rollback button fix.
 
 = 1.0.55 =
 Enhanced deployments table with better visual hierarchy, relative timestamps, and status indicators.
