@@ -1,3 +1,5 @@
+![Deploy Forge](https://media.getdeployforge.com/df-banner.png)
+
 # Deploy Forge - WordPress Plugin
 
 **Push to GitHub. Deploy to WordPress.**
