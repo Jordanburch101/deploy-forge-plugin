@@ -4,7 +4,7 @@ Tags: deployment, github, theme, automation, ci-cd
 Requires at least: 5.8
 Tested up to: 6.9
 Requires PHP: 8.0
-Stable tag: 1.0.45
+Stable tag: 1.0.46
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -107,6 +107,11 @@ Yes, tokens are encrypted using sodium cryptography before storage.
 
 == Changelog ==
 
+= 1.0.46 =
+* Self-hosted plugin updates via GitHub Releases — update notifications and one-click updates from the WordPress admin
+* Site disconnected webhook event handler
+* Version constant now reads from plugin header (single source of truth)
+
 = 1.0.45 =
 * Updated all URLs to getdeployforge.com
 
@@ -128,6 +133,9 @@ Yes, tokens are encrypted using sodium cryptography before storage.
 * Admin interface
 
 == Upgrade Notice ==
+
+= 1.0.46 =
+Self-hosted update system. Plugin now checks GitHub Releases for updates.
 
 = 1.0.45 =
 Updated branding URLs. No breaking changes.

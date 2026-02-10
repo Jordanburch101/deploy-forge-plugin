@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.46] - 2026-02-10
+
+### Added
+- Self-hosted plugin update system via GitHub Releases (`class-plugin-updater.php`)
+- Plugin checks the public GitHub repository for new releases and integrates with WordPress's native update UI
+- Users receive update notifications on the Plugins page and can update with one click
+- "View details" modal shows changelog from the GitHub Release body
+- Release data cached for 12 hours (1 hour on failure) to respect API rate limits
+- Site disconnected webhook event handler
+- Version constant now reads from plugin header (single source of truth)
+- Public README.md, LICENSE (GPL v2), and improved .gitignore
+
+### Fixed
+- Synced `DEPLOY_FORGE_VERSION` constant (was out of sync with plugin header)
+- Synced test bootstrap version constant
+
 ## [1.0.45] - 2026-01-19
 
 ### Changed
