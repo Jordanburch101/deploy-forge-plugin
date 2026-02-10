@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.52] - 2026-02-10
+
+### Added
+- Active deployment tracking via `deploy_forge_active_deployment_id` WP option
+- "Active" badge on the deployment whose files are currently live on disk
+- File change detection: compares live theme files against stored SHA-256 file manifest
+- Unified diff viewer for modified files using WordPress core `Text_Diff` library
+- "Check Changes" button on active deployment row to manually trigger file drift scan
+- Auto-check on page load with 5-minute sessionStorage and server-side transient cache
+- File Changes modal with summary bar (modified/added/removed counts) and file list table
+- File Diff modal with dark-theme syntax highlighting (additions, deletions, hunks, context)
+- Database migration 1.2: `file_manifest` (LONGTEXT) and `snapshot_path` (varchar) columns
+- Automatic cleanup of old backup and snapshot ZIPs (keeps 10 most recent)
+
+### Changed
+- `extract_and_deploy()` now generates file manifest, creates snapshot, and sets active deployment ID on success
+- `rollback_deployment()` now updates active deployment ID to the previous successful deployment and refreshes its manifest
+- Settings page notes the backup retention policy
+
+### Fixed
+- Rollback now correctly copies files from the inner theme directory within the backup ZIP (previously created a nested `theme/theme/` structure)
+- Rollback now clears the theme directory before restoring, preventing orphan files from newer deployments surviving the rollback
+- XSS protection: all dynamic content in deployment details and connection test results is now HTML-escaped
+- HTML attribute injection: `escapeHtml` now also encodes quotes for safe use in attributes
+
 ## [1.0.51] - 2026-02-10
 
 ### Changed
