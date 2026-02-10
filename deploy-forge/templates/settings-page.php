@@ -134,6 +134,18 @@ if ( ! defined( 'ABSPATH' ) ) {
 						</label>
 					</td>
 				</tr>
+				<tr>
+					<th scope="row"><?php esc_html_e( 'Error Reporting', 'deploy-forge' ); ?></th>
+					<td>
+						<label>
+							<input type="checkbox" name="error_telemetry" value="1" <?php checked( $current_settings['error_telemetry'] ); ?>>
+							<?php esc_html_e( 'Help improve Deploy Forge by sending anonymous error reports', 'deploy-forge' ); ?>
+						</label>
+						<p class="description">
+							<?php esc_html_e( 'When enabled, PHP errors originating from the Deploy Forge plugin are sent to our error tracking service. No personal data, site content, or credentials are ever included. Only plugin errors, WordPress version, and PHP version are reported.', 'deploy-forge' ); ?>
+						</p>
+					</td>
+				</tr>
 			</table>
 
 			<p class="submit">

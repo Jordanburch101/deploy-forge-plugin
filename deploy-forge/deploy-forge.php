@@ -3,7 +3,7 @@
  * Plugin Name: Deploy Forge
  * Plugin URI: https://getdeployforge.com
  * Description: Automates theme deployment from GitHub repositories via Deploy Forge platform
- * Version: 1.0.57
+ * Version: 1.0.58
  * Author: Deploy Forge
  * Author URI: https://getdeployforge.com
  * License: GPL v2 or later
@@ -131,6 +131,7 @@ class Deploy_Forge {
 		// Core classes.
 		require_once DEPLOY_FORGE_PLUGIN_DIR . 'includes/class-database.php';
 		require_once DEPLOY_FORGE_PLUGIN_DIR . 'includes/class-settings.php';
+		require_once DEPLOY_FORGE_PLUGIN_DIR . 'includes/class-error-telemetry.php';
 		require_once DEPLOY_FORGE_PLUGIN_DIR . 'includes/class-debug-logger.php';
 		require_once DEPLOY_FORGE_PLUGIN_DIR . 'includes/class-connection-handler.php';
 		require_once DEPLOY_FORGE_PLUGIN_DIR . 'includes/class-github-api.php';
@@ -148,8 +149,12 @@ class Deploy_Forge {
 		}
 
 		// Initialize instances.
-		$this->database           = new Deploy_Forge_Database();
-		$this->settings           = new Deploy_Forge_Settings();
+		$this->database = new Deploy_Forge_Database();
+		$this->settings = new Deploy_Forge_Settings();
+
+		// Initialize error telemetry early so errors in other classes are captured.
+		$error_telemetry = new Deploy_Forge_Error_Telemetry( $this->settings );
+		$error_telemetry->init();
 		$logger                   = new Deploy_Forge_Debug_Logger( $this->settings );
 		$connection_handler       = new Deploy_Forge_Connection_Handler( $this->settings, $logger );
 		$this->github_api         = new Deploy_Forge_GitHub_API( $this->settings, $logger );

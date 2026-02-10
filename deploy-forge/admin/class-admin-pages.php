@@ -328,6 +328,7 @@ class Deploy_Forge_Admin_Pages extends Deploy_Forge_Ajax_Handler_Base {
 			'require_manual_approval' => (bool) ( $settings['require_manual_approval'] ?? true ),
 			'create_backups'          => (bool) ( $settings['create_backups'] ?? true ),
 			'debug_mode'              => (bool) ( $settings['debug_mode'] ?? false ),
+			'error_telemetry'         => (bool) ( $settings['error_telemetry'] ?? true ),
 		);
 	}
 
@@ -402,6 +403,7 @@ class Deploy_Forge_Admin_Pages extends Deploy_Forge_Ajax_Handler_Base {
 					'require_manual_approval' => isset( $_POST['require_manual_approval'] ),
 					'create_backups'          => isset( $_POST['create_backups'] ),
 					'debug_mode'              => isset( $_POST['debug_mode'] ),
+					'error_telemetry'         => isset( $_POST['error_telemetry'] ),
 				);
 
 				// Merge with existing settings to preserve repo info.

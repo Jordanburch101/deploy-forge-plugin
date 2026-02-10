@@ -55,13 +55,32 @@ fi
 echo -e "${GREEN}✓${NC} All PHP files validated"
 echo ""
 
-# Step 3: Copy plugin folder to build directory
+# Step 3: Verify vendor-prefixed directory exists
+echo -e "${YELLOW}→${NC} Checking vendor-prefixed directory..."
+if [ ! -d "${PLUGIN_SLUG}/vendor-prefixed" ]; then
+    echo -e "${YELLOW}!${NC} vendor-prefixed/ not found — running composer scope..."
+    if command -v composer &> /dev/null; then
+        composer scope
+    else
+        echo -e "${RED}✗${NC} Composer not available. Run 'composer scope' manually first."
+        exit 1
+    fi
+fi
+
+if [ ! -f "${PLUGIN_SLUG}/vendor-prefixed/vendor/autoload.php" ]; then
+    echo -e "${RED}✗${NC} vendor-prefixed/vendor/autoload.php missing. Run 'composer scope' to generate it."
+    exit 1
+fi
+echo -e "${GREEN}✓${NC} vendor-prefixed directory verified"
+echo ""
+
+# Step 4: Copy plugin folder to build directory
 echo -e "${YELLOW}→${NC} Copying plugin files to build directory..."
 cp -r ${PLUGIN_SLUG} ${BUILD_DIR}/
 echo -e "${GREEN}✓${NC} Files copied"
 echo ""
 
-# Step 4: Remove development files
+# Step 5: Remove development files
 echo -e "${YELLOW}→${NC} Removing development files..."
 
 cd ${BUILD_DIR}/${PLUGIN_SLUG}
@@ -93,7 +112,7 @@ cd ../../
 echo -e "${GREEN}✓${NC} Development files removed"
 echo ""
 
-# Step 5: Create ZIP file
+# Step 6: Create ZIP file
 echo -e "${YELLOW}→${NC} Creating ZIP archive..."
 
 ZIP_NAME="${PLUGIN_SLUG}-${VERSION}.zip"
@@ -108,7 +127,7 @@ ZIP_SIZE=$(du -h ${DIST_DIR}/${ZIP_NAME} | awk '{print $1}')
 echo -e "${GREEN}✓${NC} ZIP created: ${ZIP_NAME} (${ZIP_SIZE})"
 echo ""
 
-# Step 6: Generate checksums
+# Step 7: Generate checksums
 echo -e "${YELLOW}→${NC} Generating checksums..."
 cd ${DIST_DIR}
 
@@ -137,7 +156,7 @@ echo "  MD5:    $MD5_HASH"
 echo "  SHA256: $SHA256_HASH"
 echo ""
 
-# Step 7: Display file contents
+# Step 8: Display file contents
 echo -e "${YELLOW}→${NC} Archive contents:"
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 unzip -l ${DIST_DIR}/${ZIP_NAME} | head -30
@@ -145,12 +164,12 @@ echo "  ..."
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
 
-# Step 8: File count
+# Step 9: File count
 FILE_COUNT=$(unzip -l ${DIST_DIR}/${ZIP_NAME} | tail -1 | awk '{print $2}')
 echo -e "${GREEN}✓${NC} Total files in archive: ${FILE_COUNT}"
 echo ""
 
-# Step 9: Clean up build directory
+# Step 10: Clean up build directory
 echo -e "${YELLOW}→${NC} Cleaning up temporary files..."
 rm -rf ${BUILD_DIR}
 echo -e "${GREEN}✓${NC} Build directory cleaned"

@@ -104,6 +104,7 @@ class Deploy_Forge_Settings {
 			'require_manual_approval' => false,
 			'create_backups'          => true,
 			'debug_mode'              => false,
+			'error_telemetry'         => true,
 		);
 
 		$this->settings = wp_parse_args( get_option( self::OPTION_NAME, array() ), $defaults );
@@ -154,6 +155,7 @@ class Deploy_Forge_Settings {
 			'require_manual_approval' => (bool) ( $settings['require_manual_approval'] ?? true ),
 			'create_backups'          => (bool) ( $settings['create_backups'] ?? true ),
 			'debug_mode'              => (bool) ( $settings['debug_mode'] ?? false ),
+			'error_telemetry'         => (bool) ( $settings['error_telemetry'] ?? true ),
 		);
 
 		$result = update_option( self::OPTION_NAME, $sanitized );

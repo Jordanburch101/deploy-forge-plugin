@@ -1,6 +1,7 @@
 # Dependencies
 /vendor
 /node_modules
+/deploy-forge/vendor-prefixed
 composer.lock
 
 # Build artifacts
