@@ -4,7 +4,7 @@ Tags: deployment, github, theme, automation, ci-cd
 Requires at least: 5.8
 Tested up to: 6.9
 Requires PHP: 8.0
-Stable tag: 1.0.47
+Stable tag: 1.0.48
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -107,6 +107,9 @@ Yes, tokens are encrypted using sodium cryptography before storage.
 
 == Changelog ==
 
+= 1.0.48 =
+* Removed stats widget boxes from Deployments page (stats available in web app dashboard)
+
 = 1.0.47 =
 * Simplified admin UI: removed Dashboard page, promoted Deployments as the landing page
 * Merged Deploy Now button, stats cards, and search/filter into Deployments page
@@ -138,6 +141,9 @@ Yes, tokens are encrypted using sodium cryptography before storage.
 * Admin interface
 
 == Upgrade Notice ==
+
+= 1.0.48 =
+Removed stats widgets from plugin — view stats in the Deploy Forge web app instead.
 
 = 1.0.47 =
 Simplified admin UI. Deployments is now the landing page with Deploy Now and stats built in.

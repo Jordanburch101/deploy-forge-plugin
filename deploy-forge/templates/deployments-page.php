@@ -2,8 +2,8 @@
 /**
  * Deployments page template
  *
- * Displays the main Deploy Forge page with deployment statistics,
- * Deploy Now controls, and paginated deployment history.
+ * Displays the main Deploy Forge page with Deploy Now controls
+ * and paginated deployment history.
  *
  * @package Deploy_Forge
  * @since   1.0.47
@@ -54,32 +54,6 @@ if ( ! defined( 'ABSPATH' ) ) {
 						</button>
 					</div>
 				</div>
-			</div>
-		</div>
-
-		<!-- Stats -->
-		<div class="deploy-forge-stats-section">
-			<div class="deploy-forge-stats">
-				<a href="<?php echo esc_url( admin_url( 'admin.php?page=deploy-forge' ) ); ?>" class="stat-item stat-clickable">
-					<div class="stat-number"><?php echo esc_html( $stats['total'] ); ?></div>
-					<div class="stat-label"><?php esc_html_e( 'Total', 'deploy-forge' ); ?></div>
-					<div class="stat-action"><?php esc_html_e( 'click to view', 'deploy-forge' ); ?></div>
-				</a>
-				<a href="<?php echo esc_url( admin_url( 'admin.php?page=deploy-forge&status=success' ) ); ?>" class="stat-item stat-clickable stat-success">
-					<div class="stat-number"><?php echo esc_html( $stats['success'] ); ?></div>
-					<div class="stat-label"><?php esc_html_e( 'Successful', 'deploy-forge' ); ?></div>
-					<div class="stat-action"><?php esc_html_e( 'click to view', 'deploy-forge' ); ?></div>
-				</a>
-				<a href="<?php echo esc_url( admin_url( 'admin.php?page=deploy-forge&status=failed' ) ); ?>" class="stat-item stat-clickable stat-failed">
-					<div class="stat-number"><?php echo esc_html( $stats['failed'] ); ?></div>
-					<div class="stat-label"><?php esc_html_e( 'Failed', 'deploy-forge' ); ?></div>
-					<div class="stat-action"><?php esc_html_e( 'view log', 'deploy-forge' ); ?></div>
-				</a>
-				<a href="<?php echo esc_url( admin_url( 'admin.php?page=deploy-forge&status=pending,building' ) ); ?>" class="stat-item stat-clickable stat-pending">
-					<div class="stat-number"><?php echo esc_html( $stats['pending'] + $stats['building'] ); ?></div>
-					<div class="stat-label"><?php esc_html_e( 'Pending', 'deploy-forge' ); ?></div>
-					<div class="stat-action"><?php esc_html_e( 'details', 'deploy-forge' ); ?></div>
-				</a>
 			</div>
 		</div>
 	<?php endif; ?>

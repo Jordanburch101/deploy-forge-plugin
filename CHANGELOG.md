@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.48] - 2026-02-10
+
+### Removed
+- Stats widget boxes from Deployments page (stats available in web app dashboard)
+
 ## [1.0.47] - 2026-02-10
 
 ### Changed

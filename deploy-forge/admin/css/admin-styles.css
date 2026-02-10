@@ -150,85 +150,6 @@
 	color: #d63638;
 }
 
-/* Stats Section */
-.deploy-forge-stats-section {
-	background: #fff;
-	border: 1px solid #c3c4c7;
-	border-radius: 4px;
-	padding: 20px;
-	margin: 20px 0;
-	box-shadow: 0 1px 1px rgba(0, 0, 0, 0.04);
-}
-
-.deploy-forge-stats-section h2 {
-	margin: 0 0 15px;
-	font-size: 18px;
-	font-weight: 600;
-}
-
-.deploy-forge-stats {
-	display: grid;
-	grid-template-columns: repeat(4, 1fr);
-	gap: 15px;
-}
-
-.stat-item {
-	display: block;
-	text-align: center;
-	padding: 20px 15px;
-	background: #f6f7f7;
-	border: 1px solid #e5e5e5;
-	border-radius: 4px;
-	text-decoration: none;
-	color: inherit;
-	transition: all 0.2s ease;
-}
-
-.stat-item.stat-clickable {
-	cursor: pointer;
-}
-
-.stat-item.stat-clickable:hover {
-	background: #fff;
-	border-color: #2271b1;
-	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-	transform: translateY(-2px);
-}
-
-.stat-number {
-	font-size: 36px;
-	font-weight: 700;
-	line-height: 1;
-	color: #1d2327;
-	margin-bottom: 8px;
-}
-
-.stat-label {
-	font-size: 14px;
-	font-weight: 600;
-	color: #646970;
-	margin: 8px 0 4px;
-	text-transform: capitalize;
-}
-
-.stat-action {
-	font-size: 12px;
-	color: #8c8f94;
-	margin-top: 4px;
-}
-
-.stat-success .stat-number {
-	color: #00a32a;
-}
-
-.stat-failed .stat-number {
-	color: #d63638;
-}
-
-.stat-pending .stat-number {
-	color: #dba617;
-}
-
 /* Deployment Status Badges - now in shared-styles.css */
 
 /* Table Controls */
@@ -329,10 +250,6 @@
 	width: 100%;
 	}
 
-	.deploy-forge-stats {
-	grid-template-columns: repeat(2, 1fr);
-	}
-
 	.deploy-forge-table-controls {
 	flex-direction: column;
 	}
@@ -348,12 +265,6 @@
 	.deploy-forge-deployments .wp-list-table th,
 	.deploy-forge-deployments .wp-list-table td {
 	padding: 8px 5px;
-	}
-}
-
-@media screen and (max-width: 480px) {
-	.deploy-forge-stats {
-	grid-template-columns: 1fr;
 	}
 }
 

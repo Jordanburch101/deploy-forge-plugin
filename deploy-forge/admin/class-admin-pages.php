@@ -333,7 +333,6 @@ class Deploy_Forge_Admin_Pages extends Deploy_Forge_Ajax_Handler_Base {
 	 * @return void
 	 */
 	public function render_deployments_page(): void {
-		$stats         = $this->database->get_statistics();
 		$is_configured = $this->settings->is_configured();
 		$dashboard_url = $this->settings->get_backend_url() . '/dashboard';
 
