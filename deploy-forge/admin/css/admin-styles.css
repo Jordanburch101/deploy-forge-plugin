@@ -210,6 +210,16 @@
 	border-collapse: separate;
 	border-spacing: 0;
 	margin-top: 20px;
+	border: 1px solid var(--df-border-secondary);
+	border-radius: var(--df-radius-lg);
+	overflow: hidden;
+	background: var(--df-bg-primary);
+	box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+}
+
+.deploy-forge-enhanced-table.widefat {
+	border: 1px solid var(--df-border-secondary);
+	box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
 }
 
 .deploy-forge-enhanced-table thead th {
@@ -218,22 +228,27 @@
 	text-transform: uppercase;
 	letter-spacing: 0.05em;
 	color: var(--df-text-secondary);
-	padding: 10px 12px;
-	border-bottom: 2px solid var(--df-border-secondary);
+	padding: 12px 16px;
+	border-bottom: 1px solid var(--df-border-secondary);
+	background: var(--df-bg-secondary);
 }
 
 .deploy-forge-enhanced-table tbody td {
-	padding: 14px 12px;
+	padding: 16px;
 	vertical-align: middle;
 	border-bottom: 1px solid var(--df-border-secondary);
 }
 
+.deploy-forge-enhanced-table tbody tr:last-child td {
+	border-bottom: none;
+}
+
 .deploy-forge-enhanced-table tbody tr:nth-child(even) {
-	background: rgba(0, 0, 0, 0.015);
+	background: transparent;
 }
 
 .deploy-forge-enhanced-table tbody tr:hover {
-	background: rgba(0, 0, 0, 0.03);
+	background: var(--df-bg-secondary);
 }
 
 /* Status row left border - applied on first td for border-collapse: separate */
@@ -275,11 +290,11 @@
 
 /* Active deployment row */
 .deploy-forge-enhanced-table tbody tr.deploy-forge-row-active {
-	background: rgba(0, 163, 42, 0.03);
+	background: rgba(0, 163, 42, 0.02);
 }
 
 .deploy-forge-enhanced-table tbody tr.deploy-forge-row-active:hover {
-	background: rgba(0, 163, 42, 0.05);
+	background: rgba(0, 163, 42, 0.04);
 }
 
 /* Deployment column (merged commit + message) */
@@ -385,30 +400,34 @@
 .deploy-forge-search-input {
 	flex: 1;
 	padding: 8px 12px;
-	border: 1px solid #c3c4c7;
-	border-radius: 4px;
+	border: 1px solid var(--df-border-secondary);
+	border-radius: var(--df-radius-md);
 	font-size: 14px;
+	transition: border-color 0.15s, box-shadow 0.15s;
 }
 
 .deploy-forge-search-input:focus {
-	border-color: #2271b1;
-	outline: none;
-	box-shadow: 0 0 0 1px #2271b1;
+	border-color: var(--df-primary);
+	outline: 2px solid var(--df-primary);
+	outline-offset: -1px;
+	box-shadow: none;
 }
 
 .deploy-forge-status-filter {
 	padding: 8px 32px 8px 12px;
-	border: 1px solid #c3c4c7;
-	border-radius: 4px;
+	border: 1px solid var(--df-border-secondary);
+	border-radius: var(--df-radius-md);
 	font-size: 14px;
 	background: #fff;
 	cursor: pointer;
+	transition: border-color 0.15s, box-shadow 0.15s;
 }
 
 .deploy-forge-status-filter:focus {
-	border-color: #2271b1;
-	outline: none;
-	box-shadow: 0 0 0 1px #2271b1;
+	border-color: var(--df-primary);
+	outline: 2px solid var(--df-primary);
+	outline-offset: -1px;
+	box-shadow: none;
 }
 
 /* Buttons - hero button styles now in shared-styles.css */
@@ -490,8 +509,12 @@
 	display: none;
 	}
 
+	.deploy-forge-enhanced-table thead th {
+	padding: 10px 10px;
+	}
+
 	.deploy-forge-enhanced-table tbody td {
-	padding: 10px 8px;
+	padding: 12px 10px;
 	}
 
 	.deploy-forge-search-wrapper {
@@ -610,14 +633,58 @@
 	gap: 5px;
 }
 
+/* Ghost Action Buttons (table rows) */
+.deploy-forge-enhanced-table .button.button-small {
+	background: transparent;
+	border-color: transparent;
+	color: var(--df-text-secondary);
+	border-radius: var(--df-radius-md);
+	transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.deploy-forge-enhanced-table .button.button-small:hover {
+	background: var(--df-bg-tertiary);
+	border-color: transparent;
+	color: var(--df-text-primary);
+}
+
+.deploy-forge-enhanced-table .button.button-small:focus {
+	outline: 2px solid var(--df-primary);
+	outline-offset: -1px;
+	box-shadow: none;
+}
+
+.deploy-forge-enhanced-table .button-primary.button-small {
+	background: var(--df-primary);
+	border-color: var(--df-primary);
+	color: var(--df-text-light);
+}
+
+.deploy-forge-enhanced-table .button-primary.button-small:hover {
+	background: var(--df-primary-hover);
+	border-color: var(--df-primary-hover);
+	color: var(--df-text-light);
+}
+
 /* Cancel Deployment Button */
 .cancel-deployment-btn {
 	color: #d63638;
-	border-color: #d63638;
+	border-color: transparent;
 	transition: all 0.2s;
 }
 
 .cancel-deployment-btn:hover {
+	color: #fff;
+	background: #d63638;
+	border-color: #d63638;
+}
+
+.deploy-forge-enhanced-table .button.button-small.cancel-deployment-btn {
+	color: #d63638;
+	border-color: transparent;
+}
+
+.deploy-forge-enhanced-table .button.button-small.cancel-deployment-btn:hover {
 	color: #fff;
 	background: #d63638;
 	border-color: #d63638;

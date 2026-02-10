@@ -26,8 +26,8 @@
 
 	/* Background Colors */
 	--df-bg-primary: #ffffff;
-	--df-bg-secondary: #f6f7f7;
-	--df-bg-tertiary: #f0f0f1;
+	--df-bg-secondary: #fafafa;
+	--df-bg-tertiary: #f4f4f5;
 	--df-bg-dark: #000000;
 	--df-bg-dark-secondary: #0a0a0a;
 
@@ -39,7 +39,7 @@
 
 	/* Border Colors */
 	--df-border-primary: #c3c4c7;
-	--df-border-secondary: #e5e5e5;
+	--df-border-secondary: #e4e4e7;
 	--df-border-dark: #333333;
 
 	/* Spacing */
@@ -51,9 +51,9 @@
 	--df-spacing-2xl: 24px;
 
 	/* Border Radius */
-	--df-radius-sm: 2px;
-	--df-radius-md: 4px;
-	--df-radius-lg: 6px;
+	--df-radius-sm: 4px;
+	--df-radius-md: 6px;
+	--df-radius-lg: 8px;
 
 	/* Shadows */
 	--df-shadow-sm: 0 1px 1px rgba(0, 0, 0, 0.04);
@@ -116,10 +116,11 @@
 	align-items: center;
 	gap: 6px;
 	padding: 5px 12px;
-	border-radius: var(--df-radius-sm);
-	font-size: 12px;
-	font-weight: 600;
+	border-radius: 9999px;
+	font-size: 11px;
+	font-weight: 500;
 	text-transform: uppercase;
+	letter-spacing: 0.025em;
 	line-height: 1;
 }
 
@@ -132,8 +133,8 @@
 }
 
 .deployment-status.status-success {
-	background: #d7f8e0;
-	color: var(--df-success-dark);
+	background: #dcfce7;
+	color: #166534;
 }
 
 .deployment-status.status-success .status-dot {
@@ -141,8 +142,8 @@
 }
 
 .deployment-status.status-failed {
-	background: #facfd2;
-	color: var(--df-error-dark);
+	background: #fee2e2;
+	color: #991b1b;
 }
 
 .deployment-status.status-failed .status-dot {
@@ -150,8 +151,8 @@
 }
 
 .deployment-status.status-pending {
-	background: #fcf3cf;
-	color: var(--df-warning-dark);
+	background: #fef9c3;
+	color: #854d0e;
 }
 
 .deployment-status.status-pending .status-dot {
@@ -159,31 +160,31 @@
 }
 
 .deployment-status.status-building {
-	background: #d0e1f9;
-	color: #003b75;
+	background: #dbeafe;
+	color: #1e40af;
 }
 
 .deployment-status.status-building .status-dot {
-	background: #2271b1;
+	background: #1e40af;
 }
 
 .deployment-status.status-queued {
-	background: #e3d4fc;
-	color: #5b2d91;
+	background: #ede9fe;
+	color: #5b21b6;
 }
 
 .deployment-status.status-queued .status-dot {
-	background: #7b2d91;
+	background: #5b21b6;
 }
 
 .deployment-status.status-deploying {
-	background: #c4e0ff;
-	color: #004a99;
+	background: #dbeafe;
+	color: #1e3a8a;
 	animation: pulse 2s ease-in-out infinite;
 }
 
 .deployment-status.status-deploying .status-dot {
-	background: #004a99;
+	background: #1e3a8a;
 }
 
 @keyframes pulse {
@@ -218,23 +219,25 @@
 .deployment-active-badge {
 	display: inline-block;
 	padding: 4px 10px;
-	border-radius: var(--df-radius-sm);
-	font-size: 12px;
-	font-weight: 600;
+	border-radius: 9999px;
+	font-size: 11px;
+	font-weight: 500;
 	text-transform: uppercase;
+	letter-spacing: 0.025em;
 	line-height: 1;
-	background: #e8f5e9;
-	color: #1b5e20;
-	border: 1px solid #a5d6a7;
+	background: #dcfce7;
+	color: #166534;
+	border: 1px solid #bbf7d0;
 	margin-left: 6px;
 }
 
 .deployment-drift-indicator {
 	display: inline-block;
 	padding: 3px 8px;
-	border-radius: var(--df-radius-sm);
+	border-radius: 9999px;
 	font-size: 11px;
-	font-weight: 600;
+	font-weight: 500;
+	letter-spacing: 0.025em;
 	line-height: 1;
 	background: #fff3e0;
 	color: #e65100;

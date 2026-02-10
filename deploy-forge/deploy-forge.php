@@ -3,7 +3,7 @@
  * Plugin Name: Deploy Forge
  * Plugin URI: https://getdeployforge.com
  * Description: Automates theme deployment from GitHub repositories via Deploy Forge platform
- * Version: 1.0.56
+ * Version: 1.0.57
  * Author: Deploy Forge
  * Author URI: https://getdeployforge.com
  * License: GPL v2 or later
