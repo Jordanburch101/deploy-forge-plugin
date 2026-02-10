@@ -314,7 +314,13 @@ class Deploy_Forge_Plugin_Updater {
 		$html = (string) preg_replace( '/^[\-\*] (.+)$/m', '<li>$1</li>', $html );
 		$html = (string) preg_replace( '/(<li>.*<\/li>\n?)+/s', '<ul>$0</ul>', $html );
 
-		// Line breaks for remaining lines.
+		// Remove blank lines (they produce excess <br> tags).
+		$html = (string) preg_replace( '/\n{2,}/', "\n", $html );
+
+		// Remove newlines directly after block-level closing tags.
+		$html = (string) preg_replace( '/(<\/(?:h[1-6]|ul|li|p)>)\n/', '$1', $html );
+
+		// Convert remaining newlines to <br> for inline text.
 		$html = nl2br( $html );
 
 		return $html;

@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.50] - 2026-02-10
+
+### Fixed
+- Changelog display in plugin update modal had excessive spacing caused by `nl2br()` converting blank lines and post-block-element newlines into `<br>` tags
+
 ## [1.0.49] - 2026-02-10
 
 ### Fixed
