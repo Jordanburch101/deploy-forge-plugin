@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 jobs:
-  release:
+  lint-and-test:
     runs-on: ubuntu-latest
 
     steps:
@@ -28,8 +28,145 @@ jobs:
       - name: Run PHPCS
         run: ./vendor/bin/phpcs --standard=phpcs.xml.dist
 
-      - name: Run tests
+      - name: Run unit tests
         run: ./vendor/bin/phpunit
+
+  integration:
+    runs-on: ubuntu-latest
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: wordpress
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping --silent"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    env:
+      WP_DB_NAME: wordpress
+      WP_DB_USER: root
+      WP_DB_PASS: root
+      WP_DB_HOST: 127.0.0.1
+      WP_URL: http://localhost:8080
+      WP_TITLE: "Test Site"
+      WP_ADMIN_USER: admin
+      WP_ADMIN_PASS: admin123
+      WP_ADMIN_EMAIL: admin@example.com
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup PHP 8.0 (minimum supported)
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.0'
+          extensions: mysqli, zip, sodium
+          coverage: none
+
+      - name: Install WP-CLI
+        run: |
+          curl -O https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar
+          chmod +x wp-cli.phar
+          sudo mv wp-cli.phar /usr/local/bin/wp
+
+      - name: Install WordPress
+        run: |
+          mkdir -p /tmp/wordpress
+          cd /tmp/wordpress
+          wp core download --version=latest
+          wp config create \
+            --dbname=$WP_DB_NAME \
+            --dbuser=$WP_DB_USER \
+            --dbpass=$WP_DB_PASS \
+            --dbhost=$WP_DB_HOST
+          wp core install \
+            --url=$WP_URL \
+            --title="$WP_TITLE" \
+            --admin_user=$WP_ADMIN_USER \
+            --admin_password=$WP_ADMIN_PASS \
+            --admin_email=$WP_ADMIN_EMAIL \
+            --skip-email
+          wp config set WP_DEBUG true --raw
+          wp config set WP_DEBUG_LOG true --raw
+          echo "WordPress $(wp core version) installed"
+
+      - name: Install and activate plugin
+        run: |
+          cp -r deploy-forge /tmp/wordpress/wp-content/plugins/deploy-forge
+          wp plugin activate deploy-forge --path=/tmp/wordpress
+          echo "Plugin activated successfully"
+
+      - name: Check for PHP errors
+        run: |
+          wp eval "echo 'WordPress loaded OK';" --path=/tmp/wordpress
+
+          LOG_FILE="/tmp/wordpress/wp-content/debug.log"
+          if [ -f "$LOG_FILE" ] && grep -iE "(Fatal error|Parse error)" "$LOG_FILE"; then
+            echo "FAIL: Fatal/parse errors found"
+            cat "$LOG_FILE"
+            exit 1
+          fi
+          echo "No fatal errors"
+
+      - name: Verify database tables created
+        run: |
+          TABLE=$(wp db query "SHOW TABLES LIKE '%github_deployments';" --path=/tmp/wordpress 2>/dev/null)
+          if [ -z "$TABLE" ]; then
+            echo "FAIL: Deployment table was not created"
+            exit 1
+          fi
+          echo "Database table created: $TABLE"
+
+      - name: Verify admin pages load
+        run: |
+          cd /tmp/wordpress
+          php -S localhost:8080 -t . &>/dev/null &
+          sleep 2
+
+          COOKIE_JAR=$(mktemp)
+          curl -s -c "$COOKIE_JAR" "http://localhost:8080/wp-login.php" > /dev/null
+          curl -s -b "$COOKIE_JAR" -c "$COOKIE_JAR" \
+            -d "log=$WP_ADMIN_USER&pwd=$WP_ADMIN_PASS&wp-submit=Log+In&redirect_to=%2Fwp-admin%2F&testcookie=1" \
+            -L "http://localhost:8080/wp-login.php" > /dev/null
+
+          ERRORS=0
+          for PAGE in "admin.php?page=deploy-forge" "admin.php?page=deploy-forge-settings" "admin.php?page=deploy-forge-logs"; do
+            HTTP_CODE=$(curl -s -o /tmp/page-output.html -w "%{http_code}" \
+              -b "$COOKIE_JAR" "http://localhost:8080/wp-admin/$PAGE")
+            if [ "$HTTP_CODE" != "200" ]; then
+              echo "FAIL: $PAGE returned HTTP $HTTP_CODE"
+              ERRORS=$((ERRORS + 1))
+            elif grep -qi "Fatal error\|Parse error\|Call to undefined" /tmp/page-output.html; then
+              echo "FAIL: PHP error in $PAGE"
+              ERRORS=$((ERRORS + 1))
+            else
+              echo "OK: $PAGE"
+            fi
+          done
+
+          if [ $ERRORS -gt 0 ]; then exit 1; fi
+          echo "All admin pages loaded successfully"
+
+      - name: Verify clean deactivation and re-activation
+        run: |
+          wp plugin deactivate deploy-forge --path=/tmp/wordpress
+          wp plugin activate deploy-forge --path=/tmp/wordpress
+          wp eval "echo 'Re-activation OK';" --path=/tmp/wordpress
+
+  release:
+    needs: [lint-and-test, integration]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
       - name: Validate tag format
         id: validate
