@@ -90,6 +90,8 @@ class Deploy_Forge_Database {
 			artifact_name varchar(255),
 			artifact_size bigint(20) unsigned,
 			artifact_download_url varchar(500),
+			file_manifest longtext,
+			snapshot_path varchar(500),
 			created_at datetime DEFAULT CURRENT_TIMESTAMP,
 			updated_at datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 			PRIMARY KEY (id),
