@@ -118,7 +118,13 @@ class Deploy_Forge_Database {
 	 * @return void
 	 */
 	public function maybe_upgrade(): void {
-		$current_version = get_option( 'deploy_forge_db_version', '1.0' );
+		$current_version = get_option( 'deploy_forge_db_version' );
+
+		// No version stored means tables haven't been created yet (fresh install).
+		// Activation hook will call create_tables() which handles the full schema.
+		if ( false === $current_version ) {
+			return;
+		}
 
 		if ( version_compare( $current_version, self::DB_VERSION, '<' ) ) {
 			$this->run_migrations( $current_version );
