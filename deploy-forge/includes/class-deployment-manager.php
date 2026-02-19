@@ -2387,18 +2387,17 @@ class Deploy_Forge_Deployment_Manager {
 	 */
 	private function generate_unified_diff( string $original, string $modified, string $label_orig, string $label_mod ): string {
 		if ( ! class_exists( 'Text_Diff', false ) ) {
-			require_once ABSPATH . WPINC . '/Text/Diff.php';
-			require_once ABSPATH . WPINC . '/Text/Diff/Renderer.php';
-			require_once ABSPATH . WPINC . '/Text/Diff/Renderer/unified.php';
+			require_once ABSPATH . WPINC . '/wp-diff.php';
+		}
+		if ( ! class_exists( 'Deploy_Forge_Unified_Diff_Renderer', false ) ) {
+			require_once __DIR__ . '/class-unified-diff-renderer.php';
 		}
 
 		$original_lines = explode( "\n", $original );
 		$modified_lines = explode( "\n", $modified );
 
-		$diff                              = new \Text_Diff( 'auto', array( $original_lines, $modified_lines ) );
-		$renderer                          = new \Text_Diff_Renderer_unified();
-		$renderer->_leading_context_lines  = 3;
-		$renderer->_trailing_context_lines = 3;
+		$diff     = new \Text_Diff( 'auto', array( $original_lines, $modified_lines ) );
+		$renderer = new \Deploy_Forge_Unified_Diff_Renderer();
 
 		$output = $renderer->render( $diff );
 
