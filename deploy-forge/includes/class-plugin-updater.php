@@ -87,7 +87,7 @@ class Deploy_Forge_Plugin_Updater {
 				'package'      => $release['download_url'],
 				'icons'        => array(),
 				'banners'      => array(),
-				'tested'       => '6.7',
+				'tested'       => '6.9',
 				'requires'     => '5.8',
 				'requires_php' => '8.0',
 			);
@@ -131,7 +131,7 @@ class Deploy_Forge_Plugin_Updater {
 		$info->author        = '<a href="https://getdeployforge.com">Deploy Forge</a>';
 		$info->homepage      = 'https://getdeployforge.com';
 		$info->download_link = $release['download_url'];
-		$info->tested        = '6.7';
+		$info->tested        = '6.9';
 		$info->requires      = '5.8';
 		$info->requires_php  = '8.0';
 		$info->last_updated  = $release['published_at'];

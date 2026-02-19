@@ -44,7 +44,7 @@ class Deploy_Forge_Database {
 	 * @since 1.0.0
 	 * @var string
 	 */
-	private const DB_VERSION = '1.2';
+	private const DB_VERSION = '1.3';
 
 	/**
 	 * Constructor.
@@ -178,8 +178,11 @@ class Deploy_Forge_Database {
 			}
 		}
 
-		// Migration to 1.2: Add file manifest and snapshot columns.
-		if ( version_compare( $from_version, '1.2', '<' ) ) {
+		// Migration to 1.3: Add file manifest and snapshot columns.
+		// Originally targeted 1.2, but create_tables() set db_version to 1.2
+		// before the columns were in the dbDelta schema, so the migration was
+		// skipped on existing installs. Bumped to 1.3 to force re-run.
+		if ( version_compare( $from_version, '1.3', '<' ) ) {
 			$columns_to_add = array(
 				'file_manifest' => 'longtext',
 				'snapshot_path' => 'varchar(500)',
