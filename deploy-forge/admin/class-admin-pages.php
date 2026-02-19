@@ -878,7 +878,7 @@ class Deploy_Forge_Admin_Pages extends Deploy_Forge_Ajax_Handler_Base {
 	}
 
 	/**
-	 * AJAX: Get unified diff for a specific file.
+	 * AJAX: Get side-by-side diff for a specific file.
 	 *
 	 * Returns the diff between the deployed and current live version of a file.
 	 *

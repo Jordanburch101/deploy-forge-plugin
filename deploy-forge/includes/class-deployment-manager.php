@@ -2373,35 +2373,120 @@ class Deploy_Forge_Deployment_Manager {
 	}
 
 	/**
-	 * Generate a unified diff between two strings.
+	 * Generate a side-by-side diff structure for two strings.
 	 *
-	 * Uses WordPress core's Text_Diff library.
+	 * Returns an array of row objects, each with type, left/right content and line numbers.
+	 * Types: context, delete, add, change, separator.
 	 *
-	 * @since 1.0.52
+	 * @since 1.0.63
 	 *
-	 * @param string $original   Original file contents.
-	 * @param string $modified   Modified file contents.
-	 * @param string $label_orig Label for the original file.
-	 * @param string $label_mod  Label for the modified file.
-	 * @return string Unified diff output.
+	 * @param string $original The original text.
+	 * @param string $modified The modified text.
+	 * @return array Array of diff row data.
 	 */
-	private function generate_unified_diff( string $original, string $modified, string $label_orig, string $label_mod ): string {
+	private function generate_side_by_side_diff( string $original, string $modified ): array {
 		if ( ! class_exists( 'Text_Diff', false ) ) {
 			require_once ABSPATH . WPINC . '/wp-diff.php';
 		}
-		if ( ! class_exists( 'Deploy_Forge_Unified_Diff_Renderer', false ) ) {
-			require_once __DIR__ . '/class-unified-diff-renderer.php';
+
+		$original_lines = '' === $original ? array() : explode( "\n", $original );
+		$modified_lines = '' === $modified ? array() : explode( "\n", $modified );
+
+		$diff = new \Text_Diff( 'auto', array( $original_lines, $modified_lines ) );
+		$ops  = $diff->getDiff();
+
+		// Build all rows from diff operations.
+		$all_rows  = array();
+		$left_num  = 1;
+		$right_num = 1;
+
+		foreach ( $ops as $op ) {
+			if ( $op instanceof \Text_Diff_Op_copy ) {
+				foreach ( $op->orig as $line ) {
+					$all_rows[] = array(
+						'type'      => 'context',
+						'left'      => $line,
+						'right'     => $line,
+						'left_num'  => $left_num++,
+						'right_num' => $right_num++,
+					);
+				}
+			} elseif ( $op instanceof \Text_Diff_Op_delete ) {
+				foreach ( $op->orig as $line ) {
+					$all_rows[] = array(
+						'type'      => 'delete',
+						'left'      => $line,
+						'right'     => null,
+						'left_num'  => $left_num++,
+						'right_num' => null,
+					);
+				}
+			} elseif ( $op instanceof \Text_Diff_Op_add ) {
+				foreach ( $op->final as $line ) {
+					$all_rows[] = array(
+						'type'      => 'add',
+						'left'      => null,
+						'right'     => $line,
+						'left_num'  => null,
+						'right_num' => $right_num++,
+					);
+				}
+			} elseif ( $op instanceof \Text_Diff_Op_change ) {
+				$max = max( count( $op->orig ), count( $op->final ) );
+				for ( $i = 0; $i < $max; $i++ ) {
+					$has_left   = isset( $op->orig[ $i ] );
+					$has_right  = isset( $op->final[ $i ] );
+					$all_rows[] = array(
+						'type'      => 'change',
+						'left'      => $has_left ? $op->orig[ $i ] : null,
+						'right'     => $has_right ? $op->final[ $i ] : null,
+						'left_num'  => $has_left ? $left_num++ : null,
+						'right_num' => $has_right ? $right_num++ : null,
+					);
+				}
+			}
 		}
 
-		$original_lines = explode( "\n", $original );
-		$modified_lines = explode( "\n", $modified );
+		// Apply context windowing (3 lines around changes).
+		$context     = 3;
+		$total       = count( $all_rows );
+		$show        = array_fill( 0, $total, false );
+		$first_shown = -1;
 
-		$diff     = new \Text_Diff( 'auto', array( $original_lines, $modified_lines ) );
-		$renderer = new \Deploy_Forge_Unified_Diff_Renderer();
+		for ( $i = 0; $i < $total; $i++ ) {
+			if ( 'context' !== $all_rows[ $i ]['type'] ) {
+				$start = max( 0, $i - $context );
+				$end   = min( $total - 1, $i + $context );
+				for ( $j = $start; $j <= $end; $j++ ) {
+					$show[ $j ] = true;
+				}
+			}
+		}
 
-		$output = $renderer->render( $diff );
+		// Build final rows with separators for skipped sections.
+		$result     = array();
+		$last_shown = -1;
 
-		return "--- {$label_orig}\n+++ {$label_mod}\n" . $output;
+		for ( $i = 0; $i < $total; $i++ ) {
+			if ( $show[ $i ] ) {
+				if ( -1 === $first_shown ) {
+					$first_shown = $i;
+					if ( $i > 0 ) {
+						$result[] = array( 'type' => 'separator' );
+					}
+				} elseif ( $i - $last_shown > 1 ) {
+					$result[] = array( 'type' => 'separator' );
+				}
+				$result[]   = $all_rows[ $i ];
+				$last_shown = $i;
+			}
+		}
+
+		if ( $last_shown >= 0 && $last_shown < $total - 1 ) {
+			$result[] = array( 'type' => 'separator' );
+		}
+
+		return $result;
 	}
 
 	/**
@@ -2488,7 +2573,7 @@ class Deploy_Forge_Deployment_Manager {
 	}
 
 	/**
-	 * Get a unified diff for a specific file between deployed state and live.
+	 * Get a side-by-side diff for a specific file between deployed state and live.
 	 *
 	 * @since 1.0.52
 	 *
@@ -2572,16 +2657,11 @@ class Deploy_Forge_Deployment_Manager {
 		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Reading local file, not a remote URL.
 		$current_content = $current_exists ? file_get_contents( $live_file_path ) : '';
 
-		$diff = $this->generate_unified_diff(
-			$original_content,
-			$current_content,
-			'a/' . $file_path,
-			'b/' . $file_path
-		);
+		$side_by_side = $this->generate_side_by_side_diff( $original_content, $current_content );
 
 		return array(
 			'file_path'       => $file_path,
-			'diff'            => $diff,
+			'side_by_side'    => $side_by_side,
 			'original_exists' => $original_exists,
 			'current_exists'  => $current_exists,
 		);

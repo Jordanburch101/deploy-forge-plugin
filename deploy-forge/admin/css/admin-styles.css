@@ -977,8 +977,12 @@
 }
 
 /* ==========================================================================
-	Diff Viewer
+	Diff Viewer (Side-by-Side)
 	========================================================================== */
+
+.deploy-forge-modal-diff {
+	max-width: 1200px;
+}
 
 .file-diff-output {
 	background: #1e1e1e !important;
@@ -986,42 +990,77 @@
 	font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
 	font-size: 13px;
 	line-height: 1.5;
-	padding: 16px !important;
 	border-radius: var(--df-radius-md) !important;
 	border: 1px solid #333 !important;
 	max-height: 600px;
 	overflow: auto;
+	padding: 0 !important;
+}
+
+.diff-side-by-side {
+	width: 100%;
+	border-collapse: collapse;
+	table-layout: fixed;
+}
+
+.diff-side-by-side td {
+	padding: 1px 8px;
+	vertical-align: top;
 	white-space: pre-wrap;
 	word-wrap: break-word;
 }
 
-.file-diff-output .diff-header {
-	color: #569cd6;
-	font-weight: 600;
-	display: block;
+.diff-side-by-side .diff-line-num {
+	width: 40px;
+	min-width: 40px;
+	max-width: 40px;
+	color: #858585;
+	text-align: right;
+	user-select: none;
+	padding-right: 8px;
+	border-right: 1px solid #333;
+	font-size: 12px;
 }
 
-.file-diff-output .diff-hunk {
-	color: #c586c0;
-	display: block;
-	margin-top: 4px;
+.diff-side-by-side .diff-code {
+	width: calc(50% - 40px);
+	border-right: 1px solid #333;
 }
 
-.file-diff-output .diff-add {
+.diff-side-by-side .diff-code:last-child {
+	border-right: none;
+}
+
+.diff-side-by-side .diff-add {
 	color: #6a9955;
 	background: rgba(106, 153, 85, 0.15);
-	display: block;
 }
 
-.file-diff-output .diff-remove {
+.diff-side-by-side .diff-remove {
 	color: #f44747;
 	background: rgba(244, 71, 71, 0.15);
-	display: block;
 }
 
-.file-diff-output .diff-context {
+.diff-side-by-side .diff-context {
+	color: #858585;
+}
+
+.diff-side-by-side .diff-empty-cell {
+	background: rgba(128, 128, 128, 0.05);
+}
+
+.diff-side-by-side .diff-separator td {
+	background: rgba(86, 156, 214, 0.08);
+	text-align: center;
+	color: #569cd6;
+	padding: 2px 8px;
+	font-size: 12px;
+}
+
+.diff-empty {
 	color: #808080;
-	display: block;
+	padding: 16px;
+	text-align: center;
 }
 
 /* ==========================================================================

@@ -1254,7 +1254,7 @@
 				},
 				success: ( response ) => {
 					if ( response.success && response.data.diff ) {
-						output.html( GitHubDeployAdmin.syntaxHighlightDiff( response.data.diff.diff ) );
+						output.html( GitHubDeployAdmin.renderSideBySideDiff( response.data.diff.side_by_side ) );
 					} else {
 						output.text( response.data?.message || 'Failed to load diff.' );
 					}
@@ -1266,36 +1266,68 @@
 		},
 
 		/**
-		 * Apply syntax highlighting to unified diff output
+		 * Render a side-by-side diff table from structured row data.
 		 *
-		 * @since 1.0.52
-		 * @param {string} diffText Raw unified diff text.
-		 * @return {string} HTML with syntax highlighting classes.
+		 * @since 1.0.63
+		 * @param {Array} rows Array of row objects from PHP side-by-side diff.
+		 * @return {string} HTML table for side-by-side diff.
 		 */
-		syntaxHighlightDiff: ( diffText ) => {
-			if ( ! diffText ) {
-				return '<span class="diff-context">No differences found.</span>';
+		renderSideBySideDiff: ( rows ) => {
+			if ( ! rows || ! rows.length ) {
+				return '<div class="diff-empty">No differences found.</div>';
 			}
 
-			const lines = diffText.split( '\n' );
-			let html = '';
+			let html = '<table class="diff-side-by-side"><tbody>';
 
-			lines.forEach( ( line ) => {
-				const escaped = GitHubDeployAdmin.escapeHtml( line );
+			const validTypes = [ 'context', 'delete', 'add', 'change', 'separator' ];
 
-				if ( line.startsWith( '---' ) || line.startsWith( '+++' ) ) {
-					html += '<span class="diff-header">' + escaped + '</span>';
-				} else if ( line.startsWith( '@@' ) ) {
-					html += '<span class="diff-hunk">' + escaped + '</span>';
-				} else if ( line.startsWith( '+' ) ) {
-					html += '<span class="diff-add">' + escaped + '</span>';
-				} else if ( line.startsWith( '-' ) ) {
-					html += '<span class="diff-remove">' + escaped + '</span>';
-				} else {
-					html += '<span class="diff-context">' + escaped + '</span>';
+			rows.forEach( ( row ) => {
+				const rowType = validTypes.includes( row.type ) ? row.type : 'context';
+
+				if ( 'separator' === rowType ) {
+					html += '<tr class="diff-separator">';
+					html += '<td class="diff-line-num"></td>';
+					html += '<td class="diff-code diff-separator-cell">...</td>';
+					html += '<td class="diff-line-num"></td>';
+					html += '<td class="diff-code diff-separator-cell">...</td>';
+					html += '</tr>';
+					return;
 				}
+
+				const leftNum = null !== row.left_num ? row.left_num : '';
+				const rightNum = null !== row.right_num ? row.right_num : '';
+				const leftContent = null !== row.left ? GitHubDeployAdmin.escapeHtml( row.left ) : '';
+				const rightContent = null !== row.right ? GitHubDeployAdmin.escapeHtml( row.right ) : '';
+
+				let leftClass, rightClass;
+
+				switch ( rowType ) {
+					case 'delete':
+						leftClass = 'diff-remove';
+						rightClass = 'diff-empty-cell';
+						break;
+					case 'add':
+						leftClass = 'diff-empty-cell';
+						rightClass = 'diff-add';
+						break;
+					case 'change':
+						leftClass = null !== row.left ? 'diff-remove' : 'diff-empty-cell';
+						rightClass = null !== row.right ? 'diff-add' : 'diff-empty-cell';
+						break;
+					default:
+						leftClass = 'diff-context';
+						rightClass = 'diff-context';
+				}
+
+				html += '<tr class="diff-row diff-row-' + rowType + '">';
+				html += '<td class="diff-line-num">' + leftNum + '</td>';
+				html += '<td class="diff-code ' + leftClass + '">' + ( leftContent || '&nbsp;' ) + '</td>';
+				html += '<td class="diff-line-num">' + rightNum + '</td>';
+				html += '<td class="diff-code ' + rightClass + '">' + ( rightContent || '&nbsp;' ) + '</td>';
+				html += '</tr>';
 			} );
 
+			html += '</tbody></table>';
 			return html;
 		},
 

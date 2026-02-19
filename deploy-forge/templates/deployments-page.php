@@ -242,11 +242,11 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 <!-- File Diff Modal -->
 <div id="file-diff-modal" class="deploy-forge-modal" style="display: none;">
-	<div class="deploy-forge-modal-content deploy-forge-modal-wide">
+	<div class="deploy-forge-modal-content deploy-forge-modal-wide deploy-forge-modal-diff">
 		<span class="deploy-forge-modal-close">&times;</span>
 		<h2 id="file-diff-title"><?php esc_html_e( 'File Diff', 'deploy-forge' ); ?></h2>
 		<div id="file-diff-content">
-			<pre class="file-diff-output"></pre>
+			<div class="file-diff-output"></div>
 		</div>
 	</div>
 </div>
