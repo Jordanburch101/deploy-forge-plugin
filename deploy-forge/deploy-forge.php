@@ -3,7 +3,7 @@
  * Plugin Name: Deploy Forge
  * Plugin URI: https://getdeployforge.com
  * Description: Automates theme deployment from GitHub repositories via Deploy Forge platform
- * Version: 1.0.63
+ * Version: 1.0.64
  * Author: Deploy Forge
  * Author URI: https://getdeployforge.com
  * License: GPL v2 or later
@@ -200,6 +200,22 @@ class Deploy_Forge {
 		register_deactivation_hook( __FILE__, array( $this, 'deactivate' ) );
 
 		add_action( 'rest_api_init', array( $this->webhook_handler, 'register_routes' ) );
+
+		// Inject Vercel deployment protection bypass header for staging.
+		if ( defined( 'DEPLOY_FORGE_VERCEL_BYPASS' ) ) {
+			add_filter(
+				'http_request_args',
+				function ( array $args, string $url ): array {
+					$backend_url = $this->settings->get_backend_url();
+					if ( $backend_url && str_starts_with( $url, $backend_url ) ) {
+						$args['headers']['x-vercel-protection-bypass'] = constant( 'DEPLOY_FORGE_VERCEL_BYPASS' );
+					}
+					return $args;
+				},
+				10,
+				2
+			);
+		}
 
 		// Register WP-Cron handler for async deployment processing.
 		add_action( 'deploy_forge_process_queued_deployment', array( $this, 'process_queued_deployment' ) );

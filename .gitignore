@@ -29,6 +29,7 @@ composer.lock
 
 # Internal docs
 /spec
+/docs
 
 # Personal config
 .cursorrules

@@ -2,6 +2,16 @@
 
 All notable changes to Deploy Forge will be documented in this file.
 
+## [1.0.64] - 2026-02-25
+
+### Added
+- Automatic WordPress cache clearing after successful deployments (`wp_cache_flush` + `wp_clean_themes_cache`)
+
+## [1.0.63] - 2026-02-25
+
+### Added
+- Side-by-side diff viewer for file change detection
+
 ## [1.0.62] - 2026-02-19
 
 ### Fixed

@@ -372,7 +372,7 @@ class Deploy_Forge_Settings {
 		// Call API to disconnect if we have an API key.
 		if ( ! empty( $api_key ) ) {
 			$response = wp_remote_post(
-				self::BACKEND_URL . '/api/plugin/auth/disconnect',
+				$this->get_backend_url() . '/api/plugin/auth/disconnect',
 				array(
 					'headers' => array(
 						'Content-Type' => 'application/json',

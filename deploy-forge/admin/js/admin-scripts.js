@@ -1286,10 +1286,7 @@
 
 				if ( 'separator' === rowType ) {
 					html += '<tr class="diff-separator">';
-					html += '<td class="diff-line-num"></td>';
-					html += '<td class="diff-code diff-separator-cell">...</td>';
-					html += '<td class="diff-line-num"></td>';
-					html += '<td class="diff-code diff-separator-cell">...</td>';
+					html += '<td class="diff-separator-cell" colspan="4"></td>';
 					html += '</tr>';
 					return;
 				}

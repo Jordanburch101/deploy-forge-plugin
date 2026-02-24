@@ -586,6 +586,29 @@ class DeploymentManagerTest extends TestCase {
 	}
 
 	/**
+	 * Test that flush_caches calls wp_cache_flush and wp_clean_themes_cache.
+	 *
+	 * @return void
+	 */
+	public function test_flush_caches_calls_wp_cache_functions(): void {
+		Functions\expect( 'wp_cache_flush' )->once();
+		Functions\expect( 'wp_clean_themes_cache' )->once()->with( true );
+
+		// Mock the deployment record for log_deployment.
+		$deployment = (object) array(
+			'id'              => 1,
+			'deployment_logs' => '',
+		);
+		$this->mock_database->shouldReceive( 'get_deployment' )
+			->with( 1 )
+			->andReturn( $deployment );
+		$this->mock_database->shouldReceive( 'update_deployment' )
+			->andReturn( true );
+
+		$this->manager->flush_caches( 1 );
+	}
+
+	/**
 	 * Test manual deployment fails if remote trigger fails.
 	 *
 	 * @return void

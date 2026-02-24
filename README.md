@@ -50,7 +50,7 @@ The plugin checks for updates automatically — you'll get update notifications 
 
 ## Pricing
 
-All plans include a **30-day free trial** with no credit card required.
+All plans include a **30-day free trial**. A credit card is required to start the trial, but you won't be charged until the trial ends.
 
 | Plan | Sites | Price |
 |------|-------|-------|

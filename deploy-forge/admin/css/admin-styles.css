@@ -989,9 +989,9 @@
 	color: #d4d4d4;
 	font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
 	font-size: 13px;
-	line-height: 1.5;
+	line-height: 1.6;
 	border-radius: var(--df-radius-md) !important;
-	border: 1px solid #333 !important;
+	border: 1px solid #3a3a3a !important;
 	max-height: 600px;
 	overflow: auto;
 	padding: 0 !important;
@@ -1004,57 +1004,69 @@
 }
 
 .diff-side-by-side td {
-	padding: 1px 8px;
+	padding: 0 10px;
 	vertical-align: top;
-	white-space: pre-wrap;
-	word-wrap: break-word;
+	white-space: pre;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	max-width: 0;
 }
 
+/* Line number gutters */
 .diff-side-by-side .diff-line-num {
-	width: 40px;
-	min-width: 40px;
-	max-width: 40px;
-	color: #858585;
+	width: 44px;
+	min-width: 44px;
+	max-width: 44px;
+	color: #6e7681;
+	background: rgba(255, 255, 255, 0.02);
 	text-align: right;
 	user-select: none;
-	padding-right: 8px;
-	border-right: 1px solid #333;
+	padding: 0 8px;
+	border-right: 1px solid #3a3a3a;
 	font-size: 12px;
 }
 
+/* Center divider between left and right panels */
+.diff-side-by-side .diff-line-num:nth-child(3) {
+	border-left: 2px solid #484848;
+}
+
+/* Code columns */
 .diff-side-by-side .diff-code {
-	width: calc(50% - 40px);
-	border-right: 1px solid #333;
+	width: calc(50% - 44px);
 }
 
-.diff-side-by-side .diff-code:last-child {
-	border-right: none;
-}
-
+/* Changed lines */
 .diff-side-by-side .diff-add {
-	color: #6a9955;
-	background: rgba(106, 153, 85, 0.15);
+	color: #7ec87e;
+	background: rgba(46, 160, 67, 0.12);
 }
 
 .diff-side-by-side .diff-remove {
-	color: #f44747;
-	background: rgba(244, 71, 71, 0.15);
+	color: #f47067;
+	background: rgba(248, 81, 73, 0.12);
 }
 
+/* Context lines */
 .diff-side-by-side .diff-context {
-	color: #858585;
+	color: #9a9ea3;
 }
 
+/* Empty cells on the opposite side of add/delete */
 .diff-side-by-side .diff-empty-cell {
-	background: rgba(128, 128, 128, 0.05);
+	background: rgba(128, 128, 128, 0.04);
 }
 
-.diff-side-by-side .diff-separator td {
-	background: rgba(86, 156, 214, 0.08);
+/* Separator row between chunks */
+.diff-side-by-side .diff-separator-cell {
+	background: rgba(86, 156, 214, 0.06);
+	border-top: 1px solid #3a3a3a;
+	border-bottom: 1px solid #3a3a3a;
 	text-align: center;
 	color: #569cd6;
-	padding: 2px 8px;
-	font-size: 12px;
+	padding: 1px 8px;
+	font-size: 11px;
+	height: 6px;
 }
 
 .diff-empty {

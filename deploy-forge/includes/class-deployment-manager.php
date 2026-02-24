@@ -1622,6 +1622,9 @@ class Deploy_Forge_Deployment_Manager {
 		$this->logger->log_deployment_step( $deployment_id, 'Deployment Complete', 'SUCCESS!' );
 		$this->log_deployment( $deployment_id, 'Deployment completed successfully!' );
 
+		// Flush WordPress caches so the new theme files are served immediately.
+		$this->flush_caches( $deployment_id );
+
 		// Report success status back to Deploy Forge API.
 		$this->report_status_to_backend( $deployment_id, true );
 
@@ -2695,6 +2698,25 @@ class Deploy_Forge_Deployment_Manager {
 				'deployment_logs' => $updated_logs,
 			)
 		);
+	}
+
+	/**
+	 * Flush WordPress caches after deployment.
+	 *
+	 * Clears the object cache and theme cache to ensure the newly
+	 * deployed theme files are served immediately.
+	 *
+	 * @since 1.0.64
+	 *
+	 * @param int $deployment_id The deployment ID for logging.
+	 * @return void
+	 */
+	public function flush_caches( int $deployment_id ): void {
+		wp_cache_flush();
+		wp_clean_themes_cache( true );
+
+		$this->logger->log_deployment_step( $deployment_id, 'Cache Cleared', 'success' );
+		$this->log_deployment( $deployment_id, 'Cache cleared (object cache + theme cache).' );
 	}
 
 	/**
