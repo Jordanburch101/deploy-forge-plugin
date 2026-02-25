@@ -1,4 +1,5 @@
 import { test as setup } from '@playwright/test';
+import { mkdirSync } from 'fs';
 import { WP_ADMIN_USER, WP_ADMIN_PASS } from './helpers';
 
 setup('authenticate as WP admin', async ({ page }) => {
@@ -18,5 +19,6 @@ setup('authenticate as WP admin', async ({ page }) => {
   await page.locator('#wpadminbar').waitFor({ state: 'visible' });
 
   // Persist auth state for downstream tests
+  mkdirSync('.auth', { recursive: true });
   await page.context().storageState({ path: '.auth/wp-admin.json' });
 });

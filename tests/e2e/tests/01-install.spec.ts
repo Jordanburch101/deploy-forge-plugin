@@ -13,8 +13,8 @@ test.describe.serial('Plugin Installation', () => {
     // Navigate to Plugins > Add New
     await page.goto('/wp-admin/plugin-install.php');
 
-    // Click "Upload Plugin" tab
-    await page.click('.upload-plugin');
+    // Click "Upload Plugin" button to reveal the upload form
+    await page.getByRole('button', { name: 'Upload Plugin' }).click();
 
     // Wait for file input to be visible
     const fileInput = page.locator('#pluginzip');
@@ -47,7 +47,7 @@ test.describe.serial('Plugin Installation', () => {
 
     // Verify plugin is active — Deploy Forge menu should appear in admin sidebar
     await expect(
-      page.locator('#adminmenu').getByText('Deploy Forge')
+      page.locator('#adminmenu .wp-menu-name').filter({ hasText: 'Deploy Forge' })
     ).toBeVisible({ timeout: 10_000 });
   });
 

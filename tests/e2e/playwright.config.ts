@@ -46,6 +46,7 @@ export default defineConfig({
   projects: [
     {
       name: 'setup',
+      testDir: '.',
       testMatch: '*.setup.ts',
     },
     {
