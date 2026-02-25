@@ -63,7 +63,7 @@ Tests run serially in a fixed order. Each suite depends on the state left by the
 
 1. **01-install** -- Resets the staging environment via the mu-plugin endpoint, uploads the plugin ZIP through the WordPress admin UI, activates the plugin, and verifies all admin pages load without PHP errors.
 2. **02-connect** -- Initiates the OAuth-style connection flow from the settings page, authenticates with the Deploy Forge app, selects a repository, and confirms the connection is established back in WordPress.
-3. **03-deploy** -- Triggers a manual deployment via the "Deploy Now" button, polls the deployments page until the build succeeds (up to 8 minutes), and verifies the deployment details modal works.
+3. **03-deploy** -- Triggers a manual deployment via the "Deploy Now" button, polls the deployments page until the build succeeds (up to 3 minutes), and verifies the deployment details modal works.
 4. **04-rollback** -- Verifies the rollback button is not shown on the active deployment and confirms the rollback AJAX endpoint returns a clean JSON error for an invalid deployment ID.
 
 Because the tests are stateful and sequential, the Playwright config sets `fullyParallel: false` and `workers: 1`. Retries are disabled -- a failure mid-chain means subsequent tests cannot run meaningfully.

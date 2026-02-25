@@ -35,7 +35,9 @@ async function globalSetup(): Promise<void> {
       console.log(
         `[global-setup] Attempt ${attempt}/${MAX_RETRIES}: reaching ${loginURL}`
       );
-      const response = await fetch(loginURL);
+      const response = await fetch(loginURL, {
+        signal: AbortSignal.timeout(15_000),
+      });
       if (response.ok) {
         console.log(
           `[global-setup] Staging site is reachable (status ${response.status})`

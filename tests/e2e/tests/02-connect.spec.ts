@@ -23,10 +23,9 @@ test.describe('Site Connection', () => {
 
     if (VERCEL_BYPASS_TOKEN) {
       await page.goto(
-        `${APP_URL}/login?x-vercel-protection-bypass=${VERCEL_BYPASS_TOKEN}&x-vercel-set-bypass-cookie=samesitenone`
+        `${APP_URL}/login?x-vercel-protection-bypass=${VERCEL_BYPASS_TOKEN}&x-vercel-set-bypass-cookie=samesitenone`,
+        { waitUntil: 'domcontentloaded' }
       );
-      // Wait briefly for the cookie to be set
-      await page.waitForTimeout(2_000);
     }
 
     // ── Step 1: Initiate connection from WordPress ────────────────────
