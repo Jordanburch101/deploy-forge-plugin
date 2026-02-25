@@ -8,10 +8,17 @@ import {
 } from '../helpers';
 
 test.describe.serial('Site Connection', () => {
-  test('initiate connection from settings page', async ({ page }) => {
+  /**
+   * The entire setup wizard (initiate → login → register → GitHub →
+   * repo/branch → method → redirect back) must run in a single test
+   * because Playwright gives each test() a fresh page/context.
+   * The cross-origin OAuth flow requires continuous browser state.
+   */
+  test('complete setup wizard and connect site', async ({ page }) => {
+    // ── Step 1: Initiate connection from WordPress ────────────────────
+
     await page.goto('/wp-admin/admin.php?page=deploy-forge-settings');
 
-    // Verify the connect button is present
     const connectBtn = page.locator('#connect-btn');
     await expect(connectBtn).toBeVisible();
 
@@ -23,109 +30,88 @@ test.describe.serial('Site Connection', () => {
       { timeout: 30_000 }
     );
 
-    // Click the connect button
     await connectBtn.click();
-
-    // Wait for the AJAX call to complete
     await ajaxResponse;
 
-    // The JS redirects to the Deploy Forge app after receiving the redirect URL.
-    // The app redirects to /site-setup?site_url=...&nonce=... or /login?redirect=...
+    // Wait for redirect to the Deploy Forge app
     await page.waitForURL(`${APP_URL}/**`, { timeout: 30_000 });
-  });
 
-  test('authenticate with Deploy Forge app', async ({ page }) => {
-    // If we're redirected to login, authenticate first
+    // ── Step 2: Authenticate with Deploy Forge app ────────────────────
+
     if (page.url().includes('/login')) {
       await page.getByPlaceholder('you@example.com').fill(APP_EMAIL);
       await page.getByPlaceholder('Enter your password').fill(APP_PASSWORD);
       await page.getByRole('button', { name: /sign in/i }).click();
 
-      // Wait for redirect away from login (to /site-setup)
+      // Wait for redirect away from login
       await page.waitForURL((url) => !url.href.includes('/login'), {
         timeout: 15_000,
       });
     }
 
-    // We should now be on the site-setup page
+    // Should now be on /site-setup
     expect(page.url()).toContain('/site-setup');
-  });
 
-  test('register site', async ({ page }) => {
-    // Step 1: Register Step — shows the WordPress site URL and a workspace picker
+    // ── Step 3: Register site ─────────────────────────────────────────
 
-    // Wait for the "Register Your Site" heading
     await expect(
       page.getByRole('heading', { name: /register your site/i })
     ).toBeVisible({ timeout: 15_000 });
 
-    // Select workspace (click the dropdown, pick the first option)
+    // Select workspace if the dropdown is showing
     const workspaceBtn = page.getByRole('button', {
       name: /select workspace/i,
     });
-    // If the workspace is already pre-selected, skip the dropdown
-    const needsWorkspaceSelection = await workspaceBtn.isVisible().catch(() => false);
-    if (needsWorkspaceSelection) {
+    if (await workspaceBtn.isVisible().catch(() => false)) {
       await workspaceBtn.click();
       await page.getByRole('menuitem').first().click();
     }
 
-    // Click "Register & Continue"
     await page.getByRole('button', { name: /register.*continue/i }).click();
 
-    // Wait for registration to complete — success alert or move to next step
+    // Wait for registration to complete
     await expect(
       page.getByText(/site registered|github/i)
     ).toBeVisible({ timeout: 15_000 });
-  });
 
-  test('continue past GitHub installations step', async ({ page }) => {
-    // Step 2: GitHub Step — shows existing GitHub App installations
-    // The staging E2E user should already have a GitHub App installed
+    // ── Step 4: GitHub installations ──────────────────────────────────
 
-    // Wait for the GitHub Accounts heading or the continue button
-    const continueBtn = page.getByRole('button', {
+    const continueToRepoBtn = page.getByRole('button', {
       name: /continue to repository selection/i,
     });
+    await expect(continueToRepoBtn).toBeVisible({ timeout: 15_000 });
+    await continueToRepoBtn.click();
 
-    await expect(continueBtn).toBeVisible({ timeout: 15_000 });
-    await continueBtn.click();
-  });
+    // ── Step 5: Select repository and branch ──────────────────────────
 
-  test('select repository and branch', async ({ page }) => {
-    // Step 3: Repository Step — select account, repo, and branch
-
-    // The repo name format is "owner/repo" — extract parts for matching
     const repoName = TEST_REPO.split('/').pop() ?? TEST_REPO;
 
-    // Select GitHub account (first available)
+    // Select GitHub account if dropdown is showing
     const accountDropdown = page.getByRole('button', {
       name: /select account/i,
     });
-    // If account is already selected (only one installation), skip
-    const needsAccountSelection = await accountDropdown.isVisible().catch(() => false);
-    if (needsAccountSelection) {
+    if (await accountDropdown.isVisible().catch(() => false)) {
       await accountDropdown.click();
       await page.getByRole('menuitem').first().click();
     }
 
-    // Select repository — open dropdown, search, pick the match
+    // Select repository
     const repoDropdown = page.getByRole('button', {
       name: /select repository/i,
     });
     await expect(repoDropdown).toBeEnabled({ timeout: 10_000 });
     await repoDropdown.click();
 
-    // Search for the test repo
     const repoSearch = page.getByPlaceholder('Search repositories...');
     if (await repoSearch.isVisible().catch(() => false)) {
       await repoSearch.fill(repoName);
     }
 
-    // Click the matching repo
-    await page.getByRole('menuitem', { name: new RegExp(repoName, 'i') }).click();
+    await page
+      .getByRole('menuitem', { name: new RegExp(repoName, 'i') })
+      .click();
 
-    // Select branch — open dropdown, pick the e2e-test branch
+    // Select branch
     const branchDropdown = page.getByRole('button', {
       name: /select branch/i,
     });
@@ -135,22 +121,16 @@ test.describe.serial('Site Connection', () => {
       .getByRole('menuitem', { name: new RegExp(TEST_BRANCH, 'i') })
       .click();
 
-    // Click Continue
     await page.getByRole('button', { name: /^continue$/i }).click();
-  });
 
-  test('select deployment method and complete setup', async ({ page }) => {
-    // Step 4: Method Step — select deployment method and workflow
+    // ── Step 6: Select deployment method and complete ─────────────────
 
-    // Select deployment method — GitHub Actions
     const methodDropdown = page.getByRole('button', {
       name: /select method/i,
     });
     await expect(methodDropdown).toBeVisible({ timeout: 10_000 });
     await methodDropdown.click();
-    await page
-      .getByRole('menuitem', { name: /github actions/i })
-      .click();
+    await page.getByRole('menuitem', { name: /github actions/i }).click();
 
     // Select workflow (first available)
     const workflowDropdown = page.getByRole('button', {
@@ -160,11 +140,9 @@ test.describe.serial('Site Connection', () => {
     await workflowDropdown.click();
     await page.getByRole('menuitem').first().click();
 
-    // Click "Complete Setup"
+    // Complete setup — redirects back to WordPress
     await page.getByRole('button', { name: /complete setup/i }).click();
 
-    // After completion, the app redirects back to WordPress with the
-    // connection_token. Wait for the redirect back to WP admin.
     await page.waitForURL(
       '**/wp-admin/admin.php?page=deploy-forge-settings**',
       { timeout: 60_000 }
@@ -179,12 +157,11 @@ test.describe.serial('Site Connection', () => {
       page.locator('.deploy-forge-connection-card.is-connected')
     ).toBeVisible({ timeout: 15_000 });
 
-    // Header should show "Connected to Deploy Forge"
     await expect(
       page.getByText('Connected to Deploy Forge')
     ).toBeVisible();
 
-    // Repo info should be displayed (format: "owner/repo" — contains a slash)
+    // Repo info should be displayed (format: "owner/repo")
     const repoValue = page.locator('.deploy-forge-detail-value').filter({
       hasText: '/',
     });
@@ -195,7 +172,7 @@ test.describe.serial('Site Connection', () => {
       page.getByRole('button', { name: 'Disconnect from Deploy Forge' })
     ).toBeVisible();
 
-    // Deployment Options form section should be visible (only shown when connected)
+    // Deployment Options form section should be visible
     await expect(
       page.getByRole('heading', { name: 'Deployment Options' })
     ).toBeVisible();
@@ -204,15 +181,13 @@ test.describe.serial('Site Connection', () => {
   test('deployments page shows repo header', async ({ page }) => {
     await page.goto('/wp-admin/admin.php?page=deploy-forge');
 
-    // Welcome banner should NOT be visible (site is now connected)
+    // Welcome banner should NOT be visible
     await expect(
       page.locator('.deploy-forge-welcome-banner')
     ).not.toBeVisible();
 
     // Repo header bar should be visible
-    await expect(
-      page.locator('.deploy-forge-header-bar')
-    ).toBeVisible();
+    await expect(page.locator('.deploy-forge-header-bar')).toBeVisible();
 
     // Deploy Now button should be visible
     await expect(

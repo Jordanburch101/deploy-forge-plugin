@@ -2,6 +2,15 @@
 
 All notable changes to Deploy Forge will be documented in this file.
 
+## [Unreleased] - 2026-02-25
+
+### Added
+- Playwright E2E integration test suite targeting Railway staging environment
+- Staging-only mu-plugin (`e2e-reset-deploy-forge.php`) for idempotent environment cleanup via REST endpoint
+- Full user-journey test coverage: plugin install, site connection (OAuth wizard), deployment trigger, rollback
+- GitHub Actions CI workflow (`e2e-staging.yml`) running on `staging` branch pushes with concurrency lock
+- Auth setup using Playwright storage state pattern for WordPress admin session reuse
+
 ## [1.0.64] - 2026-02-25
 
 ### Added

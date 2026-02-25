@@ -7,6 +7,9 @@ test.describe.serial('Plugin Installation', () => {
   });
 
   test('upload and activate plugin via WordPress admin', async ({ page }) => {
+    // Guard: PLUGIN_ZIP_PATH must be set
+    test.skip(!PLUGIN_ZIP_PATH, 'PLUGIN_ZIP_PATH not set — skipping upload test');
+
     // Navigate to Plugins > Add New
     await page.goto('/wp-admin/plugin-install.php');
 

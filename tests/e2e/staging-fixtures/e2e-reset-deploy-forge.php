@@ -163,7 +163,6 @@ function deploy_forge_e2e_handle_reset( WP_REST_Request $request ): WP_REST_Resp
 	// ── 6. Clear cron hooks ─────────────────────────────────────────────
 	$cron_hooks = array(
 		'deploy_forge_check_build_status',
-		'deploy_forge_cleanup_backups',
 		'deploy_forge_process_queued_deployment',
 		'deploy_forge_process_clone_deployment',
 		'deploy_forge_daily_cleanup',

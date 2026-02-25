@@ -37,10 +37,10 @@ export default defineConfig({
     navigationTimeout: 60_000,
     actionTimeout: 15_000,
 
-    /* Capture artifacts for debugging */
-    trace: 'on-first-retry',
+    /* Capture artifacts for debugging — retries are 0 so use retain-on-failure */
+    trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
-    video: 'on-first-retry',
+    video: 'retain-on-failure',
   },
 
   projects: [
