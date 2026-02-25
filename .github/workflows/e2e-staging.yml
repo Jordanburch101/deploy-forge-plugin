@@ -57,6 +57,8 @@ jobs:
           STAGING_APP_E2E_EMAIL: ${{ secrets.STAGING_APP_E2E_EMAIL }}
           STAGING_APP_E2E_PASSWORD: ${{ secrets.STAGING_APP_E2E_PASSWORD }}
           E2E_RESET_SECRET: ${{ secrets.E2E_RESET_SECRET }}
+          E2E_TEST_REPO: ${{ secrets.E2E_TEST_REPO }}
+          E2E_TEST_BRANCH: ${{ secrets.E2E_TEST_BRANCH }}
           PLUGIN_ZIP_PATH: ${{ env.PLUGIN_ZIP_PATH }}
 
       - name: Upload test report

@@ -12,6 +12,8 @@ export const APP_EMAIL = process.env.STAGING_APP_E2E_EMAIL ?? '';
 export const APP_PASSWORD = process.env.STAGING_APP_E2E_PASSWORD ?? '';
 export const RESET_SECRET = process.env.E2E_RESET_SECRET ?? '';
 export const PLUGIN_ZIP_PATH = process.env.PLUGIN_ZIP_PATH ?? '';
+export const TEST_REPO = process.env.E2E_TEST_REPO ?? '';
+export const TEST_BRANCH = process.env.E2E_TEST_BRANCH ?? 'e2e-test';
 
 /* ------------------------------------------------------------------ */
 /*  resetDeployForge                                                   */
