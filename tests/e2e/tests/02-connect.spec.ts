@@ -8,7 +8,7 @@ import {
   VERCEL_BYPASS_TOKEN,
 } from '../helpers';
 
-test.describe.serial('Site Connection', () => {
+test.describe('Site Connection', () => {
   /**
    * The entire setup wizard (initiate → login → register → GitHub →
    * repo/branch → method → redirect back) must run in a single test
@@ -89,14 +89,17 @@ test.describe.serial('Site Connection', () => {
     ).toBeVisible({ timeout: 15_000 });
 
     // ── Step 4: GitHub installations (may be skipped) ─────────────────
-    // If the user already has a GitHub App installed, the wizard skips
+    // If the user already has a GitHub App installed, the wizard may skip
     // directly to repository selection. Handle both paths.
 
     const continueToRepoBtn = page.getByRole('button', {
       name: /continue to repository selection/i,
     });
-    if (await continueToRepoBtn.isVisible({ timeout: 5_000 }).catch(() => false)) {
+    try {
+      await continueToRepoBtn.waitFor({ state: 'visible', timeout: 10_000 });
       await continueToRepoBtn.click();
+    } catch {
+      // Already on the repository selection step — continue
     }
 
     // ── Step 5: Select repository and branch ──────────────────────────
@@ -141,23 +144,17 @@ test.describe.serial('Site Connection', () => {
     await page.getByRole('button', { name: /^continue$/i }).click();
 
     // ── Step 6: Select deployment method and complete ─────────────────
-    // Dropdowns may already be auto-populated if there's only one option.
+    // Use Direct Clone — simpler and faster than GitHub Actions for E2E.
 
     const methodDropdown = page.getByRole('button', {
       name: /select method/i,
     });
-    if (await methodDropdown.isVisible({ timeout: 5_000 }).catch(() => false)) {
+    try {
+      await methodDropdown.waitFor({ state: 'visible', timeout: 10_000 });
       await methodDropdown.click();
-      await page.getByRole('menuitem', { name: /github actions/i }).click();
-    }
-
-    // Select workflow if not already auto-selected
-    const workflowDropdown = page.getByRole('button', {
-      name: /select workflow/i,
-    });
-    if (await workflowDropdown.isVisible({ timeout: 5_000 }).catch(() => false)) {
-      await workflowDropdown.click();
-      await page.getByRole('menuitem').first().click();
+      await page.getByRole('menuitem', { name: /direct clone/i }).click();
+    } catch {
+      // Method already auto-selected — continue
     }
 
     // Wait for "Complete Setup" and click it

@@ -3,7 +3,7 @@ import { waitForDeploymentStatus } from '../helpers';
 
 const DEPLOYMENTS_PAGE = '/wp-admin/admin.php?page=deploy-forge';
 
-test.describe.serial('Manual deployment', () => {
+test.describe('Manual deployment', () => {
   test('trigger a manual deployment', async ({ page }) => {
     await page.goto(DEPLOYMENTS_PAGE);
 
@@ -80,16 +80,17 @@ test.describe.serial('Manual deployment', () => {
     );
 
     // Depending on timing, the status could be any of these
-    expect(['building', 'pending', 'success']).toContain(normalizedStatus);
+    expect(['building', 'pending', 'deploying', 'success']).toContain(normalizedStatus);
   });
 
   test('wait for deployment to succeed', async ({ page }) => {
-    test.setTimeout(600_000); // 10 minutes
+    test.setTimeout(300_000); // 5 minutes
 
     await page.goto(DEPLOYMENTS_PAGE);
 
-    // Poll until the first deployment reaches "success" (up to 8 minutes)
-    await waitForDeploymentStatus(page, 'success', 480_000);
+    // Poll until the first deployment reaches "success"
+    // Direct clone is fast (seconds), but allow up to 3 minutes for slow networks.
+    await waitForDeploymentStatus(page, 'success', 180_000);
 
     // After success, the active badge should be visible
     const activeBadge = page.locator(

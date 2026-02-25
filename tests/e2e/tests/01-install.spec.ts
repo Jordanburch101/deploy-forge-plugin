@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { resetDeployForge, PLUGIN_ZIP_PATH } from '../helpers';
 
-test.describe.serial('Plugin Installation', () => {
+test.describe('Plugin Installation', () => {
   test('reset staging environment', async ({ request }) => {
     await resetDeployForge(request);
   });

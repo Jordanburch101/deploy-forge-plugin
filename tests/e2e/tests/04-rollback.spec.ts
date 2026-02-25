@@ -10,7 +10,7 @@ import { WP_URL } from '../helpers';
  * deployment with a backup_path exists. With only one deployment from the
  * prior test suite, we focus on UI state and API error handling.
  */
-test.describe.serial('Rollback', () => {
+test.describe('Rollback', () => {
   test('rollback button is not visible on active deployment', async ({
     page,
   }) => {
