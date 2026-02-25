@@ -59,6 +59,7 @@ jobs:
           E2E_RESET_SECRET: ${{ secrets.E2E_RESET_SECRET }}
           E2E_TEST_REPO: ${{ secrets.E2E_TEST_REPO }}
           E2E_TEST_BRANCH: ${{ secrets.E2E_TEST_BRANCH }}
+          VERCEL_AUTOMATION_BYPASS: ${{ secrets.VERCEL_AUTOMATION_BYPASS }}
           PLUGIN_ZIP_PATH: ${{ env.PLUGIN_ZIP_PATH }}
 
       - name: Upload test report

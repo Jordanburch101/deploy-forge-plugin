@@ -14,6 +14,7 @@ export const RESET_SECRET = process.env.E2E_RESET_SECRET ?? '';
 export const PLUGIN_ZIP_PATH = process.env.PLUGIN_ZIP_PATH ?? '';
 export const TEST_REPO = process.env.E2E_TEST_REPO ?? '';
 export const TEST_BRANCH = process.env.E2E_TEST_BRANCH ?? 'e2e-test';
+export const VERCEL_BYPASS_TOKEN = process.env.VERCEL_AUTOMATION_BYPASS ?? '';
 
 /* ------------------------------------------------------------------ */
 /*  resetDeployForge                                                   */

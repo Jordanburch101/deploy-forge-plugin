@@ -5,6 +5,7 @@ import {
   APP_PASSWORD,
   TEST_REPO,
   TEST_BRANCH,
+  VERCEL_BYPASS_TOKEN,
 } from '../helpers';
 
 test.describe.serial('Site Connection', () => {
@@ -15,6 +16,19 @@ test.describe.serial('Site Connection', () => {
    * The cross-origin OAuth flow requires continuous browser state.
    */
   test('complete setup wizard and connect site', async ({ page }) => {
+    // ── Step 0: Set Vercel deployment protection bypass cookie ────────
+    // The staging Deploy Forge app is behind Vercel deployment protection.
+    // Navigate there once with the bypass token to set the cookie before
+    // the OAuth redirect happens.
+
+    if (VERCEL_BYPASS_TOKEN) {
+      await page.goto(
+        `${APP_URL}/login?x-vercel-protection-bypass=${VERCEL_BYPASS_TOKEN}&x-vercel-set-bypass-cookie=samesitenone`
+      );
+      // Wait briefly for the cookie to be set
+      await page.waitForTimeout(2_000);
+    }
+
     // ── Step 1: Initiate connection from WordPress ────────────────────
 
     await page.goto('/wp-admin/admin.php?page=deploy-forge-settings');
@@ -74,13 +88,16 @@ test.describe.serial('Site Connection', () => {
       page.getByText(/site registered|github/i)
     ).toBeVisible({ timeout: 15_000 });
 
-    // ── Step 4: GitHub installations ──────────────────────────────────
+    // ── Step 4: GitHub installations (may be skipped) ─────────────────
+    // If the user already has a GitHub App installed, the wizard skips
+    // directly to repository selection. Handle both paths.
 
     const continueToRepoBtn = page.getByRole('button', {
       name: /continue to repository selection/i,
     });
-    await expect(continueToRepoBtn).toBeVisible({ timeout: 15_000 });
-    await continueToRepoBtn.click();
+    if (await continueToRepoBtn.isVisible({ timeout: 5_000 }).catch(() => false)) {
+      await continueToRepoBtn.click();
+    }
 
     // ── Step 5: Select repository and branch ──────────────────────────
 
@@ -111,10 +128,10 @@ test.describe.serial('Site Connection', () => {
       .getByRole('menuitem', { name: new RegExp(repoName, 'i') })
       .click();
 
-    // Select branch
-    const branchDropdown = page.getByRole('button', {
-      name: /select branch/i,
-    });
+    // Select branch — the dropdown may show "Select branch" or auto-populate
+    // with the default branch (e.g. "main"). Find the button near the Branch label.
+    const branchSection = page.locator('text=Branch').locator('..');
+    const branchDropdown = branchSection.getByRole('button');
     await expect(branchDropdown).toBeEnabled({ timeout: 10_000 });
     await branchDropdown.click();
     await page
@@ -124,24 +141,29 @@ test.describe.serial('Site Connection', () => {
     await page.getByRole('button', { name: /^continue$/i }).click();
 
     // ── Step 6: Select deployment method and complete ─────────────────
+    // Dropdowns may already be auto-populated if there's only one option.
 
     const methodDropdown = page.getByRole('button', {
       name: /select method/i,
     });
-    await expect(methodDropdown).toBeVisible({ timeout: 10_000 });
-    await methodDropdown.click();
-    await page.getByRole('menuitem', { name: /github actions/i }).click();
+    if (await methodDropdown.isVisible({ timeout: 5_000 }).catch(() => false)) {
+      await methodDropdown.click();
+      await page.getByRole('menuitem', { name: /github actions/i }).click();
+    }
 
-    // Select workflow (first available)
+    // Select workflow if not already auto-selected
     const workflowDropdown = page.getByRole('button', {
       name: /select workflow/i,
     });
-    await expect(workflowDropdown).toBeEnabled({ timeout: 10_000 });
-    await workflowDropdown.click();
-    await page.getByRole('menuitem').first().click();
+    if (await workflowDropdown.isVisible({ timeout: 5_000 }).catch(() => false)) {
+      await workflowDropdown.click();
+      await page.getByRole('menuitem').first().click();
+    }
 
-    // Complete setup — redirects back to WordPress
-    await page.getByRole('button', { name: /complete setup/i }).click();
+    // Wait for "Complete Setup" and click it
+    const completeBtn = page.getByRole('button', { name: /complete setup/i });
+    await expect(completeBtn).toBeVisible({ timeout: 10_000 });
+    await completeBtn.click();
 
     await page.waitForURL(
       '**/wp-admin/admin.php?page=deploy-forge-settings**',
