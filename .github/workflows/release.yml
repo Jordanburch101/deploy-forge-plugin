@@ -275,19 +275,6 @@ jobs:
             echo "EOF"
           } >> $GITHUB_OUTPUT
 
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v1
-        with:
-          files: dist/deploy-forge-${{ steps.validate.outputs.version }}.zip
-          body: ${{ steps.changelog.outputs.notes }}
-          draft: false
-          prerelease: false
-          tag_name: ${{ steps.validate.outputs.tag }}
-          name: Version ${{ steps.validate.outputs.version }}
-          generate_release_notes: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Upload ZIP to R2
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.CLOUDFLARE_R2_ACCESS_KEY_ID }}
@@ -311,31 +298,33 @@ jobs:
           R2_ENDPOINT: ${{ secrets.CLOUDFLARE_R2_ENDPOINT }}
           R2_BUCKET: ${{ secrets.CLOUDFLARE_R2_BUCKET }}
           R2_PUBLIC_URL: ${{ secrets.CLOUDFLARE_R2_PUBLIC_URL }}
+          CHANGELOG: ${{ steps.changelog.outputs.notes }}
         run: |
           VERSION="${{ steps.validate.outputs.version }}"
           SHA256_HASH=$(cat "dist/deploy-forge-${VERSION}.zip.sha256" | awk '{print $1}')
           PUBLISHED_AT=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
-          # Extract changelog from the release notes
-          CHANGELOG='${{ steps.changelog.outputs.notes }}'
-
-          cat > /tmp/manifest.json << MANIFEST_EOF
-          {
-            "name": "Deploy Forge",
-            "slug": "deploy-forge",
-            "version": "${VERSION}",
-            "download_url": "${R2_PUBLIC_URL}/deploy-forge-${VERSION}.zip",
-            "requires": "5.8",
-            "requires_php": "8.0",
-            "tested": "6.9",
-            "changelog": $(echo "${CHANGELOG}" | jq -Rs .),
-            "published_at": "${PUBLISHED_AT}",
-            "checksum_sha256": "${SHA256_HASH}"
-          }
-          MANIFEST_EOF
+          jq -n \
+            --arg version "${VERSION}" \
+            --arg download_url "${R2_PUBLIC_URL}/deploy-forge-${VERSION}.zip" \
+            --arg changelog "${CHANGELOG}" \
+            --arg published_at "${PUBLISHED_AT}" \
+            --arg checksum "${SHA256_HASH}" \
+            '{
+              name: "Deploy Forge",
+              slug: "deploy-forge",
+              version: $version,
+              download_url: $download_url,
+              requires: "5.8",
+              requires_php: "8.0",
+              tested: "6.9",
+              changelog: $changelog,
+              published_at: $published_at,
+              checksum_sha256: $checksum
+            }' > /tmp/manifest.json
 
           echo "Generated manifest.json:"
-          cat /tmp/manifest.json | jq .
+          cat /tmp/manifest.json
 
           aws s3 cp /tmp/manifest.json "s3://${R2_BUCKET}/manifest.json" \
             --endpoint-url "${R2_ENDPOINT}" \
@@ -343,6 +332,19 @@ jobs:
             --cache-control "public, max-age=300"
 
           echo "✅ manifest.json uploaded to R2"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: dist/deploy-forge-${{ steps.validate.outputs.version }}.zip
+          body: ${{ steps.changelog.outputs.notes }}
+          draft: false
+          prerelease: false
+          tag_name: ${{ steps.validate.outputs.tag }}
+          name: Version ${{ steps.validate.outputs.version }}
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Release Summary
         if: success()

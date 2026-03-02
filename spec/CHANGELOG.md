@@ -5,7 +5,7 @@ All notable changes to Deploy Forge will be documented in this file.
 ## [Unreleased] - 2026-03-02
 
 ### Changed
-- Plugin updater now fetches from Cloudflare R2 manifest (`updates.deployforge.com/manifest.json`) instead of GitHub Releases API
+- Plugin updater now fetches from Cloudflare R2 manifest (`updates.getdeployforge.com/manifest.json`) instead of GitHub Releases API
 - Update check cache reduced from 12 hours to 6 hours for faster hotfix propagation
 - Release workflow uploads ZIP and `manifest.json` to R2 bucket after creating GitHub Release
 - Removed `github_api_request()`, `parse_version()`, and GitHub asset extraction from updater class

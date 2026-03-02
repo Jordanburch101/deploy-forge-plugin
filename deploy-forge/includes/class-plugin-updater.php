@@ -194,7 +194,8 @@ class Deploy_Forge_Plugin_Updater {
 			array(
 				'timeout' => 15,
 				'headers' => array(
-					'Accept' => 'application/json',
+					'Accept'     => 'application/json',
+					'User-Agent' => 'Deploy-Forge/' . DEPLOY_FORGE_VERSION,
 				),
 			)
 		);

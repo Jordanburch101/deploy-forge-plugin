@@ -28,7 +28,7 @@ Create release ──────▶  Build ZIP (existing)
 ## R2 Bucket Structure
 
 ```
-updates.deployforge.com/
+updates.getdeployforge.com/
 ├── manifest.json
 ├── deploy-forge-1.0.65.zip
 ├── deploy-forge-1.0.64.zip
@@ -44,7 +44,7 @@ Old ZIPs accumulate but are not referenced by the manifest.
   "name": "Deploy Forge",
   "slug": "deploy-forge",
   "version": "1.0.65",
-  "download_url": "https://updates.deployforge.com/deploy-forge-1.0.65.zip",
+  "download_url": "https://updates.getdeployforge.com/deploy-forge-1.0.65.zip",
   "requires": "5.8",
   "requires_php": "8.0",
   "tested": "6.9",
@@ -71,7 +71,7 @@ Add a step after the existing release creation:
 
 Swap the data source:
 
-- Replace `get_release_data()` to fetch `https://updates.deployforge.com/manifest.json` instead of GitHub API
+- Replace `get_release_data()` to fetch `https://updates.getdeployforge.com/manifest.json` instead of GitHub API
 - Simpler parsing — manifest is already in the exact shape needed
 - Cache: **6h success**, **1h failure** (changed from 12h to propagate hotfixes faster)
 - Same WordPress hooks: `pre_set_site_transient_update_plugins`, `plugins_api`
@@ -82,7 +82,7 @@ Swap the data source:
 
 ### 3. Constants
 
-- Add `DEPLOY_FORGE_UPDATE_URL` constant pointing to `https://updates.deployforge.com/manifest.json`
+- Add `DEPLOY_FORGE_UPDATE_URL` constant pointing to `https://updates.getdeployforge.com/manifest.json`
 - Hardcoded — no admin setting needed
 
 ## What stays the same
@@ -110,6 +110,6 @@ These secrets must be configured in the GitHub repository settings before the fi
 | `CLOUDFLARE_R2_SECRET_ACCESS_KEY` | R2 API token secret access key | `xyz789...` |
 | `CLOUDFLARE_R2_ENDPOINT` | R2 S3-compatible endpoint URL | `https://<account-id>.r2.cloudflarestorage.com` |
 | `CLOUDFLARE_R2_BUCKET` | R2 bucket name | `deploy-forge-updates` |
-| `CLOUDFLARE_R2_PUBLIC_URL` | Public URL for the bucket (custom domain) | `https://updates.deployforge.com` |
+| `CLOUDFLARE_R2_PUBLIC_URL` | Public URL for the bucket (custom domain) | `https://updates.getdeployforge.com` |
 
 Generate R2 API tokens in the Cloudflare dashboard under R2 > Manage R2 API Tokens. The token needs `Object Read & Write` permission on the target bucket.

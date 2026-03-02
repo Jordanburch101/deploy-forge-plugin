@@ -280,6 +280,23 @@ class PluginUpdaterTest extends TestCase {
 		$this->assertSame( 'error', $this->transients[ $key ] );
 	}
 
+	/**
+	 * Test: missing download_url field is cached as error.
+	 *
+	 * @return void
+	 */
+	public function test_missing_download_url_field_cached_as_error(): void {
+		$incomplete = $this->manifest;
+		unset( $incomplete['download_url'] );
+		$this->mock_manifest_response( $incomplete );
+
+		$transient = $this->create_update_transient();
+		$this->updater->check_for_update( $transient );
+
+		$key = 'deploy_forge_plugin_update';
+		$this->assertSame( 'error', $this->transients[ $key ] );
+	}
+
 	// ─── plugin_info tests ───────────────────────────────────────────
 
 	/**
