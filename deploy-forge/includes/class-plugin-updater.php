@@ -1,9 +1,9 @@
 <?php
 /**
- * Self-hosted plugin updater via GitHub Releases.
+ * Self-hosted plugin updater via Cloudflare R2 manifest.
  *
  * Integrates with WordPress's native update system to check for new
- * releases on the public GitHub repository and allow one-click updates.
+ * releases from the R2-hosted manifest and allow one-click updates.
  *
  * @package Deploy_Forge
  * @since   1.0.46
@@ -16,20 +16,12 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * Class Deploy_Forge_Plugin_Updater
  *
- * Checks the GitHub Releases API for newer versions of Deploy Forge
+ * Checks the Cloudflare R2 manifest for newer versions of Deploy Forge
  * and injects update data into the WordPress plugin update transient.
  *
  * @since 1.0.46
  */
 class Deploy_Forge_Plugin_Updater {
-
-	/**
-	 * GitHub API URL for the latest release.
-	 *
-	 * @since 1.0.46
-	 * @var string
-	 */
-	private const GITHUB_API_URL = 'https://api.github.com/repos/Jordanburch101/deploy-forge-plugin/releases/latest';
 
 	/**
 	 * Transient key for caching release data.
@@ -38,6 +30,14 @@ class Deploy_Forge_Plugin_Updater {
 	 * @var string
 	 */
 	private const TRANSIENT_KEY = 'deploy_forge_plugin_update';
+
+	/**
+	 * Cache duration for successful responses (6 hours).
+	 *
+	 * @since 1.0.65
+	 * @var int
+	 */
+	private const CACHE_SUCCESS_SECONDS = 6 * HOUR_IN_SECONDS;
 
 	/**
 	 * Register WordPress hooks for the update system.
@@ -53,10 +53,10 @@ class Deploy_Forge_Plugin_Updater {
 	}
 
 	/**
-	 * Check GitHub for a newer plugin version.
+	 * Check the R2 manifest for a newer plugin version.
 	 *
 	 * Hooks into the plugin update transient to inject update data
-	 * when a newer release is available on GitHub.
+	 * when a newer release is available.
 	 *
 	 * @since 1.0.46
 	 *
@@ -83,13 +83,13 @@ class Deploy_Forge_Plugin_Updater {
 				'slug'         => 'deploy-forge',
 				'plugin'       => $plugin_basename,
 				'new_version'  => $remote_version,
-				'url'          => $release['html_url'],
+				'url'          => 'https://getdeployforge.com',
 				'package'      => $release['download_url'],
 				'icons'        => array(),
 				'banners'      => array(),
-				'tested'       => '6.9',
-				'requires'     => '5.8',
-				'requires_php' => '8.0',
+				'tested'       => $release['tested'] ?? '6.9',
+				'requires'     => $release['requires'] ?? '5.8',
+				'requires_php' => $release['requires_php'] ?? '8.0',
 			);
 		}
 
@@ -99,7 +99,7 @@ class Deploy_Forge_Plugin_Updater {
 	/**
 	 * Provide plugin information for the "View details" modal.
 	 *
-	 * Hooks into plugins_api to return release details from GitHub
+	 * Hooks into plugins_api to return release details from the manifest
 	 * when WordPress requests info about this plugin.
 	 *
 	 * @since 1.0.46
@@ -131,16 +131,16 @@ class Deploy_Forge_Plugin_Updater {
 		$info->author        = '<a href="https://getdeployforge.com">Deploy Forge</a>';
 		$info->homepage      = 'https://getdeployforge.com';
 		$info->download_link = $release['download_url'];
-		$info->tested        = '6.9';
-		$info->requires      = '5.8';
-		$info->requires_php  = '8.0';
-		$info->last_updated  = $release['published_at'];
+		$info->tested        = $release['tested'] ?? '6.9';
+		$info->requires      = $release['requires'] ?? '5.8';
+		$info->requires_php  = $release['requires_php'] ?? '8.0';
+		$info->last_updated  = $release['published_at'] ?? '';
 
 		$info->sections = array(
 			'description' => '<p>Deploy Forge automates theme deployment from GitHub repositories. '
 				. 'When you commit to GitHub, the plugin triggers a build and automatically '
 				. 'deploys compiled files to your WordPress theme directory.</p>',
-			'changelog'   => $this->markdown_to_html( $release['body'] ),
+			'changelog'   => $this->markdown_to_html( $release['changelog'] ?? '' ),
 		);
 
 		return $info;
@@ -150,7 +150,7 @@ class Deploy_Forge_Plugin_Updater {
 	 * Clear the update cache after a plugin upgrade.
 	 *
 	 * Deletes the cached release transient so the next update check
-	 * fetches fresh data from GitHub.
+	 * fetches fresh data from the manifest.
 	 *
 	 * @since 1.0.46
 	 *
@@ -167,11 +167,12 @@ class Deploy_Forge_Plugin_Updater {
 	}
 
 	/**
-	 * Get release data from cache or GitHub API.
+	 * Get release data from cache or R2 manifest.
 	 *
-	 * Returns cached data if available, otherwise fetches from GitHub
-	 * and caches the result. Successful responses are cached for 12 hours,
-	 * failed responses for 1 hour to avoid hammering the API.
+	 * Returns cached data if available, otherwise fetches from the
+	 * R2-hosted manifest and caches the result. Successful responses
+	 * are cached for 6 hours, failed responses for 1 hour to avoid
+	 * hammering the endpoint.
 	 *
 	 * @since 1.0.46
 	 *
@@ -188,7 +189,16 @@ class Deploy_Forge_Plugin_Updater {
 			return $cached;
 		}
 
-		$response = $this->github_api_request( self::GITHUB_API_URL );
+		$response = wp_remote_get(
+			DEPLOY_FORGE_UPDATE_URL,
+			array(
+				'timeout' => 15,
+				'headers' => array(
+					'Accept'     => 'application/json',
+					'User-Agent' => 'Deploy-Forge/' . DEPLOY_FORGE_VERSION,
+				),
+			)
+		);
 
 		if ( is_wp_error( $response ) ) {
 			// Cache failures for 1 hour to avoid repeated requests.
@@ -206,79 +216,15 @@ class Deploy_Forge_Plugin_Updater {
 		$body = wp_remote_retrieve_body( $response );
 		$data = json_decode( $body, true );
 
-		if ( ! is_array( $data ) || empty( $data['tag_name'] ) ) {
+		if ( ! is_array( $data ) || empty( $data['version'] ) || empty( $data['download_url'] ) ) {
 			set_transient( self::TRANSIENT_KEY, 'error', HOUR_IN_SECONDS );
 			return false;
 		}
 
-		// Find the ZIP asset from the release.
-		$download_url = '';
-		if ( ! empty( $data['assets'] ) && is_array( $data['assets'] ) ) {
-			foreach ( $data['assets'] as $asset ) {
-				if ( isset( $asset['browser_download_url'] )
-					&& str_ends_with( $asset['browser_download_url'], '.zip' )
-				) {
-					$download_url = $asset['browser_download_url'];
-					break;
-				}
-			}
-		}
+		// Cache successful responses for 6 hours.
+		set_transient( self::TRANSIENT_KEY, $data, self::CACHE_SUCCESS_SECONDS );
 
-		if ( empty( $download_url ) ) {
-			set_transient( self::TRANSIENT_KEY, 'error', HOUR_IN_SECONDS );
-			return false;
-		}
-
-		$release_data = array(
-			'tag_name'     => $data['tag_name'],
-			'version'      => $this->parse_version( $data['tag_name'] ),
-			'download_url' => $download_url,
-			'body'         => $data['body'] ?? '',
-			'published_at' => $data['published_at'] ?? '',
-			'html_url'     => $data['html_url'] ?? '',
-		);
-
-		// Cache successful responses for 12 hours.
-		set_transient( self::TRANSIENT_KEY, $release_data, 12 * HOUR_IN_SECONDS );
-
-		return $release_data;
-	}
-
-	/**
-	 * Make a request to the GitHub API.
-	 *
-	 * Sends a GET request with the required User-Agent header.
-	 *
-	 * @since 1.0.46
-	 *
-	 * @param string $url The API URL to request.
-	 * @return array|\WP_Error Response array on success, WP_Error on failure.
-	 */
-	private function github_api_request( string $url ) {
-		return wp_remote_get(
-			$url,
-			array(
-				'timeout' => 15,
-				'headers' => array(
-					'Accept'     => 'application/vnd.github.v3+json',
-					'User-Agent' => 'Deploy-Forge/' . DEPLOY_FORGE_VERSION,
-				),
-			)
-		);
-	}
-
-	/**
-	 * Parse a version string from a Git tag name.
-	 *
-	 * Strips the leading "v" prefix if present (e.g. "v1.0.46" becomes "1.0.46").
-	 *
-	 * @since 1.0.46
-	 *
-	 * @param string $tag_name The Git tag name.
-	 * @return string The cleaned version string.
-	 */
-	private function parse_version( string $tag_name ): string {
-		return ltrim( $tag_name, 'v' );
+		return $data;
 	}
 
 	/**
