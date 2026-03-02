@@ -27,6 +27,10 @@ define( 'DEPLOY_FORGE_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'DEPLOY_FORGE_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 define( 'DEPLOY_FORGE_PLUGIN_BASENAME', plugin_basename( __FILE__ ) );
 
+if ( ! defined( 'DEPLOY_FORGE_UPDATE_URL' ) ) {
+	define( 'DEPLOY_FORGE_UPDATE_URL', 'https://updates.deployforge.com/manifest.json' );
+}
+
 /**
  * Main plugin class for Deploy Forge.
  *

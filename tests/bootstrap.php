@@ -45,6 +45,10 @@ if ( ! defined( 'DEPLOY_FORGE_PLUGIN_URL' ) ) {
 	define( 'DEPLOY_FORGE_PLUGIN_URL', 'http://example.com/wp-content/plugins/deploy-forge/' );
 }
 
+if ( ! defined( 'DEPLOY_FORGE_UPDATE_URL' ) ) {
+	define( 'DEPLOY_FORGE_UPDATE_URL', 'https://updates.deployforge.com/manifest.json' );
+}
+
 /**
  * Mock WP_REST_Request class for testing.
  *
