@@ -114,7 +114,6 @@ Add a new section for your version:
 - Improved admin UI performance
 - Updated dependencies to latest versions
 
-[1.2.0]: https://github.com/jordanburch101/deploy-forge-client-plugin/compare/v1.1.0...v1.2.0
 ```
 
 **Changelog Tips**:
@@ -139,7 +138,7 @@ Before releasing, ensure:
 git add deploy-forge.php CHANGELOG.md
 
 # Commit with clear message
-git commit -m "Bump version to 1.2.0"
+git commit -m "chore: bump version to 1.2.0"
 
 # Push to main branch
 git push origin main
@@ -178,7 +177,7 @@ Once you push the tag, GitHub Actions will:
 7. **Notify** update server (if configured)
 
 **Monitor the workflow**:
-- Go to: https://github.com/jordanburch101/deploy-forge-client-plugin/actions
+- Go to the repository's Actions tab
 - Click on the "Release Plugin" workflow
 - Watch the progress in real-time
 
@@ -187,19 +186,14 @@ Once you push the tag, GitHub Actions will:
 After the workflow completes:
 
 1. **Check GitHub Releases**:
-   - Go to: https://github.com/jordanburch101/deploy-forge-client-plugin/releases
+   - Go to the repository's Releases page
    - Verify your release appears with:
      - Correct version number
      - ZIP file attached
      - Changelog displayed
      - Release notes generated
 
-2. **Test Download**:
-   ```bash
-   curl -L -O https://github.com/jordanburch101/deploy-forge-client-plugin/releases/download/v1.2.0/deploy-forge-1.2.0.zip
-   ```
-
-3. **Verify R2 Manifest**:
+2. **Verify R2 Manifest**:
    ```bash
    # Check R2 manifest has the new version
    curl https://updates.getdeployforge.com/manifest.json | jq .
@@ -298,7 +292,7 @@ git push origin v1.2.0
 
 **Solution**:
 1. Check workflow logs in GitHub Actions
-2. Test build locally: `./build-plugin.sh`
+2. Test build locally: `bash build.sh`
 3. Fix any errors
 4. Commit fixes and re-tag
 
@@ -347,16 +341,13 @@ If you need to create a release manually:
 
 ```bash
 # 1. Build the plugin
-./build-plugin.sh
+bash build.sh
 
 # 2. Create GitHub Release via CLI
 gh release create v1.2.0 \
   dist/deploy-forge-1.2.0.zip \
   --title "Version 1.2.0" \
   --notes "See CHANGELOG.md for details"
-
-# Or create via GitHub web interface:
-# Go to: https://github.com/jordanburch101/deploy-forge-client-plugin/releases/new
 ```
 
 ---
@@ -402,7 +393,5 @@ If a release has issues:
 ## Questions?
 
 - Check the [GitHub Actions workflow](.github/workflows/release.yml)
-- Review the [build script](build-plugin.sh)
+- Review the [build script](build.sh)
 - See [CHANGELOG.md](CHANGELOG.md) for examples
-
-**Need help?** Open an issue in the repository.

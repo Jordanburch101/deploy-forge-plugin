@@ -28,16 +28,17 @@ vendor
 *.log
 .DS_Store
 
-# Documentation (comment out if you want to include)
-spec
-TESTING-*.md
-ASYNC-*.md
+# Documentation
+docs
 CLAUDE.md
+RELEASING.md
+CHANGELOG.md
+*.report.md
 
 # Build scripts
 build.sh
-build-simple.sh
-# Note: We keep build-plugin.sh for reference
+scope.sh
+scoper.inc.php
 
 # Testing
 tests
@@ -46,18 +47,12 @@ phpunit.xml.dist
 .phpunit.result.cache
 
 # CI/CD
-.travis.yml
-.circleci
-.gitlab-ci.yml
+phpcs.xml.dist
+.env.example
 
-# Composer (if not using in production)
+# Composer
 composer.json
 composer.lock
-
-# NPM (if not using in production)
-package.json
-package-lock.json
-yarn.lock
 
 # Misc
 *.map
