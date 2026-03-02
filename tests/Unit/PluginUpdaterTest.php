@@ -60,7 +60,7 @@ class PluginUpdaterTest extends TestCase {
 			'name'            => 'Deploy Forge',
 			'slug'            => 'deploy-forge',
 			'version'         => '2.0.0',
-			'download_url'    => 'https://updates.deployforge.com/deploy-forge-2.0.0.zip',
+			'download_url'    => 'https://updates.getdeployforge.com/deploy-forge-2.0.0.zip',
 			'requires'        => '5.8',
 			'requires_php'    => '8.0',
 			'tested'          => '6.9',

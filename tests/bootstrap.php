@@ -46,7 +46,7 @@ if ( ! defined( 'DEPLOY_FORGE_PLUGIN_URL' ) ) {
 }
 
 if ( ! defined( 'DEPLOY_FORGE_UPDATE_URL' ) ) {
-	define( 'DEPLOY_FORGE_UPDATE_URL', 'https://updates.deployforge.com/manifest.json' );
+	define( 'DEPLOY_FORGE_UPDATE_URL', 'https://updates.getdeployforge.com/manifest.json' );
 }
 
 /**
