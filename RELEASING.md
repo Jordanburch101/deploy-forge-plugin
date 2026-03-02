@@ -199,17 +199,17 @@ After the workflow completes:
    curl -L -O https://github.com/jordanburch101/deploy-forge-client-plugin/releases/download/v1.2.0/deploy-forge-1.2.0.zip
    ```
 
-3. **Verify Update Server** (if deployed):
+3. **Verify R2 Manifest**:
    ```bash
-   # Check update server sees new version
-   curl https://updates.getdeployforge.com/api/updates/check/deploy-forge
+   # Check R2 manifest has the new version
+   curl https://updates.getdeployforge.com/manifest.json | jq .
    ```
 
    Should return:
    ```json
    {
      "version": "1.2.0",
-     "download_url": "https://updates.getdeployforge.com/api/updates/download",
+     "download_url": "https://updates.getdeployforge.com/deploy-forge-1.2.0.zip",
      ...
    }
    ```
@@ -302,19 +302,16 @@ git push origin v1.2.0
 3. Fix any errors
 4. Commit fixes and re-tag
 
-### Update Server Not Getting New Version
+### WordPress Sites Not Seeing Update
 
 **Problem**: WordPress sites not seeing update.
 
 **Check**:
-1. Is update server deployed?
-2. Is `UPDATE_SERVER_URL` secret configured in GitHub?
-3. Check update server logs
-4. Manually invalidate cache:
-   ```bash
-   curl -X POST \
-     https://updates.getdeployforge.com/api/cache/invalidate
-   ```
+1. Verify manifest is updated: `curl https://updates.getdeployforge.com/manifest.json | jq .version`
+2. Are R2 secrets configured in GitHub? (`CLOUDFLARE_R2_ACCESS_KEY_ID`, etc.)
+3. Check the GitHub Actions release workflow logs for R2 upload errors
+4. WordPress caches update checks — sites will pick up new versions within 6 hours
+5. To test immediately, delete the `deploy_forge_plugin_update` transient from the site's database
 
 ---
 

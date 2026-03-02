@@ -275,6 +275,64 @@ jobs:
             echo "EOF"
           } >> $GITHUB_OUTPUT
 
+      - name: Upload ZIP to R2
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.CLOUDFLARE_R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.CLOUDFLARE_R2_SECRET_ACCESS_KEY }}
+          R2_ENDPOINT: ${{ secrets.CLOUDFLARE_R2_ENDPOINT }}
+          R2_BUCKET: ${{ secrets.CLOUDFLARE_R2_BUCKET }}
+        run: |
+          ZIP_FILE="dist/deploy-forge-${{ steps.validate.outputs.version }}.zip"
+
+          echo "Uploading ${ZIP_FILE} to R2..."
+          aws s3 cp "${ZIP_FILE}" "s3://${R2_BUCKET}/deploy-forge-${{ steps.validate.outputs.version }}.zip" \
+            --endpoint-url "${R2_ENDPOINT}" \
+            --content-type "application/zip"
+
+          echo "✅ ZIP uploaded to R2"
+
+      - name: Generate and upload manifest.json
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.CLOUDFLARE_R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.CLOUDFLARE_R2_SECRET_ACCESS_KEY }}
+          R2_ENDPOINT: ${{ secrets.CLOUDFLARE_R2_ENDPOINT }}
+          R2_BUCKET: ${{ secrets.CLOUDFLARE_R2_BUCKET }}
+          R2_PUBLIC_URL: ${{ secrets.CLOUDFLARE_R2_PUBLIC_URL }}
+          CHANGELOG: ${{ steps.changelog.outputs.notes }}
+        run: |
+          VERSION="${{ steps.validate.outputs.version }}"
+          SHA256_HASH=$(cat "dist/deploy-forge-${VERSION}.zip.sha256" | awk '{print $1}')
+          PUBLISHED_AT=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+          jq -n \
+            --arg version "${VERSION}" \
+            --arg download_url "${R2_PUBLIC_URL}/deploy-forge-${VERSION}.zip" \
+            --arg changelog "${CHANGELOG}" \
+            --arg published_at "${PUBLISHED_AT}" \
+            --arg checksum "${SHA256_HASH}" \
+            '{
+              name: "Deploy Forge",
+              slug: "deploy-forge",
+              version: $version,
+              download_url: $download_url,
+              requires: "5.8",
+              requires_php: "8.0",
+              tested: "6.9",
+              changelog: $changelog,
+              published_at: $published_at,
+              checksum_sha256: $checksum
+            }' > /tmp/manifest.json
+
+          echo "Generated manifest.json:"
+          cat /tmp/manifest.json
+
+          aws s3 cp /tmp/manifest.json "s3://${R2_BUCKET}/manifest.json" \
+            --endpoint-url "${R2_ENDPOINT}" \
+            --content-type "application/json" \
+            --cache-control "public, max-age=300"
+
+          echo "✅ manifest.json uploaded to R2"
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
@@ -287,23 +345,6 @@ jobs:
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Invalidate update server cache
-        if: success()
-        continue-on-error: true
-        run: |
-          echo "Notifying update server of new release..."
-
-          # Only attempt if UPDATE_SERVER_URL secret is set
-          if [ -n "${{ secrets.UPDATE_SERVER_URL }}" ]; then
-            curl -X POST \
-              -H "Content-Type: application/json" \
-              -d '{"action":"published","release":{"tag_name":"${{ steps.validate.outputs.tag }}"}}' \
-              ${{ secrets.UPDATE_SERVER_URL }}/api/cache/invalidate \
-              || echo "⚠️  Failed to notify update server (non-fatal)"
-          else
-            echo "ℹ️  UPDATE_SERVER_URL not configured, skipping cache invalidation"
-          fi
 
       - name: Release Summary
         if: success()
@@ -318,15 +359,12 @@ jobs:
           echo "   Tag: ${{ steps.validate.outputs.tag }}"
           echo "   ZIP: deploy-forge-${{ steps.validate.outputs.version }}.zip"
           echo ""
-          echo "🔗 Release URL:"
+          echo "🔗 GitHub Release:"
           echo "   https://github.com/${{ github.repository }}/releases/tag/${{ steps.validate.outputs.tag }}"
           echo ""
-          echo "📥 Download URL:"
-          echo "   https://github.com/${{ github.repository }}/releases/download/${{ steps.validate.outputs.tag }}/deploy-forge-${{ steps.validate.outputs.version }}.zip"
+          echo "📥 R2 Update Manifest:"
+          echo "   ${{ secrets.CLOUDFLARE_R2_PUBLIC_URL }}/manifest.json"
           echo ""
-          echo "✨ Next Steps:"
-          echo "   1. WordPress sites will be notified of the update automatically"
-          echo "   2. Update server will serve this version to authorized sites"
-          echo "   3. Users can update via WordPress admin → Plugins page"
+          echo "✨ WordPress sites will pick up this update within 6 hours."
           echo ""
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
